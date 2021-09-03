@@ -51,7 +51,7 @@ namespace PKHeX.Drawing
                 2 => n + "super",
                 3 => n + "hyper",
                 4 => n + "master",
-                _ => n
+                _ => n,
             };
         }
 
@@ -68,6 +68,8 @@ namespace PKHeX.Drawing
                 return Spriter.None;
 
             var img = GetBaseImage(gift);
+            if (SpriteBuilder.ShowEncounterColor != SpriteBackgroundType.None)
+                img = ApplyEncounterColor(gift, img, SpriteBuilder.ShowEncounterColor);
             if (gift.GiftUsed)
                 img = ImageUtil.ChangeOpacity(img, 0.3);
             return img;
@@ -81,6 +83,11 @@ namespace PKHeX.Drawing
             {
                 var gender = Math.Max(0, gift.Gender);
                 var img = GetSprite(gift.Species, gift.Form, gender, 0, gift.HeldItem, gift.IsEgg, gift.IsShiny, gift.Generation);
+                if (SpriteBuilder.ShowEncounterBall && gift is IFixedBall { FixedBall: not Ball.None } b)
+                {
+                    var ballSprite = GetBallSprite((int)b.FixedBall);
+                    img = ImageUtil.LayerImage(img, ballSprite, 0, img.Height - ballSprite.Height);
+                }
                 if (gift is IGigantamax {CanGigantamax: true})
                 {
                     var gm = Resources.dyna;
@@ -152,6 +159,8 @@ namespace PKHeX.Drawing
                     sprite = ImageUtil.LayerImage(sprite, Resources.warn, 0, FlagIllegalShiftY);
                 else if (pk.Format >= 8 && pk.Moves.Any(Legal.DummiedMoves_SWSH.Contains))
                     sprite = ImageUtil.LayerImage(sprite, Resources.hint, 0, FlagIllegalShiftY);
+                if (SpriteBuilder.ShowEncounterColorPKM != SpriteBackgroundType.None)
+                    sprite = ApplyEncounterColor(la.EncounterOriginal, sprite, SpriteBuilder.ShowEncounterColorPKM);
             }
             if (inBox) // in box
             {
@@ -169,6 +178,23 @@ namespace PKHeX.Drawing
             }
 
             return sprite;
+        }
+
+        private static Image ApplyEncounterColor(IEncounterTemplate enc, Image img, SpriteBackgroundType type)
+        {
+            var index = (enc.GetType().Name.GetHashCode() * 0x43FD43FD);
+            var color = Color.FromArgb(index);
+            if (type == SpriteBackgroundType.BottomStripe)
+            {
+                int stripeHeight = SpriteBuilder.ShowEncounterThicknessStripe; // from bottom
+                byte opacity = SpriteBuilder.ShowEncounterOpacityStripe;
+                return ImageUtil.ChangeTransparentTo(img, color, opacity, img.Width * 4 * (img.Height - stripeHeight));
+            }
+            else // full background
+            {
+                byte opacity = SpriteBuilder.ShowEncounterOpacityBackground;
+                return ImageUtil.ChangeTransparentTo(img, color, opacity);
+            }
         }
 
         private const int MaxSlotCount = 30; // slots in a box
@@ -224,11 +250,18 @@ namespace PKHeX.Drawing
                 return g.Sprite();
             var gender = GetDisplayGender(enc);
             var img = GetSprite(enc.Species, enc.Form, gender, 0, 0, enc.EggEncounter, enc.IsShiny, enc.Generation);
+            if (SpriteBuilder.ShowEncounterBall && enc is IFixedBall {FixedBall: not Ball.None} b)
+            {
+                var ballSprite = GetBallSprite((int)b.FixedBall);
+                img = ImageUtil.LayerImage(img, ballSprite, 0, img.Height - ballSprite.Height);
+            }
             if (enc is IGigantamax {CanGigantamax: true})
             {
                 var gm = Resources.dyna;
-                return ImageUtil.LayerImage(img, gm, (img.Width - gm.Width) / 2, 0);
+                img = ImageUtil.LayerImage(img, gm, (img.Width - gm.Width) / 2, 0);
             }
+            if (SpriteBuilder.ShowEncounterColor != SpriteBackgroundType.None)
+                img = ApplyEncounterColor(enc, img, SpriteBuilder.ShowEncounterColor);
             return img;
         }
 

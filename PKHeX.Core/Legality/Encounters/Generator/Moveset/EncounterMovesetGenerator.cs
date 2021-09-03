@@ -139,6 +139,8 @@ namespace PKHeX.Core
         /// <returns>A consumable <see cref="IEncounterable"/> list of possible encounters.</returns>
         public static IEnumerable<IEncounterable> GenerateVersionEncounters(PKM pk, IEnumerable<int> moves, GameVersion version)
         {
+            if (pk.Species == 0) // can enter this method after failing to set a species ID that cannot exist in the format
+                return Array.Empty<IEncounterable>();
             pk.Version = (int)version;
             var format = pk.Format;
             if (format is 2 && version is GameVersion.RD or GameVersion.GN or GameVersion.BU or GameVersion.YW)
@@ -211,7 +213,7 @@ namespace PKHeX.Core
                 {
                     3 => moves.Concat(Legal.LevelUpE [(int)Species.Ninjask].GetMoves(100, 20)),
                     4 => moves.Concat(Legal.LevelUpPt[(int)Species.Ninjask].GetMoves(100, 20)),
-                    _ => moves
+                    _ => moves,
                 };
             }
             return moves;
@@ -226,7 +228,7 @@ namespace PKHeX.Core
                 EncounterOrder.Static => GetStatic(pk, needs, chain, version),
                 EncounterOrder.Trade => GetTrades(pk, needs, chain, version),
                 EncounterOrder.Slot => GetSlots(pk, needs, chain, version),
-                _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+                _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
             };
         }
 
@@ -419,9 +421,7 @@ namespace PKHeX.Core
                     return true;
                 if (FormInfo.IsFormChangeable(enc.Species, enc.Form, evo.Form, enc.Generation))
                     return true;
-                if (enc is EncounterSlot {IsRandomUnspecificForm: true})
-                    return true;
-                if (enc is EncounterStatic {IsRandomUnspecificForm: true})
+                if (enc is EncounterSlot {IsRandomUnspecificForm: true} or EncounterStatic {IsRandomUnspecificForm: true})
                     return true;
                 if (enc is EncounterStatic7 {IsTotem: true} && evo.Form == 0 && format > 7) // totems get form wiped
                     return true;
