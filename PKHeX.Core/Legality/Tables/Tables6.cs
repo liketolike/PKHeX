@@ -43,7 +43,7 @@ namespace PKHeX.Core
             40071, 40072, 40073, 40074, 40075, 40076, 40077, 40078, 40079,
         };
 
-        internal static readonly int[] Met_XY_6 = {/* XY */ 60001, 60003, /* ORAS */ 60004,};
+        internal static readonly int[] Met_XY_6 = {/* XY */ 60001, 60003, /* ORAS */ 60004 };
 
         #endregion
 
@@ -163,7 +163,7 @@ namespace PKHeX.Core
             052, 053, 054, 134, 504, 565, 566, 567, 568, 569, 570, 571, 591, 645, 708, 709,
 
             //ORAS
-            065, 066, 067
+            065, 066, 067,
         };
 
         public static readonly ushort[] Pouch_Berry_XY =
@@ -215,10 +215,14 @@ namespace PKHeX.Core
 
         internal static readonly int[] TypeTutor6 =
         {
-            520, 519, 518, // Pledge
-            338, 307, 308, // Elemental Beam
-            434, // Draco Meteor
-            620, // Dragon Ascent
+            (int)Move.GrassPledge,
+            (int)Move.FirePledge,
+            (int)Move.WaterPledge,
+            (int)Move.FrenzyPlant,
+            (int)Move.BlastBurn,
+            (int)Move.HydroCannon,
+            (int)Move.DracoMeteor,
+            (int)Move.DragonAscent,
         };
 
         internal static readonly int[][] Tutors_AO =
@@ -231,15 +235,13 @@ namespace PKHeX.Core
 
         #endregion
 
-        internal static readonly int[] EggLocations6 = {Locations.Daycare5, Locations.LinkTrade6};
-
         internal static readonly HashSet<int> ValidMet_XY = new()
         {
             006, 008, 009, 010, 012, 013, 014, 016, 017, 018, 020, 021, 022, 024, 026, 028, 029, 030, 032, 034, 035, 036,
             038, 039, 040, 042, 043, 044, 046, 047, 048, 050, 051, 052, 054, 055, 056, 058, 060, 062, 063, 064, 066, 067,
             068, 069, 070, 072, 074, 075, 076, 078, 079, 082, 084, 085, 086, 088, 089, 090, 092, 093, 094, 096, 097, 098,
             100, 101, 102, 103, 104, 106, 108, 110, 112, 114, 116, 118, 120, 122, 124, 126, 128, 130, 132, 134, 135, 136,
-            138, 140, 142, 144, 146, 148, 150, 152, 154, 156, 158, 160, 162, 164, 166, 168
+            138, 140, 142, 144, 146, 148, 150, 152, 154, 156, 158, 160, 162, 164, 166, 168,
         };
 
         internal static readonly HashSet<int> ValidMet_AO = new()
@@ -248,7 +250,7 @@ namespace PKHeX.Core
             200, 202, 204, 206, 208, 210, 212, 214, 216, 218, 220, 222, 224, 226, 228, 230, 232, 234, 236, 238, 240, 242,
             244, 246, 248, 250, 252, 254, 256, 258, 260, 262, 264, 266, 268, 270, 272, 274, 276, 278, 280, 282, 284, 286,
             288, 290, 292, 294, 296, 298, 300, 302, 304, 306, 308, 310, 312, 314, 316, 318, 320, 322, 324, 326, 328, 330,
-            332, 334, 336, 338, 340, 342, 344, 346,      350, 352, 354
+            332, 334, 336, 338, 340, 342, 344, 346,      350, 352, 354,
         };
 
         internal static readonly byte[] MovePP_XY =

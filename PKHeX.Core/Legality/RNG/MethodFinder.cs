@@ -430,6 +430,17 @@ namespace PKHeX.Core
             return GetNonMatch(out pidiv);
         }
 
+        public static IEnumerable<uint> GetCuteCharmSeeds(PKM pk)
+        {
+            var IVs = new uint[6];
+            for (int i = 0; i < 6; i++)
+                IVs[i] = (uint)pk.GetIV(i);
+            var bot = GetIVChunk(IVs, 0);
+            var top = GetIVChunk(IVs, 3);
+
+            return GetSeedsFromIVs(RNG.LCRNG, top, bot);
+        }
+
         private static bool GetBACDMatch(PKM pk, uint pid, uint[] IVs, out PIDIV pidiv)
         {
             var bot = GetIVChunk(IVs, 0);
@@ -869,8 +880,7 @@ namespace PKHeX.Core
                 // Chain shiny with Poké Radar is only possible in DPPt, in grass. Safari Zone does not allow using the Poké Radar
                 ChainShiny => pkm.IsShiny && !pkm.HGSS && (w.GroundTile & GroundTilePermission.Grass) != 0 && !Locations.IsSafariZoneLocation4(w.Location),
                 CuteCharm => IsCuteCharm4Valid(encounter, pkm),
-                Method_1 => true,
-                _ => false,
+                _ => val == Method_1,
             },
 
             PGT => IsG4ManaphyPIDValid(val, pkm), // Manaphy is the only PGT in the database

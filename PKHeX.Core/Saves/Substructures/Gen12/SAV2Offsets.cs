@@ -23,6 +23,7 @@ namespace PKHeX.Core
 
         public int Options { get; }
         public int Trainer1 { get; }
+        public int Rival { get; private set; }
 
         public int DaylightSavings { get; private set; } = -1;
         public int TimePlayed { get; private set; } = -1;
@@ -43,6 +44,8 @@ namespace PKHeX.Core
         public int EventConst { get; }
         public int Daycare { get; }
 
+        public int BlueCardPoints { get; private set; } = -1;
+
         public int PouchTMHM { get; private set; } = -1;
         public int PouchItem { get; private set; } = -1;
         public int PouchKey { get; private set; } = -1;
@@ -53,6 +56,7 @@ namespace PKHeX.Core
         {
             RTCFlags = 0x0C60;
 
+            Rival = 0x2021;
             DaylightSavings = 0x2042;
             OtherCurrentBox = 0x284C;
             switch (version)
@@ -88,6 +92,7 @@ namespace PKHeX.Core
                     JohtoBadges = 0x23E5;
                     CurrentBoxIndex = 0x2700;
                     BoxNames = 0x2703;
+                    BlueCardPoints = 0x27D9;
                     Party = 0x2865;
                     PokedexCaught = 0x2A27;
                     PokedexSeen = 0x2A47;
@@ -113,6 +118,7 @@ namespace PKHeX.Core
 
         private void LoadOffsetsJapanese(GameVersion version)
         {
+            Rival = 0x2017;
             DaylightSavings = 0x2029;
             TimePlayed = 0x2034;
             Palette = 0x204C;
@@ -151,6 +157,7 @@ namespace PKHeX.Core
                     JohtoBadges = 0x23C7;
                     CurrentBoxIndex = 0x26E2;
                     BoxNames = 0x26E5;
+                    BlueCardPoints = 0x278E;
                     Party = 0x281A;
                     PokedexCaught = 0x29AA;
                     PokedexSeen = 0x29CA;
@@ -180,6 +187,7 @@ namespace PKHeX.Core
             RTCFlags = 0x1060;
 
             // No Crystal Version
+            Rival = 0x2021;
             DaylightSavings = 0x2042;
             OtherCurrentBox = 0x284C;
 

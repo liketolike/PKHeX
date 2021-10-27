@@ -62,7 +62,7 @@ namespace PKHeX.Core
                     if (!slot.IsLevelWithinRange(metLevel))
                         break;
 
-                    if (slot.Form != evo.Form && !FormInfo.WildChangeFormAfter.Contains(evo.Species))
+                    if (slot.Form != evo.Form && slot.Species is not (int)Species.Rotom)
                         break;
 
                     if (slot.Weather is Heavy_Fog && IsWildArea8(Location))
@@ -90,7 +90,7 @@ namespace PKHeX.Core
                     if (slot.LevelMin > BoostLevel)
                         break; // Can't downlevel, only boost to 60.
 
-                    if (slot.Form != evo.Form && !FormInfo.WildChangeFormAfter.Contains(evo.Species))
+                    if (slot.Form != evo.Form && slot.Species is not (int)Species.Rotom)
                         break;
 
                     if (Location != metLocation && !CanCrossoverTo(Location, metLocation, slot.SlotType))
@@ -473,7 +473,7 @@ namespace PKHeX.Core
 
     public static class AreaSlotType8Extensions
     {
-        public static bool CanCrossover(this AreaSlotType8 type) => type is not HiddenMain or HiddenMain2 or OnlyFishing;
+        public static bool CanCrossover(this AreaSlotType8 type) => type is not (HiddenMain or HiddenMain2 or OnlyFishing);
         public static bool CanEncounterViaFishing(this AreaSlotType8 type, AreaWeather8 weather) => type is OnlyFishing || weather.HasFlag(Fishing);
         public static bool CanEncounterViaCurry(this AreaSlotType8 type) => type is HiddenMain or HiddenMain2;
     }

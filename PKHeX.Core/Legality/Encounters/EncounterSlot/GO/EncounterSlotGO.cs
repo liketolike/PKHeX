@@ -60,7 +60,7 @@ namespace PKHeX.Core
         public bool IsWithinStartEnd(int stamp)
         {
             if (End == 0)
-                return Start <= stamp && GetDate(stamp) <= DateTime.UtcNow;
+                return Start <= stamp && GetDate(stamp) <= GetMaxDateTime();
             if (Start == 0)
                 return stamp <= End;
             return Start <= stamp && stamp <= End;
@@ -71,13 +71,15 @@ namespace PKHeX.Core
         /// </summary>
         public static int GetTimeStamp(int year, int month, int day) => (year << 16) | (month << 8) | day;
 
+        private static DateTime GetMaxDateTime() => DateTime.UtcNow.AddHours(12); // UTC+12 for Kiribati, no daylight savings
+
         /// <summary>
         /// Gets a random date within the availability range.
         /// </summary>
         public DateTime GetRandomValidDate()
         {
             if (Start == 0)
-                return End == 0 ? DateTime.UtcNow : GetDate(End);
+                return End == 0 ? GetMaxDateTime() : GetDate(End);
 
             var start = GetDate(Start);
             if (End == 0)
@@ -93,13 +95,23 @@ namespace PKHeX.Core
                 pk.MetDate = GetRandomValidDate();
             if (Gender != Gender.Random)
                 pk.Gender = (int)Gender;
-            pk.SetRandomIVsGO(Type.GetMinIV());
+            pk.SetRandomIVsGO(Type.GetMinIV(), Type.GetMaxIV());
         }
 
         public bool GetIVsAboveMinimum(PKM pkm)
         {
             int min = Type.GetMinIV();
+            if (min == 0)
+                return true;
             return GetIVsAboveMinimum(pkm, min);
+        }
+
+        public bool GetIVsBelowMaximum(PKM pkm)
+        {
+            int max = Type.GetMaxIV();
+            if (max == 15)
+                return true;
+            return GetIVsBelowMaximum(pkm, max);
         }
 
         private static bool GetIVsAboveMinimum(PKM pkm, int min)
@@ -111,9 +123,20 @@ namespace PKHeX.Core
             return pkm.IV_HP >> 1 >= min; // HP
         }
 
+        private static bool GetIVsBelowMaximum(PKM pkm, int max)
+        {
+            if (pkm.IV_ATK >> 1 > max) // ATK
+                return false;
+            if (pkm.IV_DEF >> 1 > max) // DEF
+                return false;
+            return pkm.IV_HP >> 1 <= max; // HP
+        }
+
         public bool GetIVsValid(PKM pkm)
         {
             if (!GetIVsAboveMinimum(pkm))
+                return false;
+            if (!GetIVsBelowMaximum(pkm))
                 return false;
 
             // HP * 2 | 1 -> HP

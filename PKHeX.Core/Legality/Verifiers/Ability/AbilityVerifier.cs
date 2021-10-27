@@ -313,7 +313,7 @@ namespace PKHeX.Core
             var format = pkm.Format;
             if (format >= 6)
             {
-                if (CanAbilityCapsule(format, abilities))
+                if (!CanAbilityCapsule(format, abilities))
                 {
                     // Gen3-5 transfer with same ability -> 1st ability that matches
                     if (pkm.AbilityNumber == 1)
@@ -399,10 +399,12 @@ namespace PKHeX.Core
             if (pkm is G3PKM g3)
             {
                 var abit = g3.AbilityBit;
-                if (abilities[0] == abilities[1]) // Not a dual ability
+                // We've sanitized our personal data to replace "None" abilities with the first ability.
+                // Granbull, Vibrava, and Flygon have dual abilities being the same.
+                if (abilities[0] == abilities[1] && g3.Species is not ((int)Species.Granbull or (int)Species.Vibrava or (int)Species.Flygon)) // Not a dual ability
                 {
                     // Must not have the Ability bit flag set.
-                    // Some shadow stuff with single-ability might have the flag set anyways?
+                    // Shadow encounters set a random ability index; don't bother checking if it's a re-battle for ability bit flipping.
                     if (abit && enc is not EncounterStaticShadow)
                         return GetInvalid(LAbilityMismatchFlag, CheckIdentifier.PID);
                 }
@@ -477,8 +479,7 @@ namespace PKHeX.Core
 
         private static int GetEncounterFixedAbilityNumber(IEncounterTemplate enc) => enc switch
         {
-            EncounterStatic s => s.Ability,
-            EncounterTrade t => t.Ability,
+            IFixedAbilityNumber s => s.Ability,
             _ => -1,
         };
     }

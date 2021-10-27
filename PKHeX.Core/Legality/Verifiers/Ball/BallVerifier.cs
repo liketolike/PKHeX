@@ -73,7 +73,7 @@ namespace PKHeX.Core
         {
             if (s.Location == 75 && s.Generation == 5) // Entree Forest (Dream World)
                 return VerifyBallEquals(data, BallUseLegality.DreamWorldBalls);
-            return VerifyBallEquals(data, BallUseLegality.GetWildBalls(data.Info.Generation, data.Info.Game));
+            return VerifyBallEquals(data, BallUseLegality.GetWildBalls(data.Info.Generation, s.Version));
         }
 
         private CheckResult VerifyBallWild(LegalityAnalysis data, EncounterSlot w)
@@ -82,7 +82,7 @@ namespace PKHeX.Core
             if (req != None)
                 return VerifyBallEquals(data, (int) req);
 
-            return VerifyBallEquals(data, BallUseLegality.GetWildBalls(data.Info.Generation, data.Info.Game));
+            return VerifyBallEquals(data, BallUseLegality.GetWildBalls(data.Info.Generation, w.Version));
         }
 
         private CheckResult VerifyBallEgg(LegalityAnalysis data)
@@ -256,8 +256,6 @@ namespace PKHeX.Core
         {
             var pkm = data.pkm;
             int species = data.EncounterMatch.Species;
-            if (species is >= 722 and <= 730) // G7 Starters
-                return VerifyBallEquals(data, (int)Poke);
             if (species is >= (int)Species.Grookey and <= (int)Species.Inteleon) // G8 Starters
                 return VerifyBallEquals(data, (int)Poke);
 
@@ -357,6 +355,8 @@ namespace PKHeX.Core
 
             // Foreign Captures
             if (species is >= (int)Species.Treecko and <= (int)Species.Swampert) // Dynamax Adventures
+                return true;
+            if (species is >= (int)Species.Rowlet and <= (int)Species.Primarina) // Distribution Raids
                 return true;
 
             return false;

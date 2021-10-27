@@ -261,7 +261,7 @@ namespace PKHeX.Core
                 IEnumerable<int> em = MoveEgg.GetEggMoves(pk.PersonalInfo, egg.Species, egg.Form, egg.Version, egg.Generation);
                 if (egg.Generation <= 2)
                     em = em.Concat(MoveLevelUp.GetEncounterMoves(egg.Species, 0, egg.Level, egg.Version));
-                else if (Legal.LightBall.Contains(egg.Species) && needs.Contains((int)Move.VoltTackle))
+                else if (egg.Species is (int)Species.Pichu && needs.Contains((int)Move.VoltTackle) && (egg.Generation > 3 || version is GameVersion.E))
                     em = em.Concat(new[] { (int)Move.VoltTackle });
 
                 if (!needs.Except(em).Any())
@@ -291,7 +291,7 @@ namespace PKHeX.Core
                     yield return gift;
                     continue;
                 }
-                var em = gift.Moves;
+                var em = gift.Moves.Concat(gift.Relearn);
                 if (!needs.Except(em).Any())
                     yield return gift;
             }
@@ -373,6 +373,8 @@ namespace PKHeX.Core
                 IEnumerable<int> em = trade.Moves;
                 if (trade.Generation <= 2)
                     em = em.Concat(MoveLevelUp.GetEncounterMoves(trade.Species, 0, trade.Level, trade.Version));
+                else if (trade is IRelearn { Relearn: { Count: not 0 } } r)
+                    em = em.Concat(r.Relearn);
                 if (!needs.Except(em).Any())
                     yield return trade;
             }
