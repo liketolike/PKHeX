@@ -60,7 +60,7 @@
             this.Menu_Settings = new System.Windows.Forms.ToolStripMenuItem();
             this.Menu_About = new System.Windows.Forms.ToolStripMenuItem();
             this.L_UpdateAvailable = new System.Windows.Forms.LinkLabel();
-            this.dragTip = new System.Windows.Forms.ToolTip(this.components);
+            this.toolTip = new System.Windows.Forms.ToolTip(this.components);
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.PKME_Tabs = new PKHeX.WinForms.Controls.PKMEditor();
             this.C_SAV = new PKHeX.WinForms.Controls.SAVEditor();
@@ -411,7 +411,6 @@
             this.PKME_Tabs.Data = null;
             this.PKME_Tabs.Dock = System.Windows.Forms.DockStyle.Fill;
             this.PKME_Tabs.HaX = false;
-            this.PKME_Tabs.IsInitialized = false;
             this.PKME_Tabs.Location = new System.Drawing.Point(0, 0);
             this.PKME_Tabs.Margin = new System.Windows.Forms.Padding(5);
             this.PKME_Tabs.Name = "PKME_Tabs";
@@ -554,7 +553,7 @@
         private System.Windows.Forms.ToolStripMenuItem Menu_Settings;
         private System.Windows.Forms.ToolStripMenuItem Menu_ShowdownExportCurrentBox;
         private System.Windows.Forms.ToolStripMenuItem Menu_EncDatabase;
-        private System.Windows.Forms.ToolTip dragTip;
+        private System.Windows.Forms.ToolTip toolTip;
         private System.Windows.Forms.SplitContainer splitContainer1;
         private System.Windows.Forms.SplitContainer splitContainer2;
         private System.Windows.Forms.PictureBox dragout;

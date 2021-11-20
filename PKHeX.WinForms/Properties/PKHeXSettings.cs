@@ -31,6 +31,7 @@ namespace PKHeX.WinForms
         // GUI Specific
         public DrawConfig Draw { get; set; } = new();
         public AdvancedSettings Advanced { get; set; } = new();
+        public EntityEditorSettings EntityEditor { get; set; } = new();
         public EntityDatabaseSettings EntityDb { get; set; } = new();
         public EncounterDatabaseSettings EncounterDb { get; set; } = new();
         public MysteryGiftDatabaseSettings MysteryDb { get; set; } = new();
@@ -134,7 +135,7 @@ namespace PKHeX.WinForms
         public List<string> RecentlyLoaded { get; set; } = new(MaxRecentCount);
 
         // Don't let invalid values slip into the startup version.
-        private GameVersion _defaultSaveVersion = GameVersion.SW;
+        private GameVersion _defaultSaveVersion = GameVersion.BD;
         private string _language = GameLanguage.DefaultLanguage;
 
         [Browsable(false)]
@@ -261,6 +262,13 @@ namespace PKHeX.WinForms
     }
 
     [Serializable]
+    public class EntityEditorSettings
+    {
+        [LocalizedDescription("When changing the Hidden Power type, automatically maximize the IVs to ensure the highest Base Power result. Otherwise, keep the IVs as close as possible to the original.")]
+        public bool HiddenPowerOnChangeMaxPower { get; set; } = true;
+    }
+
+    [Serializable]
     public class EncounterDatabaseSettings
     {
         [LocalizedDescription("Skips searching if the user forgot to enter Species / Move(s) into the search criteria.")]
@@ -363,6 +371,9 @@ namespace PKHeX.WinForms
 
         [LocalizedDescription("Opacity for the Encounter Type stripe layer.")]
         public byte ShowEncounterOpacityStripe { get; set; } = 0x5F; // 0xFF opaque
+
+        [LocalizedDescription("Show a thin stripe to indicate the percent of level-up progress")]
+        public bool ShowExperiencePercent { get; set; }
 
         [LocalizedDescription("Amount of pixels thick to show when displaying the encounter type color stripe.")]
         public int ShowEncounterThicknessStripe { get; set; } = 4; // pixels
