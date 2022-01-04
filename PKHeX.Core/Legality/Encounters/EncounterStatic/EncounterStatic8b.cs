@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using static PKHeX.Core.StaticCorrelation8bRequirement;
 
@@ -9,12 +8,11 @@ namespace PKHeX.Core
     /// Generation 7 Static Encounter
     /// </summary>
     /// <inheritdoc cref="EncounterStatic"/>
-    public sealed record EncounterStatic8b : EncounterStatic, IRelearn, IStaticCorrelation8b
+    public sealed record EncounterStatic8b : EncounterStatic, IStaticCorrelation8b
     {
         public override int Generation => 8;
-        public IReadOnlyList<int> Relearn { get; init; } = Array.Empty<int>();
 
-        public bool Roaming { get; init; } = false;
+        public bool Roaming { get; init; }
 
         public EncounterStatic8b(GameVersion game) : base(game)
         {
@@ -75,11 +73,12 @@ namespace PKHeX.Core
             pk.MetDate = today;
         }
 
+        // defined by mvpoke in encounter data
         private static readonly int[] Roaming_MetLocation_BDSP =
         {
             197, 201, 354, 355, 356, 357, 358, 359, 361, 362, 364, 365, 367, 373, 375, 377,
-            378, 379, 383, 385, 392, 394, 395, 397, 400, 403, 404, 407, 411, 412, 414, 416,
-            420,
+            378, 379, 383, 385, 392, 394, 395, 397, 400, 403, 404, 407,
+            485,
         };
     }
 

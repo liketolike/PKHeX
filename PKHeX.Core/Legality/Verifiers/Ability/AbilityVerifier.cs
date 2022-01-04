@@ -76,6 +76,8 @@ namespace PKHeX.Core
                     var e = data.EncounterOriginal;
                     if (e.Species != pkm.Species && CanAbilityPatch(format, PKX.Personal.GetFormEntry(e.Species, e.Form).Abilities, e.Species))
                         return GetValid(LAbilityPatchUsed);
+
+                    // Verify later, it may be encountered with its hidden ability without using an ability patch.
                 }
             }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core
 {
@@ -13,11 +14,12 @@ namespace PKHeX.Core
 
         public ushort PlayedHours
         {
-            get => BitConverter.ToUInt16(Data, Offset);
-            set => BitConverter.GetBytes(value).CopyTo(Data, Offset);
+            get => ReadUInt16LittleEndian(Data.AsSpan(Offset));
+            set => WriteUInt16LittleEndian(Data.AsSpan(Offset), value);
         }
 
         public byte PlayedMinutes { get => Data[Offset + 2]; set => Data[Offset + 2] = value; }
         public byte PlayedSeconds { get => Data[Offset + 3]; set => Data[Offset + 3] = value; }
+        public string LastSavedTime => $"{PlayedHours:0000}ː{PlayedMinutes:00}ː{PlayedSeconds:00}"; // not :
     }
 }

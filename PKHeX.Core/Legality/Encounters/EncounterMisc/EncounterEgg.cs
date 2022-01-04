@@ -5,31 +5,17 @@ namespace PKHeX.Core
     /// <summary>
     /// Egg Encounter Data
     /// </summary>
-    public sealed record EncounterEgg : IEncounterable
+    public sealed record EncounterEgg(int Species, int Form, int Level, int Generation, GameVersion Version) : IEncounterable
     {
-        public int Species { get; }
-        public int Form { get; }
         public string Name => "Egg";
         public string LongName => "Egg";
 
         public bool EggEncounter => true;
         public int LevelMin => Level;
         public int LevelMax => Level;
-        public readonly int Level;
-        public int Generation { get; }
-        public GameVersion Version { get; }
         public bool IsShiny => false;
 
         public bool CanHaveVoltTackle => Species is (int)Core.Species.Pichu && (Generation > 3 || Version is GameVersion.E);
-
-        public EncounterEgg(int species, int form, int level, int gen, GameVersion game)
-        {
-            Species = species;
-            Form = form;
-            Level = level;
-            Generation = gen;
-            Version = game;
-        }
 
         public PKM ConvertToPKM(ITrainerInfo sav) => ConvertToPKM(sav, EncounterCriteria.Unrestricted);
 
@@ -48,7 +34,7 @@ namespace PKHeX.Core
             pk.Nickname = SpeciesName.GetSpeciesNameGeneration(Species, lang, gen);
             pk.CurrentLevel = Level;
             pk.Version = (int)version;
-            pk.Ball = (int)Ball.Poke;
+            pk.Ball = (int)BallBreedLegality.GetDefaultBall(Version, Species);
             pk.OT_Friendship = pk.PersonalInfo.BaseFriendship;
 
             SetEncounterMoves(pk, version);
@@ -86,6 +72,11 @@ namespace PKHeX.Core
             pk.RelearnMove2 = pk.Move2;
             pk.RelearnMove3 = pk.Move3;
             pk.RelearnMove4 = pk.Move4;
+            if (pk is IScaledSize s)
+            {
+                s.HeightScalar = PokeSizeUtil.GetRandomScalar();
+                s.WeightScalar = PokeSizeUtil.GetRandomScalar();
+            }
 
             return pk;
         }

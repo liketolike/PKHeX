@@ -127,9 +127,9 @@ namespace PKHeX.Core
                 return false;
             if (generation is 6 && move is ((int)ThousandArrows or (int)ThousandWaves))
                 return false;
-            if (generation is 8 && DummiedMoves_BDSP.Contains(move)) // can't Sketch unusable moves in BDSP
+            if (generation is 8 && (SignatureSketch_BDSP.Contains(move) || DummiedMoves_BDSP.Contains(move))) // can't Sketch unusable moves in BDSP
                 return false;
-            return true;
+            return move <= GetMaxMoveID(generation);
         }
 
         /// <summary>

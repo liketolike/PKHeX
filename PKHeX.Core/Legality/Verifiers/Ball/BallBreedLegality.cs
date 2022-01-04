@@ -985,7 +985,7 @@ namespace PKHeX.Core
         };
 
         /// <summary>
-        /// All egg species that can inherit a Safar Ball when bred in BD/SP.
+        /// All egg species that can inherit a Safari Ball when bred in BD/SP.
         /// </summary>
         internal static readonly HashSet<int> InheritSafari_BDSP = new()
         {
@@ -1012,5 +1012,48 @@ namespace PKHeX.Core
             (int)Wooper,
             (int)Yanma,
         };
+
+        internal static readonly HashSet<int> BanInheritedExceptSafari_BDSP = new()
+        {
+            (int)Exeggcute,
+            (int)Kangaskhan,
+            (int)Yanma,
+            (int)Shroomish,
+            (int)Gulpin,
+            (int)Carnivine,
+        };
+
+        internal static readonly HashSet<int> BanInheritedBall_BDSP = new()
+        {
+            // Gen1 Fossils
+            (int)Aerodactyl, (int)Omanyte, (int)Kabuto,
+            // Gen3 Fossils
+            (int)Lileep, (int)Anorith,
+            // Gen4 Fossils
+            (int)Cranidos, (int)Shieldon,
+
+            // Riolu Egg from Riley
+            (int)Riolu,
+
+            (int)Phione,
+        };
+
+        /// <summary>
+        /// Gets a legal <see cref="Ball"/> value for a bred egg encounter.
+        /// </summary>
+        /// <param name="version">Version the egg was created on.</param>
+        /// <param name="species">Species the egg contained.</param>
+        /// <returns>Valid ball to hatch with.</returns>
+        /// <remarks>Not all things can hatch with a Poké Ball!</remarks>
+        public static Ball GetDefaultBall(GameVersion version, int species)
+        {
+            if (GameVersion.BDSP.Contains(version))
+            {
+                if (BanInheritedExceptSafari_BDSP.Contains(species))
+                    return Ball.Safari;
+            }
+
+            return Ball.Poke;
+        }
     }
 }

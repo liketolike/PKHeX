@@ -129,13 +129,68 @@ namespace PKHeX.Core
             _ => -1,
         };
 
+        internal static int GetMaxMoveID(int generation) => generation switch
+        {
+            1 => MaxMoveID_1,
+            2 => MaxMoveID_2,
+            3 => MaxMoveID_3,
+            4 => MaxMoveID_4,
+            5 => MaxMoveID_5,
+            6 => MaxMoveID_6_AO,
+            7 => MaxMoveID_7b,
+            8 => MaxMoveID_8,
+            _ => -1,
+        };
+
         internal const GameVersion NONE = GameVersion.Invalid;
         internal static readonly LearnVersion LearnNONE = new(-1);
 
         internal static bool HasVisitedB2W2(this PKM pkm, int species) => pkm.InhabitedGeneration(5, species);
         internal static bool HasVisitedORAS(this PKM pkm, int species) => pkm.InhabitedGeneration(6, species) && (pkm.AO || !pkm.IsUntraded);
         internal static bool HasVisitedUSUM(this PKM pkm, int species) => pkm.InhabitedGeneration(7, species) && (pkm.USUM || !pkm.IsUntraded);
-        internal static bool IsMovesetRestricted(this PKM pkm, int gen) => (gen == 7 && pkm.Version is (int)GameVersion.GO or (int)GameVersion.GP or (int)GameVersion.GE) || pkm.IsUntraded;
+
+        internal static bool HasVisitedBDSP(this PKM pkm, int species)
+        {
+            if (!pkm.InhabitedGeneration(8, species))
+                return false;
+            if (pkm.BDSP)
+                return true;
+            if (pkm.IsUntraded)
+                return false;
+            var pi = (PersonalInfoBDSP)PersonalTable.BDSP[species];
+            return pi.IsPresentInGame;
+        }
+
+        /// <summary>
+        /// Indicates if the moveset is restricted to only the original version.
+        /// </summary>
+        /// <param name="pkm">Entity to check</param>
+        /// <returns></returns>
+        internal static bool IsMovesetRestricted(this PKM pkm)
+        {
+            if (pkm.IsUntraded)
+                return true;
+            if (pkm.BDSP)
+                return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Indicates if the moveset is restricted to only the original version.
+        /// </summary>
+        /// <param name="pkm">Entity to check</param>
+        /// <param name="gen">Generation the move check is for</param>
+        /// <returns></returns>
+        internal static bool IsMovesetRestricted(this PKM pkm, int gen)
+        {
+            if (pkm.IsMovesetRestricted())
+                return true;
+            return gen switch
+            {
+                7 when pkm.Version is (int)GameVersion.GO or (int)GameVersion.GP or (int)GameVersion.GE => true,
+                _ => false,
+            };
+        }
 
         public static int GetMaxLengthOT(int generation, LanguageID language) => language switch
         {

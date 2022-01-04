@@ -543,6 +543,7 @@ namespace PKHeX.WinForms.Controls
             SAV7 s7 => new SAV_Trainer7(s7),
             SAV7b b7 => new SAV_Trainer7GG(b7),
             SAV8SWSH swsh => new SAV_Trainer8(swsh),
+            SAV8BS bs => new SAV_Trainer8b(bs),
             _ => new SAV_SimpleTrainer(sav),
         };
 
@@ -605,6 +606,7 @@ namespace PKHeX.WinForms.Controls
                 MinimumSize = new Size(350, 380),
                 MinimizeBox = false,
                 MaximizeBox = false,
+                Icon = Properties.Resources.Icon,
             };
             var pg = new PropertyGrid {SelectedObject = sav, Dock = DockStyle.Fill};
             form.Controls.Add(pg);
@@ -648,6 +650,7 @@ namespace PKHeX.WinForms.Controls
                 3 => new SAV_Misc3(SAV),
                 4 => new SAV_Misc4((SAV4) SAV),
                 5 => new SAV_Misc5(SAV),
+                8 when SAV is SAV8BS bs => new SAV_Misc8b(bs),
                 _ => (Form?)null,
             };
             form?.ShowDialog();
@@ -1078,10 +1081,12 @@ namespace PKHeX.WinForms.Controls
 
             B_OtherSlots.Visible = sav is SAV1StadiumJ or SAV1Stadium or SAV2Stadium;
             B_OpenTrainerInfo.Visible = B_OpenItemPouch.Visible = (sav.HasParty && SAV is not SAV4BR) || SAV is SAV7b; // Box RS & Battle Revolution
-            B_OpenMiscEditor.Visible = sav is SAV3 or SAV4 or SAV5;
+            B_OpenMiscEditor.Visible = sav is SAV3 or SAV4 or SAV5 or SAV8BS;
             B_Roamer.Visible = sav is SAV3;
 
-            B_OpenHoneyTreeEditor.Visible = B_OpenUGSEditor.Visible = sav is SAV4Sinnoh;
+            B_OpenHoneyTreeEditor.Visible = sav is SAV4Sinnoh;
+            B_OpenUGSEditor.Visible = sav is SAV4Sinnoh or SAV8BS;
+            B_OpenSealStickers.Visible = B_Poffins.Visible = sav is SAV8BS;
             B_OpenApricorn.Visible = sav is SAV4HGSS;
             B_OpenRTCEditor.Visible = sav.Generation == 2 || sav is IGen3Hoenn;
             B_MailBox.Visible = sav is SAV2 or SAV3 or SAV4 or SAV5;
@@ -1177,9 +1182,30 @@ namespace PKHeX.WinForms.Controls
 
         private void B_OpenUGSEditor_Click(object sender, EventArgs e)
         {
-            if (SAV is not SAV4Sinnoh s)
+            Form form;
+            if (SAV is SAV4Sinnoh s)
+                form = new SAV_Underground(s);
+            else if (SAV is SAV8BS bs)
+                form = new SAV_Underground8b(bs);
+            else
                 return;
-            using var form = new SAV_Underground(s);
+            form.ShowDialog();
+            form.Dispose();
+        }
+
+        private void B_OpenSealStickers_Click(object sender, EventArgs e)
+        {
+            if (SAV is not SAV8BS bs)
+                return;
+            using var form = new SAV_SealStickers8b(bs);
+            form.ShowDialog();
+        }
+
+        private void B_Poffins_Click(object sender, EventArgs e)
+        {
+            if (SAV is not SAV8BS bs)
+                return;
+            using var form = new SAV_Poffin8b(bs);
             form.ShowDialog();
         }
 

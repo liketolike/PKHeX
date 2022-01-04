@@ -368,11 +368,11 @@ namespace PKHeX.WinForms.Controls
             for (int i = 0; i < stats.Count; i++)
             {
                 MT_Base[i].Text = stats[i].ToString("000");
-                MT_Base[i].BackColor = ImageUtil.ColorBaseStat(stats[i]);
+                MT_Base[i].BackColor = ColorUtil.ColorBaseStat(stats[i]);
             }
             var bst = pi.Stats.Sum();
             TB_BST.Text = bst.ToString("000");
-            TB_BST.BackColor = ImageUtil.ColorBaseStatTotal(bst);
+            TB_BST.BackColor = ColorUtil.ColorBaseStatTotal(bst);
         }
 
         public void UpdateRandomIVs(object sender, EventArgs e)
@@ -457,7 +457,7 @@ namespace PKHeX.WinForms.Controls
             pk.Stat_SPD = Util.ToInt32(Stat_SPD.Text);
         }
 
-        public void LoadEVs(int[] EVs)
+        public void LoadEVs(ReadOnlySpan<int> EVs)
         {
             ChangingFields = true;
              TB_EVHP.Text = EVs[0].ToString();
@@ -470,7 +470,7 @@ namespace PKHeX.WinForms.Controls
             UpdateStats();
         }
 
-        public void LoadIVs(int[] IVs)
+        public void LoadIVs(ReadOnlySpan<int> IVs)
         {
             ChangingFields = true;
              TB_IVHP.Text = IVs[0].ToString();

@@ -54,8 +54,8 @@
             this.GB_System = new System.Windows.Forms.TabPage();
             this.TLP_System = new System.Windows.Forms.TableLayoutPanel();
             this.GB_Work = new System.Windows.Forms.TabPage();
-            this.GB_Research = new System.Windows.Forms.TabPage();
             this.TLP_Work = new System.Windows.Forms.TableLayoutPanel();
+            this.GB_Research = new System.Windows.Forms.TabPage();
             this.GB_FlagStatus.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.NUD_System)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.NUD_Work)).BeginInit();
@@ -71,7 +71,7 @@
             // B_Cancel
             // 
             this.B_Cancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.B_Cancel.Location = new System.Drawing.Point(289, 330);
+            this.B_Cancel.Location = new System.Drawing.Point(369, 330);
             this.B_Cancel.Name = "B_Cancel";
             this.B_Cancel.Size = new System.Drawing.Size(75, 23);
             this.B_Cancel.TabIndex = 2;
@@ -167,10 +167,15 @@
             // 
             this.NUD_Work.Location = new System.Drawing.Point(159, 70);
             this.NUD_Work.Maximum = new decimal(new int[] {
-            499,
+            2147483647,
             0,
             0,
             0});
+            this.NUD_Work.Minimum = new decimal(new int[] {
+            -2147483648,
+            0,
+            0,
+            -2147483648});
             this.NUD_Work.Name = "NUD_Work";
             this.NUD_Work.Size = new System.Drawing.Size(84, 20);
             this.NUD_Work.TabIndex = 38;
@@ -213,7 +218,7 @@
             // B_Save
             // 
             this.B_Save.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.B_Save.Location = new System.Drawing.Point(372, 330);
+            this.B_Save.Location = new System.Drawing.Point(452, 330);
             this.B_Save.Name = "B_Save";
             this.B_Save.Size = new System.Drawing.Size(75, 23);
             this.B_Save.TabIndex = 9;
@@ -315,7 +320,7 @@
             this.TC_Features.Location = new System.Drawing.Point(12, 12);
             this.TC_Features.Name = "TC_Features";
             this.TC_Features.SelectedIndex = 0;
-            this.TC_Features.Size = new System.Drawing.Size(430, 309);
+            this.TC_Features.Size = new System.Drawing.Size(510, 309);
             this.TC_Features.TabIndex = 42;
             // 
             // GB_Flags
@@ -324,7 +329,7 @@
             this.GB_Flags.Location = new System.Drawing.Point(4, 22);
             this.GB_Flags.Name = "GB_Flags";
             this.GB_Flags.Padding = new System.Windows.Forms.Padding(3);
-            this.GB_Flags.Size = new System.Drawing.Size(422, 283);
+            this.GB_Flags.Size = new System.Drawing.Size(502, 283);
             this.GB_Flags.TabIndex = 0;
             this.GB_Flags.Text = "Event Flags";
             this.GB_Flags.UseVisualStyleBackColor = true;
@@ -341,7 +346,7 @@
             this.TLP_Flags.RowCount = 2;
             this.TLP_Flags.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.TLP_Flags.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.TLP_Flags.Size = new System.Drawing.Size(416, 277);
+            this.TLP_Flags.Size = new System.Drawing.Size(496, 277);
             this.TLP_Flags.TabIndex = 1;
             // 
             // GB_System
@@ -381,18 +386,6 @@
             this.GB_Work.Text = "Work Values";
             this.GB_Work.UseVisualStyleBackColor = true;
             // 
-            // GB_Research
-            // 
-            this.GB_Research.Controls.Add(this.GB_FlagStatus);
-            this.GB_Research.Controls.Add(this.GB_Researcher);
-            this.GB_Research.Location = new System.Drawing.Point(4, 22);
-            this.GB_Research.Name = "GB_Research";
-            this.GB_Research.Padding = new System.Windows.Forms.Padding(3);
-            this.GB_Research.Size = new System.Drawing.Size(422, 283);
-            this.GB_Research.TabIndex = 2;
-            this.GB_Research.Text = "Research";
-            this.GB_Research.UseVisualStyleBackColor = true;
-            // 
             // TLP_Work
             // 
             this.TLP_Work.AutoScroll = true;
@@ -409,12 +402,24 @@
             this.TLP_Work.Size = new System.Drawing.Size(416, 277);
             this.TLP_Work.TabIndex = 2;
             // 
+            // GB_Research
+            // 
+            this.GB_Research.Controls.Add(this.GB_FlagStatus);
+            this.GB_Research.Controls.Add(this.GB_Researcher);
+            this.GB_Research.Location = new System.Drawing.Point(4, 22);
+            this.GB_Research.Name = "GB_Research";
+            this.GB_Research.Padding = new System.Windows.Forms.Padding(3);
+            this.GB_Research.Size = new System.Drawing.Size(422, 283);
+            this.GB_Research.TabIndex = 2;
+            this.GB_Research.Text = "Research";
+            this.GB_Research.UseVisualStyleBackColor = true;
+            // 
             // SAV_FlagWork8b
             // 
             this.AllowDrop = true;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(454, 361);
+            this.ClientSize = new System.Drawing.Size(534, 361);
             this.Controls.Add(this.TC_Features);
             this.Controls.Add(this.L_EventFlagWarn);
             this.Controls.Add(this.B_Save);

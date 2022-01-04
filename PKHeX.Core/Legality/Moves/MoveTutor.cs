@@ -153,19 +153,35 @@ namespace PKHeX.Core
 
         private static GameVersion GetIsTutor8(PKM pkm, int species, int form, bool specialTutors, int move)
         {
-            var pi = (PersonalInfoSWSH)PersonalTable.SWSH.GetFormEntry(species, form);
-            var type = Array.IndexOf(TypeTutor8, move);
-            if (type != -1 && pi.TypeTutors[type])
-                return GameVersion.Gen8;
+            if (pkm.BDSP)
+            {
+                var pi = (PersonalInfoBDSP)PersonalTable.BDSP.GetFormEntry(species, form);
+                if (!pi.IsPresentInGame)
+                    return NONE;
+                var type = Array.IndexOf(TypeTutor8b, move);
+                if (type != -1 && pi.TypeTutors[type])
+                    return GameVersion.BDSP;
 
-            if (!specialTutors)
                 return NONE;
+            }
+            else
+            {
+                var pi = (PersonalInfoSWSH)PersonalTable.SWSH.GetFormEntry(species, form);
+                if (!pi.IsPresentInGame)
+                    return NONE;
+                var type = Array.IndexOf(TypeTutor8, move);
+                if (type != -1 && pi.TypeTutors[type])
+                    return GameVersion.SWSH;
 
-            var tutor = Array.IndexOf(Tutors_SWSH_1, move);
-            if (tutor != -1 && pi.SpecialTutors[0][tutor])
-                return GameVersion.USUM;
+                if (!specialTutors)
+                    return NONE;
 
-            return NONE;
+                var tutor = Array.IndexOf(Tutors_SWSH_1, move);
+                if (tutor != -1 && pi.SpecialTutors[0][tutor])
+                    return GameVersion.SWSH;
+
+                return NONE;
+            }
         }
 
         public static IEnumerable<int> GetTutorMoves(PKM pkm, int species, int form, bool specialTutors, int generation)
@@ -251,12 +267,22 @@ namespace PKHeX.Core
 
         private static void AddMovesTutor8(List<int> moves, int species, int form, PKM pkm, bool specialTutors)
         {
-            var pi = (PersonalInfoSWSH)PersonalTable.SWSH.GetFormEntry(species, form);
-            if (!pi.IsPresentInGame)
-                return;
-            moves.AddRange(TypeTutor8.Where((_, i) => pi.TypeTutors[i]));
-            if (specialTutors)
-                moves.AddRange(GetTutors(pi, Tutors_SWSH_1));
+            if (pkm.BDSP)
+            {
+                var pi = (PersonalInfoBDSP)PersonalTable.BDSP.GetFormEntry(species, form);
+                if (!pi.IsPresentInGame)
+                    return;
+                moves.AddRange(TypeTutor8b.Where((_, i) => pi.TypeTutors[i]));
+            }
+            else // SWSH
+            {
+                var pi = (PersonalInfoSWSH)PersonalTable.SWSH.GetFormEntry(species, form);
+                if (!pi.IsPresentInGame)
+                    return;
+                moves.AddRange(TypeTutor8.Where((_, i) => pi.TypeTutors[i]));
+                if (specialTutors)
+                    moves.AddRange(GetTutors(pi, Tutors_SWSH_1));
+            }
         }
 
         private static IEnumerable<int> GetTutors(PersonalInfo pi, params int[][] tutors)

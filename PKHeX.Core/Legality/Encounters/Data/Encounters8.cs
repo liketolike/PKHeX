@@ -36,7 +36,7 @@ namespace PKHeX.Core
             new(SWSH) { Gift = true, Species = 813, Shiny = Never, Level = 05, Location = 006 }, // Scorbunny
             new(SWSH) { Gift = true, Species = 816, Shiny = Never, Level = 05, Location = 006 }, // Sobble
 
-            new(SWSH) { Gift = true, Species = 772, Shiny = Never, Level = 50, Location = 158, FlawlessIVCount = 3, }, // Type: Null
+            new(SWSH) { Gift = true, Species = 772, Shiny = Never, Level = 50, Location = 158, FlawlessIVCount = 3 }, // Type: Null
             new(SWSH) { Gift = true, Species = 848, Shiny = Never, Level = 01, Location = 040, IVs = new[]{-1,31,-1,-1,31,-1}, Ball = 11 }, // Toxel, Attack flawless
 
             new(SWSH) { Gift = true, Species = 880, FlawlessIVCount = 3, Level = 10, Location = 068 }, // Dracozolt @ Route 6
@@ -600,11 +600,13 @@ namespace PKHeX.Core
             new EncounterStatic8S(SWSH) { Species = 832, Level = 63, Locations = new[] {204, 208}, Weather = Normal | Intense_Sun }, // Dubwool on Slippery Slope, Frostpoint Field
             new EncounterStatic8S(SW  ) { Species = 576, Level = 65, Locations = new[] {204, 208}, Weather = Heavy_Fog }, // Gothitelle on Slippery Slope, Frostpoint Field
             new EncounterStatic8S(  SH) { Species = 579, Level = 65, Locations = new[] {204, 208}, Weather = Heavy_Fog }, // Reuniclus on Slippery Slope, Frostpoint Field
+            new EncounterStatic8S(SWSH) { Species = 461, Level = 63, Locations = new[] {204, 208}, Weather = Overcast }, // Weavile in Slippery Slope, Frostpoint Field
             new EncounterStatic8S(SWSH) { Species = 531, Level = 62, Locations = new[] {204, 208}, Weather = Normal | Overcast | Intense_Sun | Icy | Heavy_Fog }, // Audino on Slippery Slope, Frostpoint Field
             new EncounterStatic8S(SWSH) { Species = 615, Level = 62, Locations = new[] {204, 208, 210}, Weather = Icy }, // Cryogonal on Slippery Slope, Frostpoint Field, Giant’s Bed
             new EncounterStatic8S(SWSH) { Species = 778, Level = 62, Locations = new[] {204, 208, 210, 212}, Weather = Heavy_Fog }, // Mimikyu on Slippery Slope, Frostpoint Field, Giant’s Bed, Old Cemetery
             new EncounterStatic8S(SWSH) { Species = 126, Level = 62, Locations = new[] {204, 210}, Weather = Intense_Sun }, // Magmar on Slippery Slope, Giant’s Bed
             new EncounterStatic8S(SWSH) { Species = 861, Level = 65, Locations = new[] {204, 210}, Weather = Heavy_Fog }, // Grimmsnarl on Slippery Slope, Giant’s Bed
+            new EncounterStatic8S(SWSH) { Species = 709, Level = 63, Locations = new[] {204, 212}, Weather = Overcast }, // Trevenant on Slippery Slope, Old Cemetery
             new(SWSH) { Species = 124, Level = 62, Location = 208, Weather = Snowing | Heavy_Fog }, // Jynx in Frostpoint Field
             new(SWSH) { Species = 460, Level = 65, Location = 208, Weather = Normal | Overcast | Intense_Sun | Snowing }, // Abomasnow in Frostpoint Field
             new(SWSH) { Species = 698, Level = 60, Location = 208, Weather = Normal | Icy }, // Amaura in Frostpoint Field
@@ -612,7 +614,6 @@ namespace PKHeX.Core
             new(SWSH) { Species = 029, Level = 60, Location = 208, Weather = Normal | Overcast | Intense_Sun | Icy }, // Nidoran♀ in Frostpoint Field
             new(SWSH) { Species = 032, Level = 60, Location = 208, Weather = Normal | Overcast | Intense_Sun | Icy }, // Nidoran♂ in Frostpoint Field
             new(SWSH) { Species = 359, Level = 62, Location = 208, Weather = Snowstorm }, // Absol in Frostpoint Field
-            new(SWSH) { Species = 461, Level = 63, Location = 208, Weather = Overcast }, // Weavile in Frostpoint Field
             new(SWSH) { Species = 143, Level = 65, Location = 208, Weather = Normal | Stormy | Intense_Sun | Overcast }, // Snorlax in Frostpoint Field
             new EncounterStatic8S(SWSH) { Species = 584, Level = 65, Locations = new[] {208, 210}, Weather = Icy }, // Vanilluxe in Frostpoint Field, Giant’s Bed
             new EncounterStatic8S(SWSH) { Species = 333, Level = 60, Locations = new[] {208, 210}, Weather = Overcast }, // Swablu in Frostpoint Field, Giant’s Bed
@@ -660,7 +661,6 @@ namespace PKHeX.Core
             new EncounterStatic8S(SWSH) { Species = 531, Level = 62, Locations = new[] {210, 222, 230}, Weather = All_CT }, // Audino in the Giant’s Bed, Giant’s Foot
             new EncounterStatic8S(SWSH) { Species = 130, Level = 67, Locations = new[] {210, 230}, Weather = Normal | Overcast | Stormy | Intense_Sun | Icy }, // Gyarados in the Giant’s Bed, Ballimere Lake
             new EncounterStatic8S(SWSH) { Species = 350, Level = 67, Locations = new[] {210, 230}, Weather = Heavy_Fog }, // Milotic in the Giant’s Bed, Ballimere Lake
-            new(SWSH) { Species = 709, Level = 63, Location = 212, Weather = Overcast }, // Trevenant in the Old Cemetery
             new(  SH) { Species = 078, Level = 67, Location = 212, Form = 01, Weather = Heavy_Fog }, // Rapidash-1 in the Old Cemetery
             new(SWSH) { Species = 872, Level = 62, Location = 214, Weather = Normal | Overcast }, // Snom on Snowslide Slope
             new(SWSH) { Species = 698, Level = 62, Location = 214, Weather = Normal | Overcast | Stormy | Heavy_Fog }, // Amaura on Snowslide Slope
@@ -768,15 +768,15 @@ namespace PKHeX.Core
         private static readonly EncounterTrade8[] TradeGift_Regular =
         {
             new(SWSH, 052,18,08,000,04,5) { Ability = 2, TID7 = 263455, IVs = TradeIVs, DynamaxLevel = 1, OTGender = 0, Gender = 0, Nature = Nature.Timid, Relearn = new[] {387,000,000,000}   }, // Meowth
-            new(SWSH, 819,10,01,044,01,2) { Ability = 1, TID7 = 648753, IVs = TradeIVs, DynamaxLevel = 1, OTGender = 1, Gender = 0, Nature = Nature.Mild,                                      }, // Skwovet
-            new(SWSH, 546,23,11,000,09,5) { Ability = 1, TID7 = 101154, IVs = TradeIVs, DynamaxLevel = 1, OTGender = 1, Gender = 1, Nature = Nature.Modest,                                    }, // Cottonee
+            new(SWSH, 819,10,01,044,01,2) { Ability = 1, TID7 = 648753, IVs = TradeIVs, DynamaxLevel = 1, OTGender = 1, Gender = 0, Nature = Nature.Mild                                       }, // Skwovet
+            new(SWSH, 546,23,11,000,09,5) { Ability = 1, TID7 = 101154, IVs = TradeIVs, DynamaxLevel = 1, OTGender = 1, Gender = 1, Nature = Nature.Modest                                     }, // Cottonee
             new(SWSH, 175,25,02,010,10,6) { Ability = 2, TID7 = 109591, IVs = TradeIVs, DynamaxLevel = 1, OTGender = 1, Gender = 0, Nature = Nature.Timid, Relearn = new[] {791,000,000,000}   }, // Togepi
-            new(SW  , 856,30,09,859,08,3) { Ability = 2, TID7 = 101101, IVs = TradeIVs, DynamaxLevel = 1, OTGender = 0, Gender = 1, Nature = Nature.Quiet,                                     }, // Hatenna
+            new(SW  , 856,30,09,859,08,3) { Ability = 2, TID7 = 101101, IVs = TradeIVs, DynamaxLevel = 1, OTGender = 0, Gender = 1, Nature = Nature.Quiet                                      }, // Hatenna
             new(  SH, 859,30,43,000,07,6) { Ability = 1, TID7 = 256081, IVs = TradeIVs, DynamaxLevel = 1, OTGender = 0, Gender = 0, Nature = Nature.Brave, Relearn = new[] {252,000,000,000}   }, // Impidimp
             new(SWSH, 562,35,16,310,15,5) { Ability = 1, TID7 = 102534, IVs = TradeIVs, DynamaxLevel = 2, OTGender = 1, Gender = 0, Nature = Nature.Bold, Relearn = new[] {261,000,000,000}    }, // Yamask
-            new(SW  , 538,37,17,129,20,7) { Ability = 2, TID7 = 768945, IVs = TradeIVs, DynamaxLevel = 2, OTGender = 0, Gender = 0, Nature = Nature.Adamant,                                   }, // Throh
-            new(  SH, 539,37,17,129,14,6) { Ability = 1, TID7 = 881426, IVs = TradeIVs, DynamaxLevel = 2, OTGender = 0, Gender = 0, Nature = Nature.Adamant,                                   }, // Sawk
-            new(SWSH, 122,40,56,000,12,4) { Ability = 1, TID7 = 891846, IVs = TradeIVs, DynamaxLevel = 1, OTGender = 0, Gender = 0, Nature = Nature.Calm,                                      }, // Mr. Mime
+            new(SW  , 538,37,17,129,20,7) { Ability = 2, TID7 = 768945, IVs = TradeIVs, DynamaxLevel = 2, OTGender = 0, Gender = 0, Nature = Nature.Adamant                                    }, // Throh
+            new(  SH, 539,37,17,129,14,6) { Ability = 1, TID7 = 881426, IVs = TradeIVs, DynamaxLevel = 2, OTGender = 0, Gender = 0, Nature = Nature.Adamant                                    }, // Sawk
+            new(SWSH, 122,40,56,000,12,4) { Ability = 1, TID7 = 891846, IVs = TradeIVs, DynamaxLevel = 1, OTGender = 0, Gender = 0, Nature = Nature.Calm                                       }, // Mr. Mime
             new(SWSH, 884,50,15,038,06,2) { Ability = 2, TID7 = 101141, IVs = TradeIVs, DynamaxLevel = 3, OTGender = 0, Gender = 0, Nature = Nature.Adamant, Relearn = new[] {400,000,000,000} }, // Duraludon
         };
 

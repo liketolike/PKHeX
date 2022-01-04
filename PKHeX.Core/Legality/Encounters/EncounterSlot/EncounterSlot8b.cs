@@ -12,10 +12,21 @@ namespace PKHeX.Core
         public override int Generation => 8;
         public bool IsUnderground => Area.Location is (>= 508 and <= 617);
         public bool IsMarsh => Area.Location is (>= 219 and <= 224);
+        public readonly bool IsBCAT;
 
-        public EncounterSlot8b(EncounterArea area, int species, int form, int min, int max) : base(area, species, form, min, max)
+        public EncounterSlot8b(EncounterArea area, int species, int form, int min, int max, bool isBCAT = false) : base(area, species, form, min, max)
         {
+            IsBCAT = isBCAT;
         }
+
+        public override EncounterMatchRating GetMatchRating(PKM pkm)
+        {
+            bool isHidden = pkm.AbilityNumber == 4;
+            if (isHidden && this.IsPartialMatchHidden(pkm.Species, Species))
+                return EncounterMatchRating.PartialMatch;
+            return base.GetMatchRating(pkm);
+        }
+
         protected override void SetFormatSpecificData(PKM pk)
         {
             if (IsUnderground)
@@ -32,42 +43,70 @@ namespace PKHeX.Core
 
         public bool CanBeUndergroundMove(int move)
         {
-            var et = EvolutionTree.Evolves8b;
-            var sf = et.GetBaseSpeciesForm(Species, Form);
-            var species = sf & 0x7FF;
-            var form = sf >> 11;
-            if (IgnoreEggMoves.TryGetValue(species, out var exclude) && Array.IndexOf(exclude, move) != -1)
+            var et = PersonalTable.BDSP;
+            var sf = (PersonalInfoBDSP)et.GetFormEntry(Species, Form);
+            var species = sf.HatchSpecies;
+            if (IsBCAT && IgnoreEggMoves.TryGetValue(species, out var exclude) && Array.IndexOf(exclude, move) != -1)
                 return false;
 
-            var baseEgg = MoveEgg.GetEggMoves(8, species, form, Version);
-            return baseEgg.Length == 0 || Array.IndexOf(baseEgg, move) >= 0;
+            var baseEgg = Legal.EggMovesBDSP[species].Moves;
+            if (baseEgg.Length == 0)
+                return move == 0;
+            return Array.IndexOf(baseEgg, move) >= 0;
         }
 
         public bool GetBaseEggMove(out int move)
         {
-            var et = EvolutionTree.Evolves8b;
-            var sf = et.GetBaseSpeciesForm(Species, Form);
-            var species = sf & 0x7FF;
-            var form = sf >> 11;
+            var et = PersonalTable.BDSP;
+            var sf = (PersonalInfoBDSP)et.GetFormEntry(Species, Form);
+            var species = sf.HatchSpecies;
 
             int[] Exclude = IgnoreEggMoves.TryGetValue(species, out var exclude) ? exclude : Array.Empty<int>();
-            var baseEgg = MoveEgg.GetEggMoves(8, species, form, Version);
+            var baseEgg = Legal.EggMovesBDSP[species].Moves;
             if (baseEgg.Length == 0)
             {
                 move = 0;
                 return false;
             }
 
+            // Official method creates a new List<ushort>() with all the egg moves, removes all ignored, then picks a random index.
+            // We'll just loop instead to not allocate, and because it's a >50% chance the move won't be ignored, thus faster.
             var rnd = Util.Rand;
             while (true)
             {
                 var index = rnd.Next(baseEgg.Length);
                 move = baseEgg[index];
-                if (Array.IndexOf(Exclude, move) == -1)
+                if (!IsBCAT || Array.IndexOf(Exclude, move) == -1)
                     return true;
             }
         }
 
+        public bool CanUseRadar => Area.Type is SlotType.Grass && !IsUnderground && !IsMarsh && Location switch
+        {
+            195 or 196 => false, // Oreburgh Mine
+            203 or 204 or 205 or 208 or 209 or 210 or 211 or 212 or 213 or 214 or 215 => false, // Mount Coronet, 206/207 exterior
+            >= 225 and <= 243 => false, // Solaceon Ruins
+            244 or 245 or 246 or 247 or 248 or 249 => false, // Victory Road
+            252 => false, // Ravaged Path
+            255 or 256 => false, // Oreburgh Gate
+            260 or 261 or 262 => false, // Stark Mountain, 259 exterior
+            >= 264 and <= 284 => false, // Turnback Cave
+            286 or 287 or 288 or 289 or 290 or 291 => false, // Snowpoint Temple
+            292 or 293 => false, // Wayward Cave
+            294 or 295 => false, // Ruin Maniac Cave
+            296 => false, // Maniac Tunnel
+            299 or 300 or 301 or 302 or 303 or 304 or 305 => false, // Iron Island, 298 exterior
+            306 or 307 or 308 or 309 or 310 or 311 or 312 or 313 or 314 => false, // Old Chateau
+            368 or 369 or 370 or 371 or 372 => false, // Route 209 (Lost Tower)
+            _ => true,
+        };
+
+        protected override HiddenAbilityPermission IsHiddenAbilitySlot() => CanUseRadar ? HiddenAbilityPermission.Possible : HiddenAbilityPermission.Never;
+
+        /// <summary>
+        /// Unreferenced in v1.0, so all egg moves are possible for ROM encounters.
+        /// Since the Underground supports BCAT distributions, we will keep this around on the off chance they do utilize that method of distribution.
+        /// </summary>
         private static readonly Dictionary<int, int[]> IgnoreEggMoves = new()
         {
             {004, new[] {394}}, // Charmander

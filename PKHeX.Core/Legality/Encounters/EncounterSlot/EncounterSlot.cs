@@ -7,26 +7,13 @@ namespace PKHeX.Core
     /// Wild Encounter Slot data
     /// </summary>
     /// <remarks>Wild encounter slots are found as random encounters in-game.</remarks>
-    public abstract record EncounterSlot : IEncounterable, ILocation, IEncounterMatch
+    public abstract record EncounterSlot(EncounterArea Area, int Species, int Form, int LevelMin, int LevelMax) : IEncounterable, ILocation, IEncounterMatch, IFixedAbilityNumber
     {
-        public int Species { get; }
-        public int Form { get; }
-        public int LevelMin { get; }
-        public int LevelMax { get; }
         public abstract int Generation { get; }
         public bool EggEncounter => false;
         public virtual bool IsShiny => false;
 
-        protected EncounterSlot(EncounterArea area, int species, int form, int min, int max)
-        {
-            Area = area;
-            Species = species;
-            Form = form;
-            LevelMin = min;
-            LevelMax = max;
-        }
-
-        protected readonly EncounterArea Area;
+        protected readonly EncounterArea Area = Area;
         public GameVersion Version => Area.Version;
         public int Location => Area.Location;
         public int EggLocation => 0;
@@ -124,6 +111,11 @@ namespace PKHeX.Core
                 return;
 
             sav.ApplyHandlingTrainerInfo(pk);
+            if (pk is IScaledSize s)
+            {
+                s.HeightScalar = PokeSizeUtil.GetRandomScalar();
+                s.WeightScalar = PokeSizeUtil.GetRandomScalar();
+            }
         }
 
         protected virtual void SetEncounterMoves(PKM pk, GameVersion version, int level)
@@ -173,8 +165,8 @@ namespace PKHeX.Core
 
         public bool IsRandomUnspecificForm => Form >= FormDynamic;
         private const int FormDynamic = FormVivillon;
-        private const int FormVivillon = 30;
-        protected const int FormRandom = 31;
+        protected internal const int FormVivillon = 30;
+        protected internal const int FormRandom = 31;
 
         private static int GetWildForm(PKM pk, int form, ITrainerInfo sav)
         {

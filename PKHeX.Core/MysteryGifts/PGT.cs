@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core
 {
@@ -23,6 +24,8 @@ namespace PKHeX.Core
             get => IsPokémon ? PK.Ball : 0;
             set { if (IsPokémon) PK.Ball = value; }
         }
+
+        public override int Ability => IsManaphyEgg ? 0 : 1 + (int)(PK.PID & 1);
 
         private enum GiftType
         {
@@ -52,7 +55,7 @@ namespace PKHeX.Core
         // Unused 0x01
         public byte Slot { get => Data[2]; set => Data[2] = value; }
         public byte Detail { get => Data[3]; set => Data[3] = value; }
-        public override int ItemID { get => BitConverter.ToUInt16(Data, 0x4); set => BitConverter.GetBytes((ushort)value).CopyTo(Data, 0x4); }
+        public override int ItemID { get => ReadUInt16LittleEndian(Data.AsSpan(0x4)); set => WriteUInt16LittleEndian(Data.AsSpan(0x4), (ushort)value); }
 
         public PK4 PK
         {
@@ -83,7 +86,7 @@ namespace PKHeX.Core
         /// <returns>True if data was encrypted, false if the data was not modified.</returns>
         public bool VerifyPKEncryption()
         {
-            if (!IsPokémon || BitConverter.ToUInt32(Data, 0x64 + 8) != 0)
+            if (!IsPokémon || ReadUInt32LittleEndian(Data.AsSpan(0x64 + 8)) != 0)
                 return false;
             EncryptPK();
             return true;
@@ -91,10 +94,9 @@ namespace PKHeX.Core
 
         private void EncryptPK()
         {
-            byte[] ekdata = new byte[PokeCrypto.SIZE_4PARTY];
-            Array.Copy(Data, 8, ekdata, 0, ekdata.Length);
-            ekdata = PokeCrypto.EncryptArray45(ekdata);
-            ekdata.CopyTo(Data, 8);
+            var span = Data.AsSpan(8, PokeCrypto.SIZE_4PARTY);
+            var ekdata = PokeCrypto.EncryptArray45(span);
+            ekdata.CopyTo(span);
         }
 
         private GiftType PGTGiftType { get => (GiftType)Data[0]; set => Data[0] = (byte)value; }
@@ -174,7 +176,7 @@ namespace PKHeX.Core
             pk4.Move1 = 294; pk4.Move1_PP = 20;
             pk4.Move2 = 145; pk4.Move2_PP = 30;
             pk4.Move3 = 346; pk4.Move3_PP = 15;
-            pk4.Ability = (int)Ability.Hydration;
+            pk4.Ability = (int)Core.Ability.Hydration;
             pk4.FatefulEncounter = true;
             pk4.Ball = (int)Core.Ball.Poke;
             pk4.Version = GameVersion.Gen4.Contains(trainer.Game) ? trainer.Game : (int)GameVersion.D;

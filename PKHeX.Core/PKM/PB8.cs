@@ -28,7 +28,12 @@ namespace PKHeX.Core
         public override IReadOnlyList<ushort> ExtraBytes => Unused;
         public override PersonalInfo PersonalInfo => PersonalTable.BDSP.GetFormEntry(Species, Form);
 
-        public PB8() => Egg_Location = Met_Location = Locations.Default8bNone;
+        public PB8()
+        {
+            Egg_Location = Met_Location = Locations.Default8bNone;
+            AffixedRibbon = -1; // 00 would make it show Kalos Champion :)
+        }
+
         public PB8(byte[] data) : base(data) { }
         public override PKM Clone() => new PB8((byte[])Data.Clone());
 
@@ -36,10 +41,12 @@ namespace PKHeX.Core
         {
             if (IsEgg)
             {
-                // Eggs do not have any modifications done if they are traded
                 // Apply link trade data, only if it left the OT (ignore if dumped & imported, or cloned, etc)
-                // if ((tr.OT != OT_Name) || (tr.TID != TID) || (tr.SID != SID) || (tr.Gender != OT_Gender))
-                //     SetLinkTradeEgg(Day, Month, Year, Locations.LinkTrade6NPC);
+                if ((tr.OT != OT_Name) || (tr.TID != TID) || (tr.SID != SID) || (tr.Gender != OT_Gender))
+                    SetLinkTradeEgg(Day, Month, Year, Locations.LinkTrade6NPC);
+
+                // Unfortunately, BDSP doesn't return if it's an egg, and can update the HT details & handler.
+                // Continue to the rest of the method.
                 // return;
             }
 
@@ -58,16 +65,20 @@ namespace PKHeX.Core
 
             if (IsEgg) // No memories if is egg.
             {
-                HT_Language = HT_Friendship = HT_TextVar = HT_Memory = HT_Intensity = HT_Feeling =
-                    /* OT_Friendship */ OT_TextVar = OT_Memory = OT_Intensity = OT_Feeling = 0;
+                HT_TextVar = HT_Memory = HT_Intensity = HT_Feeling = 0;
+                OT_TextVar = OT_Memory = OT_Intensity = OT_Feeling = 0;
 
                 // Clear Handler
-                HT_Trash.Clear();
+                if (!IsTradedEgg)
+                {
+                    HT_Friendship = HT_Language = HT_Gender = 0;
+                    HT_Trash.Clear();
+                }
                 return;
             }
 
             if (IsUntraded)
-                HT_Language = HT_Friendship = HT_TextVar = HT_Memory = HT_Intensity = HT_Feeling = 0;
+                HT_Language = HT_Friendship = HT_TextVar = HT_Memory = HT_Intensity = HT_Feeling = HT_Gender = 0;
 
             int gen = Generation;
             if (gen < 6)
@@ -90,7 +101,7 @@ namespace PKHeX.Core
         {
             if (HT_Name != tr.OT)
             {
-                HT_Friendship = 50;
+                HT_Friendship = PersonalInfo.BaseFriendship;
                 HT_Name = tr.OT;
             }
             CurrentHandler = 1;

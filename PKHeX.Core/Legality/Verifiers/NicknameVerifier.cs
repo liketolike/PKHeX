@@ -164,7 +164,7 @@ namespace PKHeX.Core
                     data.AddLine(Get(msg, ParseSettings.NicknamedAnotherSpecies));
                     return true;
                 }
-                if (pkm.Format <= 7 && StringConverter.HasEastAsianScriptCharacters(nickname) && pkm is not PB7) // East Asian Scripts
+                if (pkm.Format <= 7 && StringConverter.HasEastAsianScriptCharacters(nickname.AsSpan()) && pkm is not PB7) // East Asian Scripts
                 {
                     data.AddLine(GetInvalid(LNickInvalidChar));
                     return true;
@@ -234,25 +234,13 @@ namespace PKHeX.Core
         {
             var Info = data.Info;
             var pkm = data.pkm;
-            var format = pkm.Format;
-            switch (format)
-            {
-                case 4:
-                    if (pkm.IsNicknamed) // gen4 doesn't use the nickname flag for eggs
-                        data.AddLine(GetInvalid(LNickFlagEggNo, CheckIdentifier.Egg));
-                    break;
-                case 7:
-                    if (pkm.IsNicknamed == Info.EncounterMatch is EncounterStatic7) // gen7 doesn't use for ingame gifts
-                        data.AddLine(GetInvalid(pkm.IsNicknamed ? LNickFlagEggNo : LNickFlagEggYes, CheckIdentifier.Egg));
-                    break;
-                default:
-                    if (pkm.IsNicknamed == Info.EncounterMatch is (EncounterStatic8b or WB8)) // bdsp doesn't use for ingame gifts
-                        data.AddLine(GetInvalid(pkm.IsNicknamed ? LNickFlagEggNo : LNickFlagEggYes, CheckIdentifier.Egg));
-                    break;
-            }
+
+            bool flagState = EggStateLegality.IsNicknameFlagSet(Info.EncounterMatch, pkm);
+            if (pkm.IsNicknamed != flagState)
+                data.AddLine(GetInvalid(flagState ? LNickFlagEggYes : LNickFlagEggNo, CheckIdentifier.Egg));
 
             var nick = pkm.Nickname;
-            if (format == 2 && !SpeciesName.IsNicknamedAnyLanguage(0, nick, 2))
+            if (pkm.Format == 2 && !SpeciesName.IsNicknamedAnyLanguage(0, nick, 2))
                 data.AddLine(GetValid(LNickMatchLanguageEgg, CheckIdentifier.Egg));
             else if (nick != SpeciesName.GetSpeciesNameGeneration(0, pkm.Language, Info.Generation))
                 data.AddLine(GetInvalid(LNickMatchLanguageEggFail, CheckIdentifier.Egg));
@@ -264,6 +252,8 @@ namespace PKHeX.Core
         {
             switch (data.Info.Generation)
             {
+                case 8 when t is EncounterTrade8b b: VerifyTrade8b(data, b); return;
+
                 case 1: VerifyTrade12(data, t); return;
                 case 2: return; // already checked all relevant properties when fetching with getValidEncounterTradeVC2
                 case 3: VerifyTrade3(data, t); return;
@@ -271,7 +261,6 @@ namespace PKHeX.Core
                 case 5: VerifyTrade5(data, t); return;
                 case 6:
                 case 7:
-                case 8 when t is EncounterTrade8b: VerifyTrade8b(data, t); return;
                 case 8:
                     VerifyTrade(data, t, data.pkm.Language); return;
             }
@@ -360,13 +349,36 @@ namespace PKHeX.Core
             VerifyTrade(data, t, lang);
         }
 
-        private static void VerifyTrade8b(LegalityAnalysis data, EncounterTrade t)
+        private static void VerifyTrade8b(LegalityAnalysis data, EncounterTrade8b t)
         {
             var pkm = data.pkm;
             int lang = pkm.Language;
             if (t.Species == (int)Species.Magikarp)
-                lang = DetectTradeLanguageG4MeisterMagikarp(pkm, t, lang);
+                lang = DetectTradeLanguageG8MeisterMagikarp(pkm, t, lang);
             VerifyTrade(data, t, lang);
+        }
+
+        private static int DetectTradeLanguageG8MeisterMagikarp(PKM pkm, EncounterTrade8b t, int currentLanguageID)
+        {
+            // Receiving the trade on a German game -> Japanese LanguageID.
+            // Receiving the trade on any other language -> German LanguageID.
+            if (currentLanguageID is not ((int)Japanese or (int)German))
+                return 0;
+
+            var nick = pkm.Nickname;
+            var ot = pkm.OT_Name;
+            for (int i = 1; i < (int)ChineseT; i++)
+            {
+                if (t.Nicknames[i] != nick)
+                    continue;
+                if (t.TrainerNames[i] != ot)
+                    continue;
+
+                // Language gets flipped to another language ID; can't be equal.
+                var shouldNotBe = currentLanguageID == (int)German ? German : Japanese;
+                return i != (int)shouldNotBe ? i : 0;
+            }
+            return 0;
         }
 
         private static void FlagKoreanIncompatibleSameGenTrade(LegalityAnalysis data, PKM pkm, int lang)

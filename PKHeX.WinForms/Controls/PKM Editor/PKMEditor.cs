@@ -6,8 +6,8 @@ using System.Windows.Forms;
 using PKHeX.Core;
 using PKHeX.Drawing;
 using System.ComponentModel;
-using PKHeX.Drawing.Properties;
-
+using PKHeX.Drawing.PokeSprite;
+using PKHeX.Drawing.PokeSprite.Properties;
 using static PKHeX.Core.MessageStrings;
 
 namespace PKHeX.WinForms.Controls
@@ -66,7 +66,7 @@ namespace PKHeX.WinForms.Controls
             FlickerInterface();
         }
 
-        private class ValidationRequiredSet
+        private sealed class ValidationRequiredSet
         {
             private readonly Control[] Controls;
             private readonly Func<PKM, bool> ShouldCheck;
@@ -421,8 +421,8 @@ namespace PKHeX.WinForms.Controls
             }
 
             // Copy OT trash bytes for sensitive games (Gen1/2)
-                 if (tr is SAV1 s1 && Entity is PK1 p1) p1.OT_Trash = s1.OT_Trash;
-            else if (tr is SAV2 s2 && Entity is PK2 p2) p2.OT_Trash = s2.OT_Trash;
+                 if (tr is SAV1 s1 && Entity is PK1 p1) s1.OT_Trash.CopyTo(p1.OT_Trash);
+            else if (tr is SAV2 s2 && Entity is PK2 p2) s2.OT_Trash.CopyTo(p2.OT_Trash);
 
             UpdateNickname(this, EventArgs.Empty);
         }
@@ -572,10 +572,13 @@ namespace PKHeX.WinForms.Controls
         // Prompted Updates of PKM //
         private void ClickFriendship(object sender, EventArgs e)
         {
-            if (ModifierKeys == Keys.Control) // clear
-                TB_Friendship.Text = "0";
-            else
-                TB_Friendship.Text = TB_Friendship.Text == "255" ? Entity.PersonalInfo.BaseFriendship.ToString() : "255";
+            var pk = Entity;
+            bool worst = ModifierKeys == Keys.Control ^ pk.IsEgg;
+            var current = int.Parse(TB_Friendship.Text);
+            var value = worst
+                ? pk.IsEgg ? EggStateLegality.GetMinimumEggHatchCycles(pk) : 0
+                : pk.IsEgg ? EggStateLegality.GetMaximumEggHatchCycles(pk) : current == 255 ? pk.PersonalInfo.BaseFriendship : 255;
+            TB_Friendship.Text = value.ToString();
         }
 
         private void ClickLevel(object sender, EventArgs e)
@@ -706,7 +709,7 @@ namespace PKHeX.WinForms.Controls
                 Entity.CurrentHandler = 1;
             UpadteHandlingTrainerBackground(Entity.CurrentHandler);
 
-            TB_Friendship.Text = Entity.CurrentFriendship.ToString();
+            ReloadToFriendshipTextBox(Entity);
         }
 
         private void ClickNature(object sender, EventArgs e)
@@ -724,7 +727,8 @@ namespace PKHeX.WinForms.Controls
             UpdateLegality(skipMoveRepop: true);
             if (sender == GB_CurrentMoves)
             {
-                if (!SetSuggestedMoves(random: ModifierKeys == Keys.Control))
+                bool random = ModifierKeys == Keys.Control;
+                if (!SetSuggestedMoves(random))
                     return;
             }
             else if (sender == GB_RelearnMoves)
@@ -970,9 +974,9 @@ namespace PKHeX.WinForms.Controls
                 return;
             if (Util.ToInt32(tb.Text) > byte.MaxValue)
                 tb.Text = "255";
-            if (sender == TB_Friendship && int.TryParse(TB_Friendship.Text, out var val))
+            if (sender == TB_Friendship && int.TryParse(TB_Friendship.Text, out var value))
             {
-                Entity.CurrentFriendship = val;
+                UpdateFromFriendshipTextBox(Entity, value);
                 UpdateStats();
             }
         }
@@ -1214,7 +1218,7 @@ namespace PKHeX.WinForms.Controls
                 bool g4 = Entity.Gen4;
                 CB_GroundTile.Visible = Label_GroundTile.Visible = g4 && Entity.Format < 7;
                 if (!g4)
-                    CB_GroundTile.SelectedValue = 0;
+                    CB_GroundTile.SelectedValue = (int)GroundTileType.None;
             }
 
             if (!FieldsLoaded)
@@ -1239,16 +1243,26 @@ namespace PKHeX.WinForms.Controls
         {
             var metList = GameInfo.GetLocationList(version, format, egg: false);
             CB_MetLocation.DataSource = new BindingSource(metList, null);
+            CB_MetLocation.DropDownWidth = GetWidth(metList, CB_MetLocation.Font);
 
             var eggList = GameInfo.GetLocationList(version, format, egg: true);
             CB_EggLocation.DataSource = new BindingSource(eggList, null);
+            CB_EggLocation.DropDownWidth = GetWidth(eggList, CB_EggLocation.Font);
+
+            static int GetWidth(IEnumerable<ComboItem> items, Font f) =>
+                items.Max(z => TextRenderer.MeasureText(z.Text, f).Width) +
+                SystemInformation.VerticalScrollBarWidth;
 
             if (FieldsLoaded)
             {
                 SetMarkings(); // Set/Remove the Nativity marking when gamegroup changes too
                 int metLoc = EncounterSuggestion.GetSuggestedTransferLocation(Entity);
+                int eggLoc = CHK_AsEgg.Checked
+                    ? EncounterSuggestion.GetSuggestedEncounterEggLocationEgg(format, version)
+                    : Locations.GetNoneLocation(version);
+
                 CB_MetLocation.SelectedValue = Math.Max(0, metLoc);
-                CB_EggLocation.SelectedIndex = CHK_AsEgg.Checked ? 1 : 0; // daycare : none
+                CB_EggLocation.SelectedValue = eggLoc;
             }
             else
             {
@@ -1354,26 +1368,29 @@ namespace PKHeX.WinForms.Controls
             if (tb == TB_Nickname)
             {
                 Entity.Nickname = tb.Text;
-                var d = new TrashEditor(tb, Entity.Nickname_Trash, sav);
+                var span = Entity.Nickname_Trash;
+                var d = new TrashEditor(tb, span, sav);
                 d.ShowDialog();
                 tb.Text = d.FinalString;
-                Entity.Nickname_Trash = d.FinalBytes;
+                d.FinalBytes.CopyTo(span);
             }
             else if (tb == TB_OT)
             {
                 Entity.OT_Name = tb.Text;
-                var d = new TrashEditor(tb, Entity.OT_Trash, sav);
+                var span = Entity.OT_Trash;
+                var d = new TrashEditor(tb, span, sav);
                 d.ShowDialog();
                 tb.Text = d.FinalString;
-                Entity.OT_Trash = d.FinalBytes;
+                d.FinalBytes.CopyTo(span);
             }
             else if (tb == TB_OTt2)
             {
                 Entity.HT_Name = tb.Text;
-                var d = new TrashEditor(tb, Entity.HT_Trash, sav);
+                var span = Entity.HT_Trash;
+                var d = new TrashEditor(tb, span, sav);
                 d.ShowDialog();
                 tb.Text = d.FinalString;
-                Entity.HT_Trash = d.FinalBytes;
+                d.FinalBytes.CopyTo(span);
             }
         }
 
@@ -1383,7 +1400,7 @@ namespace PKHeX.WinForms.Controls
             {
                 ClickGT(GB_OT, EventArgs.Empty); // Switch CT over to OT.
                 Label_CTGender.Text = string.Empty;
-                TB_Friendship.Text = Entity.CurrentFriendship.ToString();
+                ReloadToFriendshipTextBox(Entity);
             }
             else if (string.IsNullOrWhiteSpace(Label_CTGender.Text))
             {
@@ -1406,7 +1423,7 @@ namespace PKHeX.WinForms.Controls
             Entity.IsEgg = CHK_IsEgg.Checked;
             if (CHK_IsEgg.Checked)
             {
-                TB_Friendship.Text = "1";
+                TB_Friendship.Text = EggStateLegality.GetMinimumEggHatchCycles(Entity).ToString();
 
                 // If we are an egg, it won't have a met location.
                 CHK_AsEgg.Checked = true;
@@ -1419,7 +1436,7 @@ namespace PKHeX.WinForms.Controls
                 {
                     var sav = SaveFileRequested.Invoke(this, e);
                     bool isTraded = sav.OT != TB_OT.Text || sav.TID != Entity.TID || sav.SID != Entity.SID;
-                    var loc = isTraded ? Locations.TradedEggLocation(sav.Generation, sav.Version) : 0;
+                    var loc = isTraded ? Locations.TradedEggLocation(sav.Generation, sav.Version) : Locations.GetNoneLocation(sav.Version);
                     CB_MetLocation.SelectedValue = loc;
                 }
                 else if (Entity.Format == 3)
@@ -1428,12 +1445,8 @@ namespace PKHeX.WinForms.Controls
                     TB_OT.Text = Entity.OT_Name;
                 }
 
-                if (!CHK_Nicknamed.Checked)
-                {
-                    TB_Nickname.Text = SpeciesName.GetSpeciesNameGeneration(0, WinFormsUtil.GetIndex(CB_Language), Entity.Format);
-                    if (Entity.Format != 4) // eggs in gen4 do not have nickname flag
-                        CHK_Nicknamed.Checked = true;
-                }
+                CHK_Nicknamed.Checked = EggStateLegality.IsNicknameFlagSet(Entity);
+                TB_Nickname.Text = SpeciesName.GetSpeciesNameGeneration(0, WinFormsUtil.GetIndex(CB_Language), Entity.Format);
 
                 // Wipe egg memories
                 if (Entity.Format >= 6 && ModifyPKM)
@@ -1448,9 +1461,15 @@ namespace PKHeX.WinForms.Controls
 
                 if (CB_EggLocation.SelectedIndex == 0)
                 {
+                    CAL_MetDate.Value = DateTime.Now;
                     CAL_EggDate.Value = new DateTime(2000, 01, 01);
                     CHK_AsEgg.Checked = false;
                     GB_EggConditions.Enabled = false;
+                }
+                else
+                {
+                    CAL_MetDate.Value = CAL_EggDate.Value;
+                    CB_MetLocation.SelectedValue = EncounterSuggestion.GetSuggestedEggMetLocation(Entity);
                 }
 
                 if (TB_Nickname.Text == SpeciesName.GetSpeciesNameGeneration(0, WinFormsUtil.GetIndex(CB_Language), Entity.Format))
@@ -1470,13 +1489,15 @@ namespace PKHeX.WinForms.Controls
                     return;
 
                 CAL_EggDate.Value = DateTime.Now;
-                CB_EggLocation.SelectedIndex = 1;
+
+                bool isTradedEgg = Entity.IsEgg && Entity.Version != (int)RequestSaveFile.Version;
+                CB_EggLocation.SelectedValue = EncounterSuggestion.GetSuggestedEncounterEggLocationEgg(Entity, isTradedEgg);
                 return;
             }
             // Remove egg met data
             CHK_IsEgg.Checked = false;
             CAL_EggDate.Value = new DateTime(2000, 01, 01);
-            CB_EggLocation.SelectedValue = 0;
+            CB_EggLocation.SelectedValue = Locations.GetNoneLocation((GameVersion)Entity.Version);
 
             UpdateLegality();
         }
@@ -1764,10 +1785,10 @@ namespace PKHeX.WinForms.Controls
             Entity.HT_Name = TB_OTt2.Text;
             Entity.OT_Name = TB_OT.Text;
             Entity.IsEgg = CHK_IsEgg.Checked;
-            Entity.CurrentFriendship = Util.ToInt32(TB_Friendship.Text);
+            UpdateFromFriendshipTextBox(Entity, Util.ToInt32(TB_Friendship.Text));
             using var form = new MemoryAmie(Entity);
             form.ShowDialog();
-            TB_Friendship.Text = Entity.CurrentFriendship.ToString();
+            ReloadToFriendshipTextBox(Entity);
         }
 
         private void B_Records_Click(object sender, EventArgs e)

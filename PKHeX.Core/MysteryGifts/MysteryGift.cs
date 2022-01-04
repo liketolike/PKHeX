@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core
 {
     /// <summary>
     /// Mystery Gift Template File
     /// </summary>
-    public abstract class MysteryGift : IEncounterable, IMoveset, IRelearn, ILocation, IFixedBall
+    public abstract class MysteryGift : IEncounterable, IMoveset, IRelearn, ILocation, IFixedBall, IFixedAbilityNumber
     {
         /// <summary>
         /// Determines whether or not the given length of bytes is valid for a mystery gift.
@@ -58,7 +59,7 @@ namespace PKHeX.Core
             WB8.Size => new WB8(data),
 
             // WC6/WC7: Check year
-            WC6.Size => BitConverter.ToUInt32(data, 0x4C) / 10000 < 2000 ? new WC7(data) : new WC6(data),
+            WC6.Size => ReadUInt32LittleEndian(data.AsSpan(0x4C)) / 10000 < 2000 ? new WC7(data) : new WC6(data),
             // WC6Full/WC7Full: 0x205 has 3 * 0x46 for gen6, now only 2.
             WC6Full.Size => data[0x205] == 0 ? new WC7Full(data).Gift : new WC6Full(data).Gift,
             _ => null,
@@ -113,6 +114,7 @@ namespace PKHeX.Core
 
         // Properties
         public virtual int Species { get => -1; set { } }
+        public abstract int Ability { get; }
         public abstract bool GiftUsed { get; set; }
         public abstract string CardTitle { get; set; }
         public abstract int CardID { get; set; }

@@ -1,7 +1,96 @@
 ﻿PKHeX - By Kaphotics
 http://projectpokemon.org/pkhex/
 
-21/11/19 - New Update
+22/01/01 - New Update:
+ - Legality:
+ - - Added: Hatch Counter legality checking.
+ - - Added: Contest Stat Sheen legality checking (roughly compared to amount of other contest stats gained).
+ - - Added: Munchlax encounter slots for DPPt and BDSP are now checked for Trainer ID legality.
+ - - Fixed: BDSP Gigantamax is now flagged illegal correctly.
+ - - Fixed: BDSP Meister Magikarp now recognized correctly.
+ - - Fixed: BDSP bred (egg) ball legality for Great Marsh exclusives now require Safari Ball.
+ - - Fixed: BDSP underground level ranges for Area 6 revised per National Dex early acquisition.
+ - - Fixed: BDSP encounter searching no longer considers SWSH TR flags when checking if a move is learnable.
+ - - Fixed: BDSP encounter slots that cannot obtain their Hidden Ability via Radar or Ability Patch are now flagged. Thanks @Lusamine !
+ - - Fixed: BDSP impossible egg hatch locations are now recognized (some version exclusives). Thanks @Lusamine & @sora10pls !
+ - - Fixed: BDSP location crossover surf encounters now recognized as valid. Thanks @sora10pls !
+ - - Fixed: SWSH "restaurant" memory now recognized as legal (Circhester restaurant). Thanks @Lusamine !
+ - - Fixed: Sketched moves are now properly flagged if the move is out of range for the game the PKM is present in.
+ - - Fixed: Gen4 Shedinja now recognizes correctly with Cute Charm, and permits Sport Ball due to HGSS ball quirk. Thanks @Lusamine !
+ - - Fixed: Gen1/2 Tradeback Catch Rates are now flagged if the PKM has Gen2 moves and the unmodified Gen1 catch rate. Thanks @soopercool101  !
+ - Added: SWSH Gen8 localization for Memories to display memories as they appeared in the memory's original game.
+ - Added: BDSP Dialga/Palkia & Roamer reset cheats to the Misc Editor. Thanks @sora10pls !
+ - Added: BDSP In-Game Trainers can now be marked as defeated in bulk in the Misc Editor.
+ - Added: BDSP savedata blocks are now editable for Battle Tower / RandomGroup / Union Room / etc.
+ - Added: BDSP inventory edits now acknowledge the item sort order.
+ - Fixed: BDSP inventory edits no longer set incorrect "NEW" flag values for items that have no quantity.
+ - Fixed: BDSP encrypted pb8 files are now recognized correctly when opened in the program.
+ - Fixed: BDSP daycare no longer indicates gained EXP (can't gain EXP from daycare).
+ - Fixed: BDSP eggs dropped into the program no longer partially set trainer data.
+ - Fixed: BDSP Pokedex clearing all entries now clears all form and language entries.
+ - Fixed: BDSP event work values can now be properly edited in the GUI. Thanks @MewTracker !
+ - Fixed: Gen4 Rival String can now be edited correctly.
+ - Fixed: Inventory editing can now filter out illegal items for giving all. SWSH no longer gives all illegal dynamax crystals.
+ - Fixed: Program Icon now appears correctly on some generic subform windows. Thanks @murrty !
+ - Fixed: Clearing Contest Stats now resets to the matched encounter template's minimum values.
+ - Fixed: Hint/Warn image no longer has stray opaque pixels. Thanks @sora10pls !
+ - Changed: Toggling egg state in the PKM Editor GUI will now update met locations and hatch counters correctly.
+ - Changed: Key Items with changed names (in BDSP) now reflect the BDSP name in prior games (DPPt).
+
+21/11/27 - New Update: (156702) [4347352]
+ - Legality:
+ - - Fixed: Shiny Roamers now recognized correctly (shiny type preservation with fakeTID).
+ - - Fixed: BDSP Milotic Prism Scale evolution is now disallowed. Thanks @sora10pls !
+ - - Fixed: BDSP Magnezone evolution via Thunder Stone instead of level up is now recognized correctly. Thanks @NinFanBoyFTW !
+ - - Fixed: BDSP Ribbon indexes for Pioneer and Twinkling Star now recognized correctly. Thanks @sora10pls !
+ - - Fixed: BDSP Ribbon legality revised to recognize all legal ribbons in BDSP. Thanks @Kermalis & @sora10pls !
+ - - Changed: BDSP TrainerID + SecretID both being zero is now illegal. Also int.MaxValue due to RNG quirks.
+ - - Added: Setting to flag entities with zero Height & Weight when appropriate; default severity is Fishy.
+ - Added: Height & Weight randomization in the PKM Editor GUI by control clicking the numeric entry.
+ - Added: BDSP Poffin Editor; hit Give All to give super poffins that max out contest stats in a single poffin.
+ - Added: BDSP received Sticker (Ball Capsule) editor; max quantity of a given sticker is 99.
+ - Added: BDSP Misc editor to toggle various cheats active (meeting all Underground NPCs, unlocking Shaymin/Darkrai events on latest patch).
+ - Added: BDSP Battle Team slots are now indicated in boxes, similar to Gen7. If teams ever get locked, then they will show the lock symbol too!
+ - Added: BDSP Safari RNG seed and roamer details now editable in the Encounter block.
+ - Added: BDSP Mystery Gift receiving records are now editable in the MysteryRecords block.
+ - Added: BDSP Player Misc data is now editable in the Player block.
+ - Added: BDSP Underground stats are now editable in UgCount block.
+ - Added: BDSP BP is now editable in the Trainer Info editor. Thanks @Synthlight !
+ - Fixed: BDSP game clear record is no longer clamped to 999,999. Please double check this record in the Trainer Editor and set to YYYYMMDD if needed.
+ - Fixed: BDSP genderless species are now registered to the Pokédex with both gender flags instead of just Male. Thanks @sora10pls !
+ - Fixed: BDSP Work values are now unclamped. Thanks @Bl4ckSh4rk !
+ - Fixed: BDSP custom system flag set now sets the correct flag value.
+ - Fixed: BDSP v1.1 save backups are now loaded into the File Browser (CTRL-F) correctly like v1.0 saves.
+ - Fixed: BDSP affixed ribbon values (not mutable in game, still present) now saves correctly in the Ribbon Editor.
+ - Changed: BDSP Box Backgrounds cropped for better viewing. Thanks @sora10pls!
+ - Changed: BDSP met locations now indicate sublocations if applicable for that zone ID. Met Location drop-downs now auto-size their width to fit all text.
+ - Changed: BDSP egg toggling via the PKM Editor GUI now sets the Nicknamed flag data according to matched encounter data.
+
+21/11/21 - New Update: (50606) [4190650]
+ - Legality:
+ - - Fixed: TM learn permissions now reference the correct move IDs.
+ - - Fixed: Elemental Beam type tutors now permitted for PB8 formats.
+ - - Fixed: Revised roamer met location list to match dumped roam locations.
+ - - Fixed: Feebas and Burmy encounter matching now behaves as intended.
+ - - Fixed: Ball legality for bred Fossil species restricted to only Poké Balls.
+ - - Added: Affixed Ribbon value is now checked for PB8 format.
+ - - Added: Minimum hatch counter values are now checked for all formats.
+ - Added: Clicking the Hatch Counter label now toggles min/max suggested values, similar to clicking the Friendship label shortcut.
+ - Added: BDSP saves now indicate the (computer local time) saved time from the save file. Backups are now saved with this detail.
+ - Added: BDSP Underground player inventory editor. Statues, goods, items, etc.
+ - Added: BDSP Specialized Trainer Info editor is now used for BD/SP instead of the old generic form.
+ - Added: BDSP Fashion unlock flags are now in the Event Flag editor.
+ - Added: BDSP PB8<->PK8 Incompatible conversion path is now available if opted in via program settings.
+ - Added: BDSP Daycare details including the RNG seed are now shown, similar to prior games.
+ - Fixed: BDSP poffin ingredient berries are now able to be edited via the player Inventory Editor.
+ - Fixed: BDSP inventory editor now deletes item slots that have been deleted via the GUI editor.
+ - Fixed: BDSP Blank PB8 files (encounter templates) are created with AffixedRibbon=-1, along with the met locations.
+ - Fixed: BDSP Batch editor now works for the PB8 format.
+ - Fixed: BDSP encounter database now yields Shining Pearl egg encounters.
+ - Fixed: Toggling egg state in the PKM Editor GUI now sets the correct met location values.
+ - Changed: Editing the HT_Friendship value for eggs in the Memories editor is now possible if it is a HT-handled egg, rather than being greyed out.
+
+21/11/19 - New Update: (41229) [4140044]
  - Introducing Brilliant Diamond & Shining Pearl Support! Thanks @SciresM, @sora10pls, @Lusamine, @architdate, @ReignOfComputer for troubleshooting!
  - - Initial Legality Checking is provided. Please refer to the forums when reporting legality issues for BDSP parsing.
  - - Bag editing, Pokédex, and Event Flags, Trainer Info editing is provided. More editable values can be found in the Block Data editor.

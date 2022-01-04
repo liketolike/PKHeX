@@ -10,7 +10,7 @@ namespace PKHeX.Core
     {
         // PKM Info
         public readonly string[] specieslist, movelist, itemlist, abilitylist, types, natures, forms,
-            memories, genloc, feeling, intensity,
+            memories, genloc, feeling6, feeling8, intensity,
             trainingbags, trainingstage, characteristics,
             groundtiletypes, balllist, gamelist, pokeblocks, ribbons;
 
@@ -96,7 +96,8 @@ namespace PKHeX.Core
             pokeblocks = Get("pokeblock");
             forms = Get("forms");
             memories = Get("memories");
-            feeling = Get("feeling");
+            feeling6 = Get("feeling6");
+            feeling8 = Get("feeling");
             intensity = Get("intensity");
             genloc = Get("genloc");
             trainingbags = Get("trainingbag");
@@ -264,19 +265,19 @@ namespace PKHeX.Core
             if (lang is "es" or "it")
             {
                 // Campeonato Mundial duplicates
-                for (int i = 27; i < 34; i++)
+                for (int i = 28; i < 35; i++)
                     metXY_40000[i] += " (-)";
 
                 // Evento de Videojuegos -- first as duplicate
-                metXY_40000[34] += " (-)";
-                metSM_40000[37] += " (-)";
-                metGG_40000[26] += " (-)";
+                metXY_40000[35] += " (-)";
+                metSM_40000[38] += " (-)";
+                metGG_40000[27] += " (-)";
             }
 
             if (lang == "ko")
             {
                 // Pokémon Ranger duplicate (should be Ranger Union)
-                metBW2_40000[70] += " (-)";
+                metBW2_40000[71] += " (-)";
             }
         }
 
@@ -303,24 +304,24 @@ namespace PKHeX.Core
                 metBW2_00000[i] += "●";
 
             // Collision between 40002 (legal) and 00002 (illegal) "Faraway place"
-            if (metBW2_00000[2] == metBW2_40000[2 - 1])
+            if (metBW2_00000[2] == metBW2_40000[2])
                 metBW2_00000[2] += " (2)";
 
-            for (int i = 96; i < 108; i++)
-                metBW2_40000[i] += $" ({i - 96})";
+            for (int i = 97; i < 109; i++)
+                metBW2_40000[i] += $" ({i - 97})";
 
             // Localize the Poketransfer to the language (30001)
-            metBW2_30000[1 - 1] = GameLanguage.GetTransporterName(LanguageIndex);
-            metBW2_30000[2 - 1] += $" ({NPC})";             // Anything from an NPC
-            metBW2_30000[3 - 1] += $" ({EggName})";         // Link Trade (Egg)
+            metBW2_30000[1] = GameLanguage.GetTransporterName(LanguageIndex);
+            metBW2_30000[2] += $" ({NPC})";             // Anything from an NPC
+            metBW2_30000[3] += $" ({EggName})";         // Link Trade (Egg)
 
             // Zorua/Zoroark events
-            metBW2_30000[10 - 1] = $"{specieslist[251]} ({specieslist[570]} 1)"; // Celebi's Zorua Event
-            metBW2_30000[11 - 1] = $"{specieslist[251]} ({specieslist[570]} 2)"; // Celebi's Zorua Event
-            metBW2_30000[12 - 1] = $"{specieslist[571]} (1)"; // Zoroark
-            metBW2_30000[13 - 1] = $"{specieslist[571]} (2)"; // Zoroark
+            metBW2_30000[10] = $"{specieslist[251]} ({specieslist[570]} 1)"; // Celebi's Zorua Event
+            metBW2_30000[11] = $"{specieslist[251]} ({specieslist[570]} 2)"; // Celebi's Zorua Event
+            metBW2_30000[12] = $"{specieslist[571]} (1)"; // Zoroark
+            metBW2_30000[13] = $"{specieslist[571]} (2)"; // Zoroark
 
-            metBW2_60000[3 - 1] += $" ({EggName})";  // Egg Treasure Hunter/Breeder, whatever...
+            metBW2_60000[3] += $" ({EggName})";  // Egg Treasure Hunter/Breeder, whatever...
         }
 
         private void SanitizeMetG6XY()
@@ -329,11 +330,11 @@ namespace PKHeX.Core
             metXY_00000[106] += " (X/Y)";      // Pokémon League
             metXY_00000[202] += " (OR/AS)";    // Pokémon League
             metXY_00000[298] += " (OR/AS)";    // Victory Road
-            metXY_30000[0] += $" ({NPC})";     // Anything from an NPC
-            metXY_30000[1] += $" ({EggName})"; // Egg From Link Trade
+            metXY_30000[1] += $" ({NPC})";     // Anything from an NPC
+            metXY_30000[2] += $" ({EggName})"; // Egg From Link Trade
 
-            for (int i = 62; i < 69; i++)
-                metXY_40000[i] += $" ({i - 61})";
+            for (int i = 63; i <= 69; i++)
+                metXY_40000[i] += $" ({i - 62})";
         }
 
         private void SanitizeMetG7SM()
@@ -352,15 +353,15 @@ namespace PKHeX.Core
             metSM_00000[32] += " (2)";
             metSM_00000[102] += " (2)";
 
-            metSM_30000[0] += $" ({NPC})";      // Anything from an NPC
-            metSM_30000[1] += $" ({EggName})";  // Egg From Link Trade
-            for (int i = 2; i <= 5; i++) // distinguish first set of regions (unused) from second (used)
+            metSM_30000[1] += $" ({NPC})";      // Anything from an NPC
+            metSM_30000[2] += $" ({EggName})";  // Egg From Link Trade
+            for (int i = 3; i <= 6; i++) // distinguish first set of regions (unused) from second (used)
                 metSM_30000[i] += " (-)";
 
-            for (int i = 58; i < 65; i++) // distinguish Event year duplicates
+            for (int i = 59; i < 66; i++) // distinguish Event year duplicates
                 metSM_40000[i] += " (-)";
 
-            for (int i = 47; i < 54; i++) // distinguish Event year duplicates
+            for (int i = 48; i < 55; i++) // distinguish Event year duplicates
                 metGG_40000[i] += " (-)";
         }
 
@@ -376,21 +377,21 @@ namespace PKHeX.Core
                 metSWSH_00000[i] += $" ({nextLoc})";
             }
 
-            metSWSH_30000[0] += $" ({NPC})";      // Anything from an NPC
-            metSWSH_30000[1] += $" ({EggName})";  // Egg From Link Trade
-            for (int i = 2; i <= 5; i++) // distinguish first set of regions (unused) from second (used)
+            metSWSH_30000[1] += $" ({NPC})";      // Anything from an NPC
+            metSWSH_30000[2] += $" ({EggName})";  // Egg From Link Trade
+            for (int i = 3; i <= 6; i++) // distinguish first set of regions (unused) from second (used)
                 metSWSH_30000[i] += " (-)";
-            metSWSH_30000[18] += " (?)"; // Kanto for the third time
+            metSWSH_30000[19] += " (?)"; // Kanto for the third time
 
-            for (int i = 54; i < 60; i++) // distinguish Event year duplicates
+            for (int i = 55; i < 61; i++) // distinguish Event year duplicates
                 metSWSH_40000[i] += " (-)";
-            metSWSH_40000[29] += " (-)"; // a Video game Event (in spanish etc) -- duplicate with line 39
-            metSWSH_40000[52] += " (-)"; // a Pokémon event -- duplicate with line 37
+            metSWSH_40000[30] += " (-)"; // a Video game Event (in spanish etc) -- duplicate with line 39
+            metSWSH_40000[53] += " (-)"; // a Pokémon event -- duplicate with line 37
 
-            metSWSH_40000[80] += " (-)"; // Pokémon GO -- duplicate with 30000's entry
-            metSWSH_40000[85] += " (-)"; // Pokémon HOME -- duplicate with 30000's entry
-            // metSWSH_30000[11] += " (-)"; // Pokémon GO -- duplicate with 40000's entry
-            // metSWSH_30000[17] += " (-)"; // Pokémon HOME -- duplicate with 40000's entry
+            metSWSH_40000[81] += " (-)"; // Pokémon GO -- duplicate with 30000's entry
+            metSWSH_40000[86] += " (-)"; // Pokémon HOME -- duplicate with 30000's entry
+            // metSWSH_30000[12] += " (-)"; // Pokémon GO -- duplicate with 40000's entry
+            // metSWSH_30000[18] += " (-)"; // Pokémon HOME -- duplicate with 40000's entry
         }
 
         private void SanitizeMetG8BDSP()
@@ -398,13 +399,13 @@ namespace PKHeX.Core
             metBDSP_30000[1] += $" ({NPC})";      // Anything from an NPC
             metBDSP_30000[2] += $" ({EggName})";  // Egg From Link Trade
 
-            Deduplicate(metBDSP_00000);
-            Deduplicate(metBDSP_30000);
-            Deduplicate(metBDSP_40000);
-            Deduplicate(metBDSP_60000);
+            Deduplicate(metBDSP_00000, 00000);
+            Deduplicate(metBDSP_30000, 30000);
+            Deduplicate(metBDSP_40000, 40000);
+            Deduplicate(metBDSP_60000, 60000);
         }
 
-        private static void Deduplicate(string[] arr)
+        private static void Deduplicate(string[] arr, int group)
         {
             var counts = new Dictionary<string, int>();
 
@@ -420,7 +421,7 @@ namespace PKHeX.Core
             for (var i = arr.Length - 1; i >= 0; i--)
             {
 #if DEBUG
-                arr[i] += $" ({i:00000})";
+                arr[i] += $" ({group + i:00000})";
 #else
                 var s = arr[i];
                 var count = counts[s]--;
@@ -533,8 +534,6 @@ namespace PKHeX.Core
                     gen = format;
 
                 location %= size;
-                if (bankID >= 3) // 30000 and onwards don't use 0th index, shift down 1
-                    location--;
             }
 
             var bank = GetLocationNames(gen, version, bankID);

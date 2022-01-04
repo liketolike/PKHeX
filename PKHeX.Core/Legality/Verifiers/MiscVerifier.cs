@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using static PKHeX.Core.LegalityCheckStrings;
 using static PKHeX.Core.CheckIdentifier;
+using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core
 {
@@ -168,7 +169,7 @@ namespace PKHeX.Core
         {
             var catch_rate = pk1.Catch_Rate;
             var tradeback = GBRestrictions.IsTimeCapsuleTransferred(pk1, data.Info.Moves, data.EncounterMatch);
-            var result = tradeback == TimeCapsuleEvaluation.NotTransferred
+            var result = tradeback is TimeCapsuleEvaluation.NotTransferred or TimeCapsuleEvaluation.BadCatchRate
                 ? GetWasNotTradeback(tradeback)
                 : GetWasTradeback(tradeback);
             data.AddLine(result);
@@ -185,6 +186,8 @@ namespace PKHeX.Core
 
             CheckResult GetWasNotTradeback(TimeCapsuleEvaluation timeCapsuleEvalution)
             {
+                if (data.Info.Moves.Any(z => z.Generation == 2))
+                    return GetInvalid(LG1CatchRateItem);
                 var e = data.EncounterMatch;
                 if (e is EncounterStatic1E {Version: GameVersion.Stadium} or EncounterTrade1)
                     return GetValid(LG1CatchRateMatchPrevious); // Encounters detected by the catch rate, cant be invalid if match this encounters
@@ -262,10 +265,7 @@ namespace PKHeX.Core
                 data.AddLine(GetInvalid(LEggPP, Egg));
 
             var enc = data.EncounterMatch;
-            var HatchCycles = enc is EncounterStatic s ? s.EggCycles : 0;
-            if (HatchCycles == 0) // no value set
-                HatchCycles = pkm.PersonalInfo.HatchCycles;
-            if (pkm.OT_Friendship > HatchCycles)
+            if (!EggStateLegality.GetIsEggHatchCyclesValid(pkm, enc))
                 data.AddLine(GetInvalid(LEggHatchCycles, Egg));
 
             if (pkm.Format >= 6 && enc is EncounterEgg && !MovesMatchRelearn(pkm))
@@ -436,8 +436,12 @@ namespace PKHeX.Core
 
         private static bool IsCloseEnough(float a, float b)
         {
-            var ia = BitConverter.ToInt32(BitConverter.GetBytes(a), 0);
-            var ib = BitConverter.ToInt32(BitConverter.GetBytes(b), 0);
+            // since we don't have access to SingleToInt32Bits on net46, just do a temp write-read.
+            Span<byte> ta = stackalloc byte[4];
+            WriteSingleLittleEndian(ta, a);
+            var ia = ReadInt32LittleEndian(ta);
+            WriteSingleLittleEndian(ta, b);
+            var ib = ReadInt32LittleEndian(ta);
             return Math.Abs(ia - ib) <= 7;
         }
 
@@ -510,13 +514,18 @@ namespace PKHeX.Core
                 data.AddLine(GetInvalid(string.Format(LMoveSourceTR, ParseSettings.MoveStrings[Legal.TMHM_SWSH[i + PersonalInfoSWSH.CountTM]])));
             }
 
-            // weight/height scalars can be legally 0 so don't bother checking
+            if (CheckHeightWeightOdds(data.EncounterMatch) && pk8.HeightScalar == 0 && pk8.WeightScalar == 0 && ParseSettings.ZeroHeightWeight != Severity.Valid)
+                data.AddLine(Get(LStatInvalidHeightWeight, ParseSettings.ZeroHeightWeight, Encounter));
         }
 
         private void VerifyBDSPStats(LegalityAnalysis data, PB8 pb8)
         {
             if (pb8.Favorite)
                 data.AddLine(GetInvalid(LFavoriteMarkingUnavailable, Encounter));
+
+            var affix = pb8.AffixedRibbon;
+            if (affix != -1) // None
+                data.AddLine(GetInvalid(string.Format(LRibbonMarkingAffixedF_0, affix)));
 
             var social = pb8.Sociability;
             if (social != 0)
@@ -529,7 +538,7 @@ namespace PKHeX.Core
                 data.AddLine(GetInvalid(LStatBattleVersionInvalid));
 
             if (pb8.CanGigantamax)
-                GetInvalid(LStatGigantamaxInvalid);
+                data.AddLine(GetInvalid(LStatGigantamaxInvalid));
 
             if (pb8.DynamaxLevel != 0)
                 data.AddLine(GetInvalid(LStatDynamaxInvalid));
@@ -537,7 +546,23 @@ namespace PKHeX.Core
             if (pb8.HasAnyMoveRecordFlag() && !pb8.IsEgg) // already checked for eggs
                 data.AddLine(GetInvalid(LEggRelearnFlags));
 
-            // weight/height scalars can be legally 0 so don't bother checking
+            if (CheckHeightWeightOdds(data.EncounterMatch) && pb8.HeightScalar == 0 && pb8.WeightScalar == 0 && ParseSettings.ZeroHeightWeight != Severity.Valid)
+                data.AddLine(Get(LStatInvalidHeightWeight, ParseSettings.ZeroHeightWeight, Encounter));
+        }
+
+        private static bool CheckHeightWeightOdds(IEncounterTemplate enc)
+        {
+            if (enc.Generation < 8)
+                return false;
+
+            if (GameVersion.BDSP.Contains(enc.Version))
+                return true;
+
+            if (enc is WC8 { IsHOMEGift: true })
+                return false;
+            if (GameVersion.SWSH.Contains(enc.Version))
+                return true;
+            return false;
         }
 
         private void VerifyStatNature(LegalityAnalysis data, PKM pk)

@@ -1,4 +1,6 @@
-﻿namespace PKHeX.Core
+﻿using System;
+
+namespace PKHeX.Core
 {
     /// <summary>
     /// Contains logic for the Generation 8b (BD/SP) roaming spawns.
@@ -24,6 +26,8 @@
             do
             {
                 var seed = Util.Rand32(rnd);
+                if (seed == int.MaxValue)
+                    continue; // Unity's Rand is [int.MinValue, int.MaxValue)
                 if (TryApplyFromSeed(pk, criteria, shiny, flawless, seed))
                     return;
             } while (++ctr != maxAttempts);
@@ -36,10 +40,11 @@
 
             // Encryption Constant
             pk.EncryptionConstant = seed;
-            var _ = xoro.NextUInt(); // fakeTID
 
             // PID
+            var fakeTID = xoro.NextUInt(); // fakeTID
             var pid = xoro.NextUInt();
+            pid = GetRevisedPID(fakeTID, pid, pk);
             if (shiny == Shiny.Never)
             {
                 if (GetIsShiny(pk.TID, pk.SID, pid))
@@ -58,12 +63,12 @@
             pk.PID = pid;
 
             // Check IVs: Create flawless IVs at random indexes, then the random IVs for not flawless.
-            int[] ivs = { UNSET, UNSET, UNSET, UNSET, UNSET, UNSET };
+            Span<int> ivs = stackalloc [] { UNSET, UNSET, UNSET, UNSET, UNSET, UNSET };
             const int MAX = 31;
             var determined = 0;
             while (determined < flawless)
             {
-                var idx = xoro.NextUInt(6);
+                var idx = (int)xoro.NextUInt(6);
                 if (ivs[idx] != UNSET)
                     continue;
                 ivs[idx] = 31;
@@ -100,21 +105,24 @@
         public static bool ValidateRoamingEncounter(PKM pk, Shiny shiny = Shiny.Random, int flawless = 0)
         {
             var seed = pk.EncryptionConstant;
+            if (seed == int.MaxValue)
+                return false; // Unity's Rand is [int.MinValue, int.MaxValue)
             var xoro = new Xoroshiro128Plus8b(seed);
 
             // Check PID
-            var _ = xoro.NextUInt(); // fakeTID
+            var fakeTID = xoro.NextUInt(); // fakeTID
             var pid = xoro.NextUInt();
+            pid = GetRevisedPID(fakeTID, pid, pk);
             if (pk.PID != pid)
                 return false;
 
             // Check IVs: Create flawless IVs at random indexes, then the random IVs for not flawless.
-            int[] ivs = { UNSET, UNSET, UNSET, UNSET, UNSET, UNSET };
+            Span<int> ivs = stackalloc [] { UNSET, UNSET, UNSET, UNSET, UNSET, UNSET };
 
             var determined = 0;
             while (determined < flawless)
             {
-                var idx = xoro.NextUInt(6);
+                var idx = (int)xoro.NextUInt(6);
                 if (ivs[idx] != UNSET)
                     continue;
                 ivs[idx] = 31;
@@ -127,12 +135,12 @@
                     ivs[i] = (int)xoro.NextUInt(31 + 1);
             }
 
-            if (ivs[0] != pk.GetIV(0)) return false;
-            if (ivs[1] != pk.GetIV(1)) return false;
-            if (ivs[2] != pk.GetIV(2)) return false;
-            if (ivs[3] != pk.GetIV(4)) return false;
-            if (ivs[4] != pk.GetIV(5)) return false;
-            if (ivs[5] != pk.GetIV(3)) return false;
+            if (ivs[0] != pk.IV_HP ) return false;
+            if (ivs[1] != pk.IV_ATK) return false;
+            if (ivs[2] != pk.IV_DEF) return false;
+            if (ivs[3] != pk.IV_SPA) return false;
+            if (ivs[4] != pk.IV_SPD) return false;
+            if (ivs[5] != pk.IV_SPE) return false;
 
             // Don't check Hidden ability, as roaming encounters are 1/2 only.
             if (pk.AbilityNumber != (1 << (int)xoro.NextUInt(2)))
@@ -226,10 +234,36 @@
             return s.HeightScalar == height && s.WeightScalar == weight;
         }
 
+        private static uint GetRevisedPID(uint fakeTID, uint pid, ITrainerID tr)
+        {
+            var xor = GetShinyXor(pid, fakeTID);
+            var newXor = GetShinyXor(pid, (uint)(tr.TID | (tr.SID << 16)));
+
+            var fakeRare = GetRareType(xor);
+            var newRare = GetRareType(newXor);
+
+            if (fakeRare == newRare)
+                return pid;
+
+            var isShiny = xor < 16;
+            if (isShiny)
+                return (((uint)(tr.TID ^ tr.SID) ^ (pid & 0xFFFF) ^ (xor == 0 ? 0u : 1u)) << 16) | (pid & 0xFFFF); // force same shiny star type
+            return pid ^ 0x1000_0000;
+        }
+
+        private static Shiny GetRareType(uint xor) => xor switch
+        {
+            0 => Shiny.AlwaysSquare,
+         < 16 => Shiny.AlwaysStar,
+            _ => Shiny.Never,
+        };
+
         private static bool GetIsShiny(int tid, int sid, uint pid)
         {
-            return GetShinyXor(pid, (uint)((sid << 16) | tid)) < 16;
+            return GetIsShiny(pid, (uint)((sid << 16) | tid));
         }
+
+        private static bool GetIsShiny(uint pid, uint oid) => GetShinyXor(pid, oid) < 16;
 
         private static uint GetShinyXor(uint pid, uint oid)
         {

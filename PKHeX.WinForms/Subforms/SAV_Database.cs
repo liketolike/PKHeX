@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using PKHeX.Core;
 using PKHeX.Core.Searching;
-using PKHeX.Drawing;
+using PKHeX.Drawing.PokeSprite;
 using PKHeX.WinForms.Controls;
 using PKHeX.WinForms.Properties;
 using static PKHeX.Core.MessageStrings;
@@ -154,11 +154,9 @@ namespace PKHeX.WinForms
                 if (File.Exists(path))
                     File.Delete(path);
             }
-            else if (entry.Source is SlotInfoBox b && entry.SAV == SAV)
+            else if (entry.Source is SlotInfoBox(var box, var slot) && entry.SAV == SAV)
             {
                 // Data from Box: Delete from save file
-                int box = b.Box;
-                int slot = b.Slot;
                 var change = new SlotInfoBox(box, slot);
                 var pkSAV = change.Read(SAV);
 
@@ -337,9 +335,7 @@ namespace PKHeX.WinForms
                 while (!IsHandleCreated) { }
                 BeginInvoke(new MethodInvoker(() => SetResults(RawDB)));
             }
-#pragma warning disable CA1031 // Do not catch general exception types
             catch { /* Window Closed? */ }
-#pragma warning restore CA1031 // Do not catch general exception types
         }
 
         private static List<SlotCache> LoadPKMSaves(string pkmdb, SaveFile SAV, IEnumerable<string> otherPaths, bool otherDeep)
@@ -653,9 +649,7 @@ namespace PKHeX.WinForms
                     continue;
 
                 try { File.Delete(path); ++deleted; }
-#pragma warning disable CA1031 // Do not catch general exception types
                 catch (Exception ex) { WinFormsUtil.Error(MsgDBDeleteCloneFail + Environment.NewLine + ex.Message + Environment.NewLine + path); }
-#pragma warning restore CA1031 // Do not catch general exception types
             }
 
             if (deleted == 0)

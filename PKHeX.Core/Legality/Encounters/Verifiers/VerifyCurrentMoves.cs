@@ -146,7 +146,7 @@ namespace PKHeX.Core
             var games = enc.Generation == 1 ? GBRestrictions.GetGen1Versions(enc) : GBRestrictions.GetGen2Versions(enc, pkm.Korean);
             foreach (var ver in games)
             {
-                var VerInitialMoves = enc is IMoveset {Moves: {Count: not 0}} x ? (int[])x.Moves : MoveLevelUp.GetEncounterMoves(enc.Species, 0, level, ver);
+                var VerInitialMoves = enc is IMoveset {Moves.Count: not 0 } x ? (int[])x.Moves : MoveLevelUp.GetEncounterMoves(enc.Species, 0, level, ver);
                 if (VerInitialMoves.Intersect(InitialMoves).Count() == VerInitialMoves.Length)
                     return res;
 
@@ -578,7 +578,7 @@ namespace PKHeX.Core
             {
                 if (evos[gen].Count != 2)
                     continue; // Was not evolved in this generation
-                if (gen == 4 && pkm.Ball != 4)
+                if (gen == 4 && pkm.Ball != 4 && !(pkm.Ball == (int)Ball.Sport && pkm.HGSS))
                     continue; // Was definitively evolved in Gen3
 
                 var maxLevel = pkm.CurrentLevel;

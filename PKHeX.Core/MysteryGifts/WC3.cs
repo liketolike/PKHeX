@@ -72,6 +72,8 @@ namespace PKHeX.Core
             init => _metLevel = value;
         }
 
+        public override int Ability => 0; // 1/2
+
         public override PKM ConvertToPKM(ITrainerInfo sav, EncounterCriteria criteria)
         {
             PK3 pk = new()
@@ -160,7 +162,7 @@ namespace PKHeX.Core
                 Moves = MoveList.GetBaseEggMoves(pk, Species, Form, (GameVersion)pk.Version, Level);
             if (Moves.Count != 4)
             {
-                var moves = Moves.ToArray();
+                int[] moves = Moves.ToArray();
                 Array.Resize(ref moves, 4);
                 Moves = moves;
             }

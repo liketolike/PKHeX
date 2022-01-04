@@ -10,7 +10,7 @@ namespace PKHeX.Core
     /// <remarks>
     /// Serves as the main object that is accessed for stat data in a particular generation/game format.
     /// </remarks>
-    public class PersonalTable
+    public sealed class PersonalTable
     {
         /// <summary>
         /// Personal Table used in <see cref="GameVersion.BDSP"/>.
@@ -112,10 +112,7 @@ namespace PKHeX.Core
         /// </summary>
         public static readonly PersonalTable Y = GetTable("y", GameVersion.YW);
 
-        private static PersonalTable GetTable(string game, GameVersion format)
-        {
-            return new(Util.GetBinaryResource($"personal_{game}"), format);
-        }
+        private static PersonalTable GetTable(string game, GameVersion format) => new(Util.GetBinaryResource($"personal_{game}"), format);
 
         private static Func<byte[], PersonalInfo> GetConstructor(GameVersion format) => format switch
         {
@@ -208,7 +205,7 @@ namespace PKHeX.Core
             }
         }
 
-        public PersonalTable(byte[] data, GameVersion format)
+        public PersonalTable(ReadOnlySpan<byte> data, GameVersion format)
         {
             var get = GetConstructor(format);
             int size = GetEntrySize(format);
