@@ -24,13 +24,13 @@ PKHeX espera archivos de guardado que no estén cifrados con las claves específ
 
 ## Capturas de Pantalla
 
-![Pantalla principal](https://i.imgur.com/tw9zZap.png)
+![Pantalla principal](https://i.imgur.com/umit9S2.png)
 
 ## Building
 
-PKHeX es una aplicación de Windows Forms que requiere [.NET Framework v4.6](https://www.microsoft.com/en-us/download/details.aspx?id=48137), con soporte experimental para [.NET 5.0](https://dotnet.microsoft.com/download/dotnet/5.0).
+PKHeX es una aplicación de Windows Forms que requiere [.NET Framework v4.6](https://www.microsoft.com/es-es/download/details.aspx?id=48137), con soporte experimental para [.NET 6.0](https://dotnet.microsoft.com/download/dotnet/6.0).
 
-El archivo ejecutable puede ser construido con cualquier compilador que soporte C# 8.
+El archivo ejecutable puede ser construido con cualquier compilador que soporte C# 10.
 
 ### Configuraciones del Build
 
@@ -42,9 +42,11 @@ La generación de códigos QR de PKHeX es la de [QRCoder](https://github.com/cod
 
 La colección de sprites de Pokémons Shiny de PKHeX fue tomada de [pokesprite](https://github.com/msikma/pokesprite), licenciado bajo [la licencia MIT](https://github.com/msikma/pokesprite/blob/master/LICENSE).
 
+PKHeX's Pokémon Legends: Arceus sprite collection is taken from the [National Pokédex - Icon Dex](https://www.deviantart.com/pikafan2000/art/National-Pokedex-Version-Delta-Icon-Dex-824897934) project and its abundance of collaborators and contributors.
+
 ### IDE
 
-PKHeX se puede abrir con un IDE como [Visual Studio](https://visualstudio.microsoft.com/downloads/), abriendo los archivos .sln o .csproj.
+PKHeX se puede abrir con un IDE como [Visual Studio](https://visualstudio.microsoft.com/es/downloads/), abriendo los archivos .sln o .csproj.
 
 ### GNU/Linux
 

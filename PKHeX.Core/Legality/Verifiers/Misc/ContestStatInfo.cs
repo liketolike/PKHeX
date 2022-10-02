@@ -1,49 +1,68 @@
-﻿using System;
+using System;
 using static PKHeX.Core.ContestStatGranting;
 
 namespace PKHeX.Core;
 
+/// <summary>
+/// Logic for checking and applying <see cref="IContestStats"/>.
+/// </summary>
 public static class ContestStatInfo
 {
-    private const int LowestFeelBlock3 = 3;
-    private const int LowestFeelPoffin4 = 17;
-    private const int LowestFeelPoffin8b = 8;
-    private const int MaxContestStat = 255;
-    private const int BestSheenStat8b = 160; // using optimal poffins in BD/SP, roughly 160-170; be generous.
+    private const int LowestFeelBlock3 = 1; // quad Nutpea
+    private const int LowestFeelPoffin4 = 11; // Beauty Haircut
+    private const int LowestFeelPoffin8b = 7;
+    private const int HighestFeelPoffin8b = 79;
 
-    public static void SetSuggestedContestStats(this PKM pk, IEncounterTemplate enc)
+    private const byte MaxContestStat = 255;
+
+    /// <summary>
+    /// By giving out all-Nutpea blocks in 3, you can have contest stats all maxed while feel is at 214 if the random stats of the foul blocks line up perfectly.
+    /// </summary>
+    private const int BestSheenStat3 = 214;
+
+    /// <summary>
+    /// Using optimal poffins in BD/SP, roughly 120-140; be generous.
+    /// </summary>
+    /// <remarks>
+    /// Liechi-Pomeg-Qualot-Occa etc. (2 each), which puts sheen at 140 and will max all stats if the cook times are 47.43 or faster
+    /// Leppa-Pomeg-Qualot-Occa etc. (3 each), which puts sheen at 135 and will max all stats if the cook times are 43.32 or faster
+    /// Liechi-Leppa-Pomeg-Qualot etc. (2 each), which puts sheen at 120 and will max all stats if the cook times area 40.40 or faster
+    /// </remarks>
+    private const int BestSheenStat8b = 120;
+
+    public static void SetSuggestedContestStats(this PKM pk, IEncounterTemplate enc, EvolutionHistory h)
     {
         if (pk is not IContestStatsMutable s)
             return;
 
-        var restrict = GetContestStatRestriction(pk, pk.Generation);
+        var restrict = GetContestStatRestriction(pk, pk.Generation, h);
         var baseStat = GetReferenceTemplate(enc);
         if (restrict == None || pk.Species is not (int)Species.Milotic)
             baseStat.CopyContestStatsTo(s); // reset
         else
-            s.SetAllContestStatsTo(MaxContestStat, restrict == NoSheen ? baseStat.CNT_Sheen : (byte)255);
+            s.SetAllContestStatsTo(MaxContestStat, restrict == NoSheen ? baseStat.CNT_Sheen : MaxContestStat);
     }
 
-    public static void SetMaxContestStats(this PKM pk, IEncounterTemplate enc)
+    public static void SetMaxContestStats(this PKM pk, IEncounterTemplate enc, EvolutionHistory h)
     {
         if (pk is not IContestStatsMutable s)
             return;
-        var restrict = GetContestStatRestriction(pk, pk.Generation);
+        var restrict = GetContestStatRestriction(pk, enc.Generation, h);
         var baseStat = GetReferenceTemplate(enc);
         if (restrict == None)
             return;
-        s.SetAllContestStatsTo(MaxContestStat, restrict == NoSheen ? baseStat.CNT_Sheen : (byte)255);
+        s.SetAllContestStatsTo(MaxContestStat, restrict == NoSheen ? baseStat.CNT_Sheen : MaxContestStat);
     }
 
-    public static ContestStatGranting GetContestStatRestriction(PKM pk, int origin) => origin switch
+    public static ContestStatGranting GetContestStatRestriction(PKM pk, int origin, EvolutionHistory h) => origin switch
     {
         3 => pk.Format < 6    ? CorrelateSheen : Mixed,
         4 => pk.Format < 6    ? CorrelateSheen : Mixed,
 
-        5 => pk.Format >= 6          ? NoSheen : None, // ORAS Contests
-        6 => pk.AO || !pk.IsUntraded ? NoSheen : None,
-        8 => pk.BDSP          ? CorrelateSheen : None, // BDSP Contests
-        _ => None,
+        5 => pk.Format < 6           ? None : !h.HasVisitedBDSP ? NoSheen : Mixed, // ORAS Contests
+        6 => !pk.AO && pk.IsUntraded ? None : !h.HasVisitedBDSP ? NoSheen : Mixed,
+
+        _ => h.HasVisitedBDSP ? CorrelateSheen : None, // BDSP Contests
     };
 
     public static int CalculateMaximumSheen(IContestStats s, int nature, IContestStats initial, bool pokeBlock3)
@@ -61,9 +80,20 @@ public static class ContestStatInfo
         if (avg <= 0)
             return initial.CNT_Sheen;
 
+		if (avg <= 2)
+			return 59;
+
         // Can get trash poffins by burning and spilling on purpose.
-        return Math.Min(MaxContestStat, avg * LowestFeelPoffin4);
+        return Math.Min(MaxContestStat, avg * HighestFeelPoffin8b);
     }
+
+    public static int CalculateMinimumSheen(IContestStats s, IContestStats initial, INature pk, ContestStatGrantingSheen method) => method switch
+    {
+        ContestStatGrantingSheen.Gen8b => CalculateMinimumSheen8b(s, pk.Nature, initial),
+        ContestStatGrantingSheen.Gen3 => CalculateMinimumSheen3(s, pk.Nature, initial),
+        ContestStatGrantingSheen.Gen4 => CalculateMinimumSheen4(s, pk.Nature, initial),
+        _ => throw new ArgumentOutOfRangeException(nameof(method)),
+    };
 
     // Slightly better stat:sheen ratio than Gen4; prefer if has visited.
     public static int CalculateMinimumSheen8b(IContestStats s, int nature, IContestStats initial)
@@ -77,11 +107,12 @@ public static class ContestStatInfo
 
         var avg = Math.Max(1, nature % 6 == 0 ? rawAvg : GetAverageFeel(s, nature, initial));
         avg = Math.Min(rawAvg, avg); // be generous
+        avg = (BestSheenStat8b * avg) / MaxContestStat;
 
         return Math.Min(BestSheenStat8b, Math.Max(LowestFeelPoffin8b, avg));
     }
 
-    public static int CalculateMinimumSheen(IContestStats s, int nature, IContestStats initial, bool pokeBlock3)
+    public static int CalculateMinimumSheen3(IContestStats s, int nature, IContestStats initial)
     {
         if (s.IsContestEqual(initial))
             return initial.CNT_Sheen;
@@ -93,14 +124,30 @@ public static class ContestStatInfo
         var avg = Math.Max(1, nature % 6 == 0 ? rawAvg : GetAverageFeel(s, nature, initial));
         avg = Math.Min(rawAvg, avg); // be generous
 
-        var worst = pokeBlock3 ? LowestFeelBlock3 : LowestFeelPoffin4;
-        return Math.Min(MaxContestStat, Math.Max(worst, avg));
+        avg = (BestSheenStat3 * avg) / MaxContestStat;
+        return Math.Min(BestSheenStat3, Math.Max(LowestFeelBlock3, avg));
+    }
+
+    public static int CalculateMinimumSheen4(IContestStats s, int nature, IContestStats initial)
+    {
+        if (s.IsContestEqual(initial))
+            return initial.CNT_Sheen;
+
+        var rawAvg = GetAverageFeel(s, 0, initial);
+        if (rawAvg == MaxContestStat)
+            return MaxContestStat;
+
+        var avg = Math.Max(1, nature % 6 == 0 ? rawAvg : GetAverageFeel(s, nature, initial));
+        avg = Math.Min(rawAvg, avg); // be generous
+
+        return Math.Min(MaxContestStat, Math.Max(LowestFeelPoffin4, avg));
     }
 
     private static int CalculateMaximumSheen3(IContestStats s, int nature, IContestStats initial)
     {
         // By using Enigma and Lansat and a 25 +1/-1, can get a +9/+19s at minimum RPM
-        // By using Enigma, Lansat, and Starf, can get a black +2/2/2 & 21 block (6:21) at minimum RPM.
+        // By using Strib, Chilan, Niniku, or Topo, can get a black +2/2/2 & 83 block (6:83) at minimum RPM.
+        // https://github.com/kwsch/PKHeX/issues/3517
         var sum = GetGainedSum(s, nature, initial);
         if (sum == 0)
             return 0;
@@ -114,14 +161,14 @@ public static class ContestStatInfo
         bool has3 = gained >= 3;
 
         // Prefer the bad-black-block correlation if more than 3 stats have gains >= 2.
-        var permit = has3 ? (sum * 21 / 6) : (sum * 19 / 9);
+        var permit = has3 ? (sum * 83 / 6) : (sum * 19 / 9);
         return Math.Min(MaxContestStat, Math.Max(LowestFeelBlock3, permit));
     }
 
     private static int GetAverageFeel(IContestStats s, int nature, IContestStats initial)
     {
         var sum = GetGainedSum(s, nature, initial);
-        return sum / 5;
+        return (int)Math.Ceiling(sum / 5f);
     }
 
     private static int GetGainedSum(IContestStats s, int nature, IContestStats initial)
@@ -164,9 +211,9 @@ public static class ContestStatInfo
 
     private static readonly DummyContestNone DummyNone = new();
 
-    public static IContestStats GetReferenceTemplate(IEncounterTemplate initial) => initial is IContestStats s ? s : DummyNone;
+    public static IContestStats GetReferenceTemplate(IEncounterTemplate initial) => initial as IContestStats ?? DummyNone;
 
-    private class DummyContestNone : IContestStats
+    private sealed class DummyContestNone : IContestStats
     {
         public byte CNT_Cool => 0;
         public byte CNT_Beauty => 0;

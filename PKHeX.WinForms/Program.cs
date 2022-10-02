@@ -36,7 +36,7 @@ namespace PKHeX.WinForms
             new Task(() => splash.ShowDialog()).Start();
             new Task(() => EncounterEvent.RefreshMGDB(WinForms.Main.MGDatabasePath)).Start();
             var main = new Main();
-            splash.Invoke((MethodInvoker)(() => splash.Close()));
+            splash.Invoke(() => splash.ForceClose());
             Application.Run(main);
         }
 
@@ -130,7 +130,7 @@ namespace PKHeX.WinForms
 
         private static bool IsOldPkhexCorePresent(Exception? ex)
         {
-            return ex is MissingMethodException
+            return ex is MissingMethodException or TypeLoadException or TypeInitializationException
                 && File.Exists("PKHeX.Core.dll")
                 && AssemblyName.GetAssemblyName("PKHeX.Core.dll").Version < Assembly.GetExecutingAssembly().GetName().Version;
         }

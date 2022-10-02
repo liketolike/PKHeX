@@ -4,6 +4,9 @@ using System.Linq;
 
 namespace PKHeX.Core;
 
+/// <summary>
+/// Utility Logic for converting Generation 4 character encoding.
+/// </summary>
 public static class StringConverter4Util
 {
     /// <summary>
@@ -29,7 +32,7 @@ public static class StringConverter4Util
     }
 
     /// <summary>
-    /// Strips diacritics on gen1-4 french pkm names
+    /// Strips diacritics on gen1-4 french pk names
     /// </summary>
     /// <param name="input">String to clean</param>
     /// <returns>Cleaned string</returns>

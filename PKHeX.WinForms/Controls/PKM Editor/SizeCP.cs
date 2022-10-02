@@ -3,133 +3,157 @@ using System.Globalization;
 using System.Windows.Forms;
 using PKHeX.Core;
 
-namespace PKHeX.WinForms.Controls
+namespace PKHeX.WinForms.Controls;
+
+public partial class SizeCP : UserControl
 {
-    public partial class SizeCP : UserControl
+    private IScaledSize? ss;
+    private IScaledSizeValue? sv;
+    private ICombatPower? pk;
+    private bool Loading;
+
+    public SizeCP()
     {
-        private IScaledSize? ss;
-        private PB7? pkm;
-        private bool Loading;
+        InitializeComponent();
+        Initialized = true;
+    }
 
-        public SizeCP()
+    private readonly bool Initialized;
+    private static readonly string[] SizeClass = Enum.GetNames(typeof(PokeSize));
+
+    public void LoadPKM(PKM entity)
+    {
+        pk = entity as ICombatPower;
+        ss = entity as IScaledSize;
+        sv = entity as IScaledSizeValue;
+        if (ss == null)
+            return;
+        TryResetStats();
+    }
+
+    public void TryResetStats()
+    {
+        if (!Initialized)
+            return;
+
+        if (CHK_Auto.Checked)
+            ResetCalculatedStats();
+        LoadStoredValues();
+    }
+
+    private void ResetCalculatedStats()
+    {
+        sv?.ResetHeight();
+        sv?.ResetWeight();
+        pk?.ResetCP();
+    }
+
+    private static string GetString(float value) => value.ToString("F6", CultureInfo.InvariantCulture);
+
+    private void LoadStoredValues()
+    {
+        Loading = true;
+        if (ss != null)
         {
-            InitializeComponent();
-            Initialized = true;
+            if (NUD_HeightScalar.Focused || NUD_WeightScalar.Focused)
+                CHK_Auto.Focus();
+            NUD_HeightScalar.Value = ss.HeightScalar;
+            NUD_WeightScalar.Value = ss.WeightScalar;
         }
-
-        private readonly bool Initialized;
-        private static readonly string[] SizeClass = Enum.GetNames(typeof(PokeSize));
-
-        public void LoadPKM(PKM pk)
+        if (sv != null)
         {
-            pkm = pk as PB7;
-            ss = pk as IScaledSize;
-            if (ss == null)
-                return;
-            TryResetStats();
+            TB_HeightAbs.Text = GetString(sv.HeightAbsolute);
+            TB_WeightAbs.Text = GetString(sv.WeightAbsolute);
         }
-
-        public void TryResetStats()
+        if (pk != null)
         {
-            if (!Initialized)
-                return;
-
-            if (pkm != null && CHK_Auto.Checked)
-                pkm.ResetCalculatedValues();
-            LoadStoredValues();
+            MT_CP.Text = Math.Min(65535, pk.Stat_CP).ToString();
         }
+        Loading = false;
+    }
 
-        private void LoadStoredValues()
+    private void UpdateFlagState(object sender, EventArgs e)
+    {
+        if (!CHK_Auto.Checked)
+            return;
+
+        ResetCalculatedStats();
+        LoadStoredValues();
+    }
+
+    private void MT_CP_TextChanged(object sender, EventArgs e)
+    {
+        if (pk != null && int.TryParse(MT_CP.Text, out var cp))
+            pk.Stat_CP = Math.Min(65535, cp);
+    }
+
+    private void NUD_HeightScalar_ValueChanged(object sender, EventArgs e)
+    {
+        if (ss != null)
         {
-            Loading = true;
-            if (ss != null)
-            {
-                NUD_HeightScalar.Value = ss.HeightScalar;
-                NUD_WeightScalar.Value = ss.WeightScalar;
-            }
-            if (pkm != null)
-            {
-                MT_CP.Text = Math.Min(65535, pkm.Stat_CP).ToString();
-                TB_HeightAbs.Text = pkm.HeightAbsolute.ToString(CultureInfo.InvariantCulture);
-                TB_WeightAbs.Text = pkm.WeightAbsolute.ToString(CultureInfo.InvariantCulture);
-            }
-            Loading = false;
-        }
-
-        private void UpdateFlagState(object sender, EventArgs e)
-        {
-            if (!CHK_Auto.Checked)
-                return;
-
-            pkm?.ResetCalculatedValues();
-            LoadStoredValues();
-        }
-
-        private void MT_CP_TextChanged(object sender, EventArgs e)
-        {
-            if (int.TryParse(MT_CP.Text, out var cp) && pkm != null)
-                pkm.Stat_CP = Math.Min(65535, cp);
-        }
-
-        private void NUD_HeightScalar_ValueChanged(object sender, EventArgs e)
-        {
-            if (ss != null)
-            {
+            if (!Loading)
                 ss.HeightScalar = (byte) NUD_HeightScalar.Value;
-                L_SizeH.Text = SizeClass[(int)PokeSizeUtil.GetSizeRating(ss.HeightScalar)];
-            }
-
-            if (!CHK_Auto.Checked || Loading || pkm == null)
-                return;
-            pkm.ResetHeight();
-            TB_HeightAbs.Text = pkm.HeightAbsolute.ToString("F8");
+            L_SizeH.Text = SizeClass[(int)PokeSizeUtil.GetSizeRating(ss.HeightScalar)];
         }
 
-        private void NUD_WeightScalar_ValueChanged(object sender, EventArgs e)
+        if (!CHK_Auto.Checked || Loading || sv == null)
+            return;
+        sv.ResetHeight();
+        sv.ResetWeight();
+        TB_HeightAbs.Text = GetString(sv.HeightAbsolute);
+        TB_WeightAbs.Text = GetString(sv.WeightAbsolute);
+        if (sv is PA8 a)
+            a.HeightScalarCopy = a.HeightScalar;
+    }
+
+    private void NUD_WeightScalar_ValueChanged(object sender, EventArgs e)
+    {
+        if (ss != null)
         {
-            if (ss != null)
-            {
+            if (!Loading)
                 ss.WeightScalar = (byte) NUD_WeightScalar.Value;
-                L_SizeW.Text = SizeClass[(int)PokeSizeUtil.GetSizeRating(ss.WeightScalar)];
-            }
-
-            if (!CHK_Auto.Checked || Loading || pkm == null)
-                return;
-            pkm.ResetWeight();
-            TB_WeightAbs.Text = pkm.WeightAbsolute.ToString("F8");
+            L_SizeW.Text = SizeClass[(int)PokeSizeUtil.GetSizeRating(ss.WeightScalar)];
         }
 
-        private void TB_HeightAbs_TextChanged(object sender, EventArgs e)
-        {
-            if (pkm == null)
-                return;
-            if (CHK_Auto.Checked)
-                pkm.ResetHeight();
-            else if (float.TryParse(TB_HeightAbs.Text, out var result))
-                pkm.HeightAbsolute = result;
-        }
+        if (!CHK_Auto.Checked || Loading || sv == null)
+            return;
+        sv.ResetWeight();
+        TB_WeightAbs.Text = GetString(sv.WeightAbsolute);
+    }
 
-        private void TB_WeightAbs_TextChanged(object sender, EventArgs e)
-        {
-            if (pkm == null)
-                return;
-            if (CHK_Auto.Checked)
-                pkm.ResetWeight();
-            else if (float.TryParse(TB_WeightAbs.Text, out var result))
-                pkm.WeightAbsolute = result;
-        }
+    private void TB_HeightAbs_TextChanged(object sender, EventArgs e)
+    {
+        if (sv == null || Loading)
+            return;
+        if (CHK_Auto.Checked)
+            sv.ResetHeight();
+        else if (float.TryParse(TB_HeightAbs.Text, out var result))
+            sv.HeightAbsolute = result;
+    }
 
-        public void ToggleVisibility(PKM pk)
-        {
-            var pb7 = pk is PB7;
-            FLP_CP.Visible = L_CP.Visible = TB_HeightAbs.Visible = TB_WeightAbs.Visible = pb7;
-        }
+    private void TB_WeightAbs_TextChanged(object sender, EventArgs e)
+    {
+        if (sv == null || Loading)
+            return;
+        if (CHK_Auto.Checked)
+            sv.ResetWeight();
+        else if (float.TryParse(TB_WeightAbs.Text, out var result))
+            sv.WeightAbsolute = result;
+    }
 
-        private void ClickScalarEntry(object sender, EventArgs e)
-        {
-            if (sender is not NumericUpDown nud || ModifierKeys != Keys.Control)
-                return;
-            nud.Value = PokeSizeUtil.GetRandomScalar();
-        }
+    public void ToggleVisibility(PKM entity)
+    {
+        bool isCP = entity is ICombatPower;
+        bool isAbsolute = entity is IScaledSizeValue;
+        MT_CP.Visible = L_CP.Visible = isCP;
+        TB_HeightAbs.Visible = TB_WeightAbs.Visible = isAbsolute;
+        FLP_CP.Visible = isCP || isAbsolute; // Auto checkbox
+    }
+
+    private void ClickScalarEntry(object sender, EventArgs e)
+    {
+        if (sender is not NumericUpDown nud || ModifierKeys != Keys.Control)
+            return;
+        nud.Value = PokeSizeUtil.GetRandomScalar();
     }
 }

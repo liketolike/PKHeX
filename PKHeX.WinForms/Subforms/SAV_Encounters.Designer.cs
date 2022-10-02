@@ -64,6 +64,7 @@
             this.TC_SearchOptions = new System.Windows.Forms.TabControl();
             this.Tab_General = new System.Windows.Forms.TabPage();
             this.Tab_Advanced = new System.Windows.Forms.TabPage();
+            this.B_Add = new System.Windows.Forms.Button();
             this.menuStrip1.SuspendLayout();
             this.P_Results.SuspendLayout();
             this.TLP_Filters.SuspendLayout();
@@ -434,10 +435,13 @@
             // 
             // RTB_Instructions
             // 
-            this.RTB_Instructions.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.RTB_Instructions.Location = new System.Drawing.Point(0, 0);
+            this.RTB_Instructions.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.RTB_Instructions.Location = new System.Drawing.Point(0, 42);
+            this.RTB_Instructions.Margin = new System.Windows.Forms.Padding(0);
             this.RTB_Instructions.Name = "RTB_Instructions";
-            this.RTB_Instructions.Size = new System.Drawing.Size(256, 314);
+            this.RTB_Instructions.Size = new System.Drawing.Size(256, 272);
             this.RTB_Instructions.TabIndex = 119;
             this.RTB_Instructions.Text = "";
             // 
@@ -481,6 +485,7 @@
             // 
             // Tab_Advanced
             // 
+            this.Tab_Advanced.Controls.Add(this.B_Add);
             this.Tab_Advanced.Controls.Add(this.RTB_Instructions);
             this.Tab_Advanced.Location = new System.Drawing.Point(4, 22);
             this.Tab_Advanced.Name = "Tab_Advanced";
@@ -488,6 +493,17 @@
             this.Tab_Advanced.TabIndex = 1;
             this.Tab_Advanced.Text = "Advanced";
             this.Tab_Advanced.UseVisualStyleBackColor = true;
+            // 
+            // B_Add
+            // 
+            this.B_Add.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.B_Add.Location = new System.Drawing.Point(197, -1);
+            this.B_Add.Name = "B_Add";
+            this.B_Add.Size = new System.Drawing.Size(57, 23);
+            this.B_Add.TabIndex = 122;
+            this.B_Add.Text = "Add";
+            this.B_Add.UseVisualStyleBackColor = true;
+            this.B_Add.Click += new System.EventHandler(this.B_Add_Click);
             // 
             // SAV_Encounters
             // 
@@ -508,6 +524,7 @@
             this.Name = "SAV_Encounters";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Database";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.SAV_Encounters_FormClosing);
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();
             this.P_Results.ResumeLayout(false);
@@ -560,5 +577,6 @@
         private System.Windows.Forms.TabPage Tab_Advanced;
         public System.Windows.Forms.CheckBox CHK_IsEgg;
         public System.Windows.Forms.CheckBox CHK_Shiny;
+        private System.Windows.Forms.Button B_Add;
     }
 }

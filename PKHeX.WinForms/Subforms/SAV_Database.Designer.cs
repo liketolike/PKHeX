@@ -36,8 +36,8 @@
             this.Menu_Tools = new System.Windows.Forms.ToolStripMenuItem();
             this.Menu_SearchSettings = new System.Windows.Forms.ToolStripMenuItem();
             this.Menu_SearchBoxes = new System.Windows.Forms.ToolStripMenuItem();
-            this.Menu_SearchBackups = new System.Windows.Forms.ToolStripMenuItem();
             this.Menu_SearchDatabase = new System.Windows.Forms.ToolStripMenuItem();
+            this.Menu_SearchBackups = new System.Windows.Forms.ToolStripMenuItem();
             this.Menu_SearchLegal = new System.Windows.Forms.ToolStripMenuItem();
             this.Menu_SearchIllegal = new System.Windows.Forms.ToolStripMenuItem();
             this.Menu_SearchClones = new System.Windows.Forms.ToolStripMenuItem();
@@ -100,6 +100,7 @@
             this.Tab_General = new System.Windows.Forms.TabPage();
             this.Tab_Advanced = new System.Windows.Forms.TabPage();
             this.RTB_Instructions = new System.Windows.Forms.RichTextBox();
+            this.B_Add = new System.Windows.Forms.Button();
             this.menuStrip1.SuspendLayout();
             this.P_Results.SuspendLayout();
             this.FLP_Egg.SuspendLayout();
@@ -189,15 +190,6 @@
             this.Menu_SearchBoxes.Size = new System.Drawing.Size(198, 22);
             this.Menu_SearchBoxes.Text = "Search Within Boxes";
             // 
-            // Menu_SearchBackups
-            // 
-            this.Menu_SearchBackups.Checked = true;
-            this.Menu_SearchBackups.CheckOnClick = true;
-            this.Menu_SearchBackups.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.Menu_SearchBackups.Name = "Menu_SearchBackups";
-            this.Menu_SearchBackups.Size = new System.Drawing.Size(198, 22);
-            this.Menu_SearchBackups.Text = "Search Within Backups";
-            // 
             // Menu_SearchDatabase
             // 
             this.Menu_SearchDatabase.Checked = true;
@@ -206,6 +198,15 @@
             this.Menu_SearchDatabase.Name = "Menu_SearchDatabase";
             this.Menu_SearchDatabase.Size = new System.Drawing.Size(198, 22);
             this.Menu_SearchDatabase.Text = "Search Within Database";
+            // 
+            // Menu_SearchBackups
+            // 
+            this.Menu_SearchBackups.Checked = true;
+            this.Menu_SearchBackups.CheckOnClick = true;
+            this.Menu_SearchBackups.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.Menu_SearchBackups.Name = "Menu_SearchBackups";
+            this.Menu_SearchBackups.Size = new System.Drawing.Size(198, 22);
+            this.Menu_SearchBackups.Text = "Search Within Backups";
             // 
             // Menu_SearchLegal
             // 
@@ -699,7 +700,7 @@
             "Gen 5 (BW/B2W2)",
             "Gen 6 (XY/ORAS)",
             "Gen 7 (SM/USUM/LGPE)",
-            "Gen 8 (SWSH)"});
+            "Gen 8 (SWSH/BDSP/LA)"});
             this.CB_Generation.Location = new System.Drawing.Point(83, 293);
             this.CB_Generation.Margin = new System.Windows.Forms.Padding(0);
             this.CB_Generation.Name = "CB_Generation";
@@ -977,6 +978,7 @@
             // 
             // Tab_Advanced
             // 
+            this.Tab_Advanced.Controls.Add(this.B_Add);
             this.Tab_Advanced.Controls.Add(this.RTB_Instructions);
             this.Tab_Advanced.Location = new System.Drawing.Point(4, 22);
             this.Tab_Advanced.Name = "Tab_Advanced";
@@ -987,12 +989,26 @@
             // 
             // RTB_Instructions
             // 
-            this.RTB_Instructions.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.RTB_Instructions.Location = new System.Drawing.Point(0, 0);
+            this.RTB_Instructions.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.RTB_Instructions.Location = new System.Drawing.Point(0, 42);
+            this.RTB_Instructions.Margin = new System.Windows.Forms.Padding(0);
             this.RTB_Instructions.Name = "RTB_Instructions";
-            this.RTB_Instructions.Size = new System.Drawing.Size(256, 362);
+            this.RTB_Instructions.Size = new System.Drawing.Size(256, 320);
             this.RTB_Instructions.TabIndex = 120;
             this.RTB_Instructions.Text = "";
+            // 
+            // B_Add
+            // 
+            this.B_Add.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.B_Add.Location = new System.Drawing.Point(196, -1);
+            this.B_Add.Name = "B_Add";
+            this.B_Add.Size = new System.Drawing.Size(57, 23);
+            this.B_Add.TabIndex = 122;
+            this.B_Add.Text = "Add";
+            this.B_Add.UseVisualStyleBackColor = true;
+            this.B_Add.Click += new System.EventHandler(this.B_Add_Click);
             // 
             // SAV_Database
             // 
@@ -1106,5 +1122,6 @@
         private System.Windows.Forms.TabPage Tab_Advanced;
         private System.Windows.Forms.RichTextBox RTB_Instructions;
         private System.Windows.Forms.ToolStripMenuItem Menu_SearchBackups;
+        private System.Windows.Forms.Button B_Add;
     }
 }

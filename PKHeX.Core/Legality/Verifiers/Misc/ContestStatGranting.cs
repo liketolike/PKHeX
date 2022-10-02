@@ -1,5 +1,9 @@
 ﻿namespace PKHeX.Core;
 
+/// <summary>
+/// Rules for how <see cref="IContestStats"/> are acquired.
+/// </summary>
+/// <seealso cref="ContestStatGrantingSheen"/>
 public enum ContestStatGranting
 {
     /// <summary> Not possible to get any contest stats. </summary>

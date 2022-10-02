@@ -1,5 +1,6 @@
 ﻿#if DEBUG
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -46,17 +47,19 @@ namespace PKHeX.WinForms
 
         private static void UpdateTranslations()
         {
+            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+            var types = assembly.GetTypes();
             // add mode
             WinFormsTranslator.SetRemovalMode(false);
             WinFormsTranslator.LoadSettings<PKHeXSettings>(DefaultLanguage);
-            WinFormsTranslator.LoadAllForms(LoadBanlist); // populate with every possible control
+            WinFormsTranslator.LoadAllForms(types, LoadBanlist); // populate with every possible control
             WinFormsTranslator.UpdateAll(DefaultLanguage, Languages); // propagate to others
             WinFormsTranslator.DumpAll(Banlist); // dump current to file
 
             // de-populate
             WinFormsTranslator.SetRemovalMode(); // remove used keys, don't add any
             WinFormsTranslator.LoadSettings<PKHeXSettings>(DefaultLanguage, false);
-            WinFormsTranslator.LoadAllForms(LoadBanlist);
+            WinFormsTranslator.LoadAllForms(types, LoadBanlist);
             WinFormsTranslator.RemoveAll(DefaultLanguage, PurgeBanlist); // remove all lines from above generated files that still remain
 
             // Move translated files from the debug exe loc to their project location
@@ -91,15 +94,16 @@ namespace PKHeX.WinForms
             nameof(SplashScreen),
             "Gender=", // editor gender labels
             "BTN_Shinytize", // ☆
-            "Main.L_SizeH", // height rating
-            "Main.L_SizeW", // weight rating
-            "Main.B_Box", // << and >> arrows
-            "Main.L_Characteristic=", // Characterstic (dynamic)
-            "Main.L_Potential", // ★☆☆☆ IV judge evaluation
-            "SAV_HoneyTree.L_Tree0", // dynamic, don't bother
-            "SAV_Misc3.BTN_Symbol", // symbols should stay as their current character
-            "SAV_GameSelect.L_Prompt", // prompt text (dynamic)
-            "SAV_BlockDump8.L_BlockName", // Block name (dynamic)
+            $"{nameof(Main)}.L_SizeH", // height rating
+            $"{nameof(Main)}.L_SizeW", // weight rating
+            $"{nameof(Main)}.B_Box", // << and >> arrows
+            $"{nameof(Main)}.L_Characteristic=", // Characterstic (dynamic)
+            $"{nameof(Main)}.L_Potential", // ★☆☆☆ IV judge evaluation
+            $"{nameof(SAV_HoneyTree)}.L_Tree0", // dynamic, don't bother
+            $"{nameof(SAV_Misc3)}.BTN_Symbol", // symbols should stay as their current character
+            $"{nameof(SAV_GameSelect)}.L_Prompt", // prompt text (dynamic)
+            $"{nameof(SAV_BlockDump8)}.L_BlockName", // Block name (dynamic)
+            $"{nameof(SAV_PokedexResearchEditorLA)}.L_", // Dynamic label
         };
 
         private static readonly string[] PurgeBanlist =
@@ -120,9 +124,15 @@ namespace PKHeX.WinForms
             {
                 LocalizationUtil.SetLocalization(t, lang);
                 var entries = LocalizationUtil.GetLocalization(t);
-                var export = entries.Select(z => new {Variable = z.Split('=')[0], Line = z})
-                    .OrderBy(z => z.Variable) // sort by length (V1 = 2, V100 = 4)
-                    .Select(z => z.Line); // sorted lines
+                IEnumerable<string> export = entries.OrderBy(GetName); // sorted lines
+
+                static string GetName(string line)
+                {
+                    var index = line.IndexOf('=');
+                    if (index == -1)
+                        return line;
+                    return line[..index];
+                }
 
                 if (!sorted)
                     export = entries;
@@ -141,13 +151,18 @@ namespace PKHeX.WinForms
 
         private static string GetResourcePath(params string[] subdir)
         {
+            // Starting from the executable path, crawl upwards until we get to the repository/sln root
+            const string repo = "PKHeX";
             var path = Application.StartupPath;
-            const string projname = "PKHeX\\";
-            var pos = path.LastIndexOf(projname, StringComparison.Ordinal);
-            var str = path[..(pos + projname.Length)];
-            var coreFolder = Path.Combine(str, Path.Combine(subdir));
-
-            return coreFolder;
+            while (true)
+            {
+                var parent = Directory.GetParent(path);
+                if (parent is null)
+                    throw new DirectoryNotFoundException();
+                path = parent.FullName;
+                if (path.EndsWith(repo))
+                    return Path.Combine(path, Path.Combine(subdir));
+            }
         }
     }
 }

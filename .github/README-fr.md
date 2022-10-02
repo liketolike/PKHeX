@@ -2,7 +2,7 @@ PKHeX
 =====
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
 
-Éditeur de sauvegarde de la série de base Pokémon, programmé en [C#](https://en.wikipedia.org/wiki/C_Sharp_%28programming_language%29).
+Éditeur de sauvegarde de la série de base Pokémon, programmé en [C#](https://fr.wikipedia.org/wiki/C_sharp).
 
 Prend en charge les fichiers suivants :
 * Enregistrer les fichiers ("main", \*.sav, \*.dsv, \*.dat, \*.gci, \*.bin)
@@ -23,13 +23,13 @@ PKHeX attend des fichiers de sauvegarde qui ne sont pas chiffrés avec des clés
 
 ## Captures d'écran
 
-![Main Window](https://i.imgur.com/OqOD05v.png)
+![Main Window](https://i.imgur.com/EhtQ14x.png)
 
 ## Construction
 
-PKHeX est une application Windows Forms qui nécessite [.NET Framework v4.6](https://www.microsoft.com/en-us/download/details.aspx?id=48137), avec une prise en charge expérimentale de [.NET 5.0.](https://dotnet.microsoft.com/download/dotnet/5.0)
+PKHeX est une application Windows Forms qui nécessite [.NET Framework v4.6](https://www.microsoft.com/fr-fr/download/details.aspx?id=48137), avec une prise en charge expérimentale de [.NET 6.0.](https://dotnet.microsoft.com/download/dotnet/6.0)
 
-L'exécutable peut être construit avec n'importe quel compilateur prenant en charge C# 8.
+L'exécutable peut être construit avec n'importe quel compilateur prenant en charge C# 10.
 
 ### Construire les configurations
 
@@ -41,9 +41,11 @@ Le code de génération du QR code de PKHeX est extrait de [QRCoder](https://git
 
 La collection de sprites shiny de PKHeX est tirée de [pokesprite](https://github.com/msikma/pokesprite), qui est [sous licence MIT](https://github.com/msikma/pokesprite/blob/master/LICENSE).
 
+PKHeX's Pokémon Legends: Arceus sprite collection is taken from the [National Pokédex - Icon Dex](https://www.deviantart.com/pikafan2000/art/National-Pokedex-Version-Delta-Icon-Dex-824897934) project and its abundance of collaborators and contributors.
+
 ## IDE
 
-PKHeX peut être ouvert avec des IDE tels que [Visual Studio](https://visualstudio.microsoft.com/downloads/) en ouvrant le fichier .sln ou .csproj.
+PKHeX peut être ouvert avec des IDE tels que [Visual Studio](https://visualstudio.microsoft.com/fr/downloads/) en ouvrant le fichier .sln ou .csproj.
 
 ## GNU/Linux
 
