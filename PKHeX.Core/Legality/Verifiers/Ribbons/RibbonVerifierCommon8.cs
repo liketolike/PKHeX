@@ -14,12 +14,17 @@ public static class RibbonVerifierCommon8
             list.Add(TowerMaster);
 
         var pk = args.Entity;
+        bool ranked = evos.HasVisitedSWSH || evos.HasVisitedGen9;
+
         if (!evos.HasVisitedSWSH)
         {
             if (r.RibbonChampionGalar)
                 list.Add(ChampionGalar);
-            if (r.RibbonMasterRank)
-                list.Add(MasterRank);
+        }
+
+        if (r.RibbonMasterRank && !ranked)
+        {
+            list.Add(MasterRank);
         }
         else
         {
@@ -35,9 +40,7 @@ public static class RibbonVerifierCommon8
                     list.Add(ChampionGalar, true);
             }
 
-            // Legends cannot compete in Ranked, thus cannot reach Master Rank and obtain the ribbon.
-            // Past gen Pokemon can get the ribbon only if they've been reset.
-            if (r.RibbonMasterRank && !RibbonRules.IsRibbonValidMasterRankSWSH(pk, enc, evos))
+            if (r.RibbonMasterRank && !RibbonRules.IsRibbonValidMasterRank(pk, enc, evos))
                 list.Add(MasterRank);
 
             if (!r.RibbonTowerMaster)
@@ -57,8 +60,8 @@ public static class RibbonVerifierCommon8
             list.Add(TwinklingStar);
 
         // received when capturing photos with Pokémon in the Photography Studio
-        if (r.RibbonPioneer && !evos.HasVisitedPLA)
-            list.Add(Pioneer);
+        if (r.RibbonHisui && !evos.HasVisitedPLA)
+            list.Add(Hisui);
     }
 
     public static void ParseEgg(this IRibbonSetCommon8 r, ref RibbonResultList list)
@@ -71,7 +74,7 @@ public static class RibbonVerifierCommon8
             list.Add(MasterRank);
         if (r.RibbonTwinklingStar)
             list.Add(TwinklingStar);
-        if (r.RibbonPioneer)
-            list.Add(Pioneer);
+        if (r.RibbonHisui)
+            list.Add(Hisui);
     }
 }

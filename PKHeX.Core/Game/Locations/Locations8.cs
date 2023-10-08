@@ -1,15 +1,17 @@
+using System;
+
 namespace PKHeX.Core;
 
 internal static class Locations8
 {
-    internal static readonly ushort[] Met0 =
+    public static ReadOnlySpan<byte> Met0 => new byte[]
     {
              002, 004, 006, 008,
              012, 014, 016, 018,
         020, 022, 024,      028,
         030, 032, 034, 036,
         040,      044, 046, 048,
-        052, 054, 056, 058,
+             052, 054, 056, 058,
         060,      064, 066, 068,
         070, 072,      076, 078,
         080,      084, 086, 088,
@@ -31,13 +33,13 @@ internal static class Locations8
         240, 242, 244, 246,
     };
 
-    internal static readonly ushort[] Met3 =
+    public static ReadOnlySpan<ushort> Met3 => new ushort[]
     {
                30001, 30003, 30004, 30005, 30006, 30007, 30008, 30009,
         30010, 30011, 30012, 30013, 30014, 30015, 30016, 30017, 30018,
     };
 
-    internal static readonly ushort[] Met4 =
+    public static ReadOnlySpan<ushort> Met4 => new ushort[]
     {
                40001, 40002, 40003,        40005, 40006, 40007, 40008, 40009,
         40010, 40011, 40012, 40013, 40014,        40016, 40017, 40018, 40019,
@@ -50,5 +52,5 @@ internal static class Locations8
         40080, 40081, 40082, 40083, 40084, 40085, 40086,
     };
 
-    internal static readonly ushort[] Met6 = {/* XY */ 60001, 60003, /* ORAS */ 60004 };
+    public static ReadOnlySpan<ushort> Met6 => new ushort[] {/* XY */ 60001, 60003, /* ORAS */ 60004 };
 }

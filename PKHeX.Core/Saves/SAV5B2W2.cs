@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace PKHeX.Core;
@@ -21,9 +21,9 @@ public sealed class SAV5B2W2 : SAV5, ISaveBlock5B2W2
         Initialize();
     }
 
-    public override IPersonalTable Personal => PersonalTable.B2W2;
+    public override PersonalTable5B2W2 Personal => PersonalTable.B2W2;
     public SaveBlockAccessor5B2W2 Blocks { get; }
-    protected override SaveFile CloneInternal() => new SAV5B2W2((byte[]) Data.Clone());
+    protected override SAV5B2W2 CloneInternal() => new((byte[]) Data.Clone());
     public override int EventWorkCount => 0x1AF; // this doesn't seem right?
     public override int EventFlagCount => 0xBF8;
     protected override int EventWorkOffset => 0x1FF00;
@@ -53,21 +53,22 @@ public sealed class SAV5B2W2 : SAV5, ISaveBlock5B2W2
     public override Entralink5 Entralink => Blocks.Entralink;
     public override Musical5 Musical => Blocks.Musical;
     public override Encount5 Encount => Blocks.Encount;
+    public override UnityTower5 UnityTower => Blocks.UnityTower;
     public FestaBlock5 Festa => Blocks.Festa;
     public PWTBlock5 PWT => Blocks.PWT;
-    public override int Fused => 0x1FA00 + sizeof(uint);
+    public int Fused => 0x1FA00 + sizeof(uint);
     public override int GTS => 0x20400;
 
     public string Rival
     {
         get => GetString(Rival_Trash);
-        set => SetString(Rival_Trash, value.AsSpan(), OTLength, StringConverterOption.ClearZero);
+        set => SetString(Rival_Trash, value, MaxStringLengthOT, StringConverterOption.ClearZero);
     }
 
     public Span<byte> Rival_Trash
     {
-        get => Data.AsSpan(0x23BA4, OTLength * 2);
-        set { if (value.Length == OTLength * 2) value.CopyTo(Data.AsSpan(0x23BA4)); }
+        get => Data.AsSpan(0x23BA4, MaxStringLengthOT * 2);
+        set { if (value.Length == MaxStringLengthOT * 2) value.CopyTo(Data.AsSpan(0x23BA4)); }
     }
 
     public override string GetDaycareRNGSeed(int loc) => $"{Daycare.GetSeed()!:X16}";

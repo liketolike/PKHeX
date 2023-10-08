@@ -1,8 +1,12 @@
+using System;
+
 namespace PKHeX.Core;
 
-internal static class LearnSource5
+public abstract class LearnSource5
 {
-    internal static readonly ushort[] TMHM_BW =
+    private protected readonly EggMoves6[] EggMoves = EggMoves6.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("eggmove_bw.pkl"), "bw"));
+
+    internal static ReadOnlySpan<ushort> TMHM_BW => new ushort[]
     {
         468, 337, 473, 347, 046, 092, 258, 339, 474, 237,
         241, 269, 058, 059, 063, 113, 182, 240, 477, 219,
@@ -18,7 +22,7 @@ internal static class LearnSource5
         015, 019, 057, 070, 127, 291,
     };
 
-    internal static readonly ushort[] TypeTutor567 =
+    internal static ReadOnlySpan<ushort> TypeTutor567 => new ushort[]
     {
         (int)Move.GrassPledge,
         (int)Move.FirePledge,

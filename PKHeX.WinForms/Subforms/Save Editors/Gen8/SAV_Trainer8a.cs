@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Windows.Forms;
 using PKHeX.Core;
@@ -40,7 +40,7 @@ public partial class SAV_Trainer8a : Form
 
         // Display Data
         TB_OTName.Text = SAV.OT;
-        trainerID1.LoadIDValues(SAV);
+        trainerID1.LoadIDValues(SAV, SAV.Generation);
         MT_Money.Text = SAV.Money.ToString();
         CB_Language.SelectedValue = SAV.Language;
 
@@ -83,8 +83,8 @@ public partial class SAV_Trainer8a : Form
 
         // Save PlayTime
         SAV.PlayedHours = ushort.Parse(MT_Hours.Text);
-        SAV.PlayedMinutes = ushort.Parse(MT_Minutes.Text)%60;
-        SAV.PlayedSeconds = ushort.Parse(MT_Seconds.Text)%60;
+        SAV.PlayedMinutes = ushort.Parse(MT_Minutes.Text) % 60;
+        SAV.PlayedSeconds = ushort.Parse(MT_Seconds.Text) % 60;
 
         var advDay = CAL_AdventureStartDate.Value.Date;
         SAV.AdventureStart.Timestamp = advDay.AddSeconds(CAL_AdventureStartTime.Value.TimeOfDay.TotalSeconds);

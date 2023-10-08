@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace PKHeX.Core;
 
@@ -31,10 +31,9 @@ public abstract class DataMysteryGift : MysteryGift
     {
         byte[] data = (byte[])Data.Clone();
         var result = GetMysteryGift(data);
-        if (result == null)
-            throw new ArgumentException(nameof(MysteryGift));
+        ArgumentNullException.ThrowIfNull(result);
         return result;
     }
 
-    public override bool Empty => new ReadOnlySpan<byte>(Data).IsRangeEmpty();
+    public override bool Empty => Data.AsSpan().IndexOfAnyExcept<byte>(0) == -1;
 }

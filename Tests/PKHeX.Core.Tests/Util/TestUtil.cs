@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.IO;
 
-namespace PKHeX.Tests;
+namespace PKHeX.Core.Tests;
 
 internal static class TestUtil
 {
@@ -11,10 +11,23 @@ internal static class TestUtil
         while (!folder.EndsWith(nameof(Tests)))
         {
             var dir = Directory.GetParent(folder);
-            if (dir == null)
-                throw new ArgumentNullException(nameof(dir));
+            ArgumentNullException.ThrowIfNull(dir);
             folder = dir.FullName;
         }
         return folder;
+    }
+
+    private static readonly object InitLock = new();
+    private static bool IsInitialized;
+
+    public static void InitializeLegality()
+    {
+        lock (InitLock)
+        {
+            if (IsInitialized)
+                return;
+            RibbonStrings.ResetDictionary(GameInfo.Strings.ribbons);
+            IsInitialized = true;
+        }
     }
 }

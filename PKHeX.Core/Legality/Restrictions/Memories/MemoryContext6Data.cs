@@ -1,11 +1,11 @@
-using System.Collections.Generic;
+using System;
 
 namespace PKHeX.Core;
 
 // data tables stored separately!
 public partial class MemoryContext6
 {
-    private static readonly byte[] Memory_NotXY =
+    private static ReadOnlySpan<byte> Memory_NotXY => new byte[]
     {
         65, // {0} was with {1} when (he/she) built a Secret Base. {4} that {3}.
         66, // {0} participated in a contest with {1} and impressed many people. {4} that {3}.
@@ -14,7 +14,7 @@ public partial class MemoryContext6
         69, // {1} asked {0} to dive. Down it went, deep into the ocean, to explore the bottom of the sea. {4} that {3}.
     };
 
-    private static readonly byte[] Memory_NotAO =
+    private static ReadOnlySpan<byte> Memory_NotAO => new byte[]
     {
         11, // {0} went clothes shopping with {1}. {4} that {3}.
         43, // {0} was impressed by the speed of the train it took with {1}. {4} that {3}.
@@ -24,7 +24,7 @@ public partial class MemoryContext6
         62, // {0} saw itself in a mirror in a mirror cave that it went to with {1}. {4} that {3}.
     };
 
-    internal static readonly byte[] MoveSpecificMemoryHM = // Ordered by HM index for bitflag checks.
+    internal static ReadOnlySpan<byte> MoveSpecificMemoryHM => new byte[] // Ordered by HM index for bitflag checks.
     {
         36, // {0} proudly used Cut at {1}’s instruction in... {2}. {4} that {3}.
         24, // {0} flew, carrying {1} on its back, to {2}. {4} that {3}.
@@ -38,7 +38,7 @@ public partial class MemoryContext6
     /// <summary>
     /// Kalos locations with a Pokémon Center
     /// </summary>
-    private static readonly byte[] LocationsWithPokeCenter_XY =
+    private static ReadOnlySpan<byte> LocationsWithPokeCenter_XY => new byte[]
     {
         // Kalos locations with a PKMN CENTER
         018, // Santalune City
@@ -46,7 +46,7 @@ public partial class MemoryContext6
         030, // Camphrier Town
         040, // Cyllage City
         044, // Ambrette Town
-        052, // Geosenge Towny
+        052, // Geosenge Town
         058, // Shalour City
         064, // Coumarine City
         070, // Laverre City
@@ -60,7 +60,7 @@ public partial class MemoryContext6
     /// <summary>
     /// Hoenn locations with a Pokémon Center
     /// </summary>
-    private static readonly byte[] LocationsWithPokeCenter_AO =
+    private static ReadOnlySpan<byte> LocationsWithPokeCenter_AO => new byte[]
     {
         // Hoenn locations with a PKMN CENTER
         172, // Oldale Town
@@ -81,7 +81,7 @@ public partial class MemoryContext6
         202, // Pokémon League (OR/AS)
     };
 
-    private static readonly byte[] MemoryMinIntensity =
+    private static ReadOnlySpan<byte> MemoryMinIntensity => new byte[]
     {
         0, 1, 1, 1, 1, 2, 2, 2, 2, 2,
         2, 2, 2, 2, 3, 3, 3, 3, 4, 4,
@@ -92,7 +92,7 @@ public partial class MemoryContext6
         3, 3, 3, 3, 3, 2, 3, 4, 4, 2,
     };
 
-    private static readonly byte[] MemoryRandChance =
+    private static ReadOnlySpan<byte> MemoryRandChance => new byte[]
     {
         000, 100, 100, 100, 100, 005, 005, 005, 005, 005,
         005, 005, 005, 005, 010, 020, 010, 001, 050, 030,
@@ -106,7 +106,7 @@ public partial class MemoryContext6
     /// <summary>
     /// 24bits of flags allowing certain feelings for a given memory index.
     /// </summary>
-    private static readonly uint[] MemoryFeelings =
+    private static ReadOnlySpan<int> MemoryFeelings => new[]
     {
         0x000000, 0x04CBFD, 0x004BFD, 0x04CBFD, 0x04CBFD, 0xFFFBFB, 0x84FFF9, 0x47FFFF, 0xBF7FFA, 0x7660B0,
         0x80BDF9, 0x88FB7A, 0x083F79, 0x0001FE, 0xCFEFFF, 0x84EBAF, 0xB368B0, 0x091F7E, 0x0320A0, 0x080DDD,
@@ -117,22 +117,31 @@ public partial class MemoryContext6
         0xB770B0, 0x881F7A, 0x839F7A, 0x839F7A, 0x839F7A, 0x53897F, 0x41BB6F, 0x0C35FF, 0x8BBF7F, 0x8BBF7F,
     };
 
-    private static readonly Dictionary<ushort, ushort[]> KeyItemMemoryArgsGen6 = new()
+    private static ReadOnlySpan<ushort> KeyItemMemoryArgsAnySpecies => new ushort[]
     {
-        {(int) Species.Shaymin, new ushort[] {466}}, // Gracidea
-        {(int) Species.Tornadus, new ushort[] {638}}, // Reveal Glass
-        {(int) Species.Thundurus, new ushort[] {638}}, // Reveal Glass
-        {(int) Species.Landorus, new ushort[] {638}}, // Reveal Glass
-        {(int) Species.Kyurem, new ushort[] {628, 629}}, // DNA Splicers
-        {(int) Species.Hoopa, new ushort[] {765}}, // Prison Bottle
+        466, // Gracidea
+        628, 629, // DNA Splicers
+        638, // Reveal Glass
+        765, // Prison Bottle
     };
 
-    private static readonly ushort[] KeyItemUsableObserve6 =
+    private static bool IsKeyItemMemoryArgValid(ushort species, ushort arg) => species switch
     {
-        775, // Eon Flute
+        (int)Species.Shaymin => arg is 466, // Gracidea
+        (int)Species.Tornadus => arg is 638, // Reveal Glass
+        (int)Species.Thundurus => arg is 638, // Reveal Glass
+        (int)Species.Landorus => arg is 638, // Reveal Glass
+        (int)Species.Kyurem => arg is 628 or 629, // DNA Splicers
+        (int)Species.Hoopa => arg is 765, // Prison Bottle
+        _ => false,
     };
 
-    private static readonly HashSet<ushort> PurchaseableItemXY = new()
+    /// <summary>
+    /// Only item that can be observed by other Pokémon in party, to show up as a memory arg.
+    /// </summary>
+    private const ushort KeyItemUsableObserveEonFlute = 775; // Eon Flute
+
+    private static ReadOnlySpan<ushort> PurchaseableItemXY => new ushort[]
     {
         002, 003, 004, 006, 007, 008, 009, 010, 011, 012,
         013, 014, 015, 017, 018, 019, 020, 021, 022, 023,
@@ -144,7 +153,7 @@ public partial class MemoryContext6
         365, 377, 379, 395, 402, 403, 405, 411, 618,
     };
 
-    private static readonly HashSet<ushort> PurchaseableItemAO = new()
+    private static ReadOnlySpan<ushort> PurchaseableItemAO => new ushort[]
     {
         002, 003, 004, 006, 007, 008, 009, 010, 011, 013,
         014, 015, 017, 018, 019, 020, 021, 022, 023, 024,
@@ -157,8 +166,48 @@ public partial class MemoryContext6
         694,
     };
 
-    private static readonly ushort[] LotoPrizeXYAO =
+    private static ReadOnlySpan<ushort> LotoPrizeXYAO => new ushort[]
     {
         0001, 0033, 0050, 0051, 0053,
+    };
+
+    public static ReadOnlySpan<byte> CaptureFlagsX => new byte[]
+    {
+        0xB6, 0x75, 0xE1, 0x7B, 0xCB, 0x5A, 0x4A, 0xF5, 0x6C, 0xAD, 0x9C, 0xAA, 0x65, 0x93, 0xFF, 0xFF,
+        0x3F, 0xD4, 0x5F, 0x00, 0x3A, 0x8D, 0x8C, 0xCF, 0x4E, 0xEC, 0xEA, 0xEF, 0x9B, 0x58, 0x82, 0x00,
+        0xC0, 0x98, 0x54, 0x53, 0x64, 0xDE, 0xCB, 0xFF, 0xF9, 0xF1, 0x7F, 0x0A, 0xB7, 0xCA, 0x9E, 0x00,
+        0x00, 0xB0, 0x51, 0x95, 0x8A, 0x06, 0xA6, 0x9E, 0xFB, 0x1C, 0x00, 0x80, 0x00, 0x00, 0x00, 0xC6,
+        0x2A, 0xB9, 0x2C, 0xAD, 0xD1, 0xB0, 0x52, 0x9B, 0x76, 0xDC, 0x34, 0x81, 0xED, 0xED, 0xA9, 0x1D,
+        0x00, 0x6C, 0x7B, 0x7F, 0xB7, 0x54, 0x73, 0xE5, 0x7B, 0x55,
+    };
+
+    public static ReadOnlySpan<byte> CaptureFlagsY => new byte[]
+    {
+        0xB6, 0x7D, 0xE1, 0x7B, 0xCB, 0x5A, 0x4A, 0xF5, 0x6C, 0xAD, 0x9C, 0xAE, 0x65, 0x93, 0xFF, 0xFC,
+        0x3F, 0xD4, 0x5F, 0x00, 0x3A, 0x8D, 0x8C, 0xCF, 0x4E, 0xEC, 0xEA, 0xEF, 0x8B, 0x58, 0xC2, 0x00,
+        0xC0, 0x98, 0x54, 0x53, 0x64, 0xDE, 0xE8, 0xFF, 0xF9, 0xF1, 0x7F, 0x0A, 0xB7, 0x4A, 0x9F, 0x00,
+        0x00, 0xB0, 0x51, 0x95, 0x8A, 0x06, 0xA6, 0x9E, 0xFB, 0x1C, 0x00, 0x80, 0x00, 0x00, 0x00, 0xC6,
+        0x2A, 0xB9, 0x2C, 0xAD, 0xD1, 0xB0, 0x52, 0x9B, 0x76, 0xDC, 0x34, 0x81, 0xED, 0xED, 0xA9, 0x1D,
+        0x00, 0x6C, 0x7B, 0x7F, 0xB7, 0x54, 0x4F, 0xE5, 0x7B, 0x65,
+    };
+
+    public static ReadOnlySpan<byte> CaptureFlagsAS => new byte[]
+    {
+        0x00, 0x40, 0x1A, 0x0A, 0xA8, 0x5E, 0x66, 0x85, 0x04, 0xAF, 0xD2, 0x81, 0x36, 0xA0, 0xF4, 0x81,
+        0x36, 0x56, 0x00, 0x49, 0x00, 0x8D, 0x84, 0xC1, 0x40, 0x2F, 0x40, 0xC4, 0x0F, 0x95, 0x39, 0x92,
+        0xA4, 0xD7, 0xD0, 0xB9, 0x64, 0x5B, 0xBB, 0xDF, 0xBD, 0x29, 0xFB, 0xAB, 0xEB, 0x5B, 0x4E, 0x7E,
+        0x4D, 0x02, 0x14, 0x05, 0x60, 0x8A, 0x11, 0x0F, 0x08, 0x05, 0x00, 0x00, 0xEF, 0x81, 0x24, 0x04,
+        0xA0, 0x38, 0x9C, 0x18, 0x94, 0xF8, 0x58, 0x55, 0x00, 0x02, 0x8D, 0x24, 0x24, 0x20, 0x3C, 0xD2,
+        0x75, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x05, 0x18,
+    };
+
+    public static ReadOnlySpan<byte> CaptureFlagsOR => new byte[]
+    {
+        0x00, 0x40, 0x1A, 0x0A, 0xA8, 0x5E, 0x66, 0x85, 0x04, 0xAF, 0xD2, 0x81, 0x36, 0xA0, 0xF4, 0x81,
+        0x36, 0x56, 0x00, 0x49, 0x00, 0x8D, 0x84, 0xC1, 0x40, 0x2F, 0x40, 0xC4, 0x0F, 0x95, 0x39, 0x94,
+        0xA4, 0x17, 0xD6, 0xB9, 0x64, 0x9B, 0xBB, 0xDF, 0xBD, 0xA9, 0xFC, 0xAB, 0xEB, 0x5B, 0x4E, 0xBE,
+        0x4D, 0x02, 0x14, 0x05, 0x60, 0x8A, 0x11, 0x0F, 0x08, 0x05, 0x00, 0x00, 0xF7, 0x81, 0x24, 0x04,
+        0xA0, 0x38, 0x9C, 0x14, 0x94, 0xF8, 0x58, 0x55, 0x00, 0x02, 0x8D, 0x24, 0x24, 0x20, 0x3C, 0xD2,
+        0x6B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x05, 0x18,
     };
 }

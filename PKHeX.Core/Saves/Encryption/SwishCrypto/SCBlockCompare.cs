@@ -1,5 +1,8 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace PKHeX.Core;
 
@@ -43,7 +46,7 @@ public sealed class SCBlockCompare
             else
             {
                 var b = s2.GetBlock(k);
-                AddedKeys.Add($"{name} - {b.Type}");
+                AddedKeys.Add($"{name} - {b.Type} - 0x{b.Data.Length:X5} {b.Data.Length}");
             }
         }
     }
@@ -72,7 +75,7 @@ public sealed class SCBlockCompare
             if (x1.Type is SCTypeCode.Object or SCTypeCode.Array)
             {
                 if (!x1.Data.SequenceEqual(x2.Data))
-                    ValueChanged.Add($"{name} - Bytes Changed");
+                    ValueChanged.Add($"Bytes Changed: Length: {x1.Data.Length} {name}");
                 continue;
             }
 
@@ -92,16 +95,22 @@ public sealed class SCBlockCompare
         var aType = s1.GetType();
         var b1n = aType.GetAllPropertiesOfType<IDataIndirect>(s1);
         var names = aType.GetAllConstantsOfType<uint>();
-        Add(b1n, b1);
-        Add(b1n, b2);
+        ReplaceLabels(b1n, b1);
+        ReplaceLabels(b1n, b2);
 
-        void Add(Dictionary<IDataIndirect, string> list, IEnumerable<SCBlock> blocks)
+        // Replace all const name labels with explicit block property names if they exist.
+        // Since our Block classes do not retain the u32 key they originated from, we need to compare the buffers to see if they match.
+        // Could have just checked ContainsKey then indexed in, but I wanted to play with the higher performance API method to get the bucket and mutate directly.
+        void ReplaceLabels(Dictionary<IDataIndirect, string> list, IEnumerable<SCBlock> blocks)
         {
             foreach (var b in blocks)
             {
                 var match = list.FirstOrDefault(z => ReferenceEquals(z.Key.Data, b.Data));
-                if (match.Value != null && names.ContainsKey(b.Key))
-                    names[b.Key] = match.Value;
+                if (match.Value is not { } x)
+                    continue;
+                ref var exist = ref CollectionsMarshal.GetValueRefOrNullRef(names, b.Key);
+                if (!Unsafe.IsNullRef(ref exist))
+                    exist = x;
             }
         }
         return names;
@@ -113,16 +122,18 @@ public sealed class SCBlockCompare
         AddIfPresent(result, AddedKeys, "Blocks Added:");
         AddIfPresent(result, RemovedKeys, "Blocks Removed:");
         AddIfPresent(result, TypesChanged, "BlockType Changed:");
-        AddIfPresent(result, ValueChanged, "Value Changed:");
+        AddIfPresent(result, ValueChanged, "Value Changed:", true);
 
         return result;
 
-        static void AddIfPresent(List<string> result, ICollection<string> list, string hdr)
+        static void AddIfPresent(List<string> result, ICollection<string> list, string hdr, bool sort = false)
         {
             if (list.Count == 0)
                 return;
             result.Add(hdr);
             result.AddRange(list);
+            if (sort)
+                result.Sort(result.Count - list.Count, list.Count, StringComparer.Ordinal);
             result.Add(string.Empty);
         }
     }

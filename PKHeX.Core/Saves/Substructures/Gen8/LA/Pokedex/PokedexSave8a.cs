@@ -32,7 +32,7 @@ public sealed class PokedexSave8a
     public static ushort GetDexIndex(PokedexType8a which, ushort species)
     {
         // Check species is valid
-        if ((uint)species > MaxSpeciesID)
+        if (species > MaxSpeciesID)
             return DexInvalid;
 
         // Check each form
@@ -511,7 +511,8 @@ public sealed class PokedexSave8a
         var formCount = Personal[species].FormCount;
         for (byte form = 0; form < formCount; form++)
         {
-            var index = Array.BinarySearch(PokedexConstants8a.PokemonInfoIds, (ushort)(species | (form << 11)));
+            var mash = (ushort)(species | (form << 11));
+            var index = PokedexConstants8a.PokemonInfoIds.BinarySearch(mash);
             if (index < 0)
                 continue;
 
@@ -541,7 +542,8 @@ public sealed class PokedexSave8a
         var formCount = Personal[species].FormCount;
         for (var form = 0; form < formCount; form++)
         {
-            var index = Array.BinarySearch(PokedexConstants8a.PokemonInfoIds, (ushort)(species | (form << 11)));
+            var mash = (ushort)(species | (form << 11));
+            var index = PokedexConstants8a.PokemonInfoIds.BinarySearch(mash);
             if (index < 0)
                 continue;
 
@@ -1119,8 +1121,10 @@ public sealed class PokedexSave8a
         if (hash == 0xCBF29CE484222645)
             return 0;
 
-        return (int)(uint)SaveFile.Accessor.GetBlockValue((uint)(hash & 0xFFFFFFFF));
+        return (int)(uint)SaveFile.Accessor.GetBlockValue(GetSaveBlockKey(hash));
     }
+
+    private static uint GetSaveBlockKey(ulong hash) => (uint)hash; // truncate to 32-bit
 
     private int GetSpeciesQuestState(ulong hash)
     {
@@ -1128,7 +1132,8 @@ public sealed class PokedexSave8a
             return 0;
 
         // These are single-byte blocks, but type is "object"...
-        return SaveFile.Accessor.GetBlock((uint)(hash & 0xFFFFFFFF)).Data[0];
+        var key = GetSaveBlockKey(hash);
+        return SaveFile.Accessor.GetBlock(key).Data[0];
     }
 
     public static bool IsAnyTaskTriggered(ushort species, PokedexResearchTaskType8a which, MoveType moveType, int move, PokedexTimeOfDay8a timeOfDay)
@@ -1190,7 +1195,8 @@ public sealed class PokedexSave8a
 
         var speciesEntry = SaveData.GetResearchEntry(species);
 
-        var pokeInfoIndex = Array.BinarySearch(PokedexConstants8a.PokemonInfoIds, (ushort)(species | (form << 11)));
+        var mash = (ushort)(species | (form << 11));
+        var pokeInfoIndex = PokedexConstants8a.PokemonInfoIds.BinarySearch(mash);
         if (pokeInfoIndex >= 0 && (PokedexConstants8a.PokemonInfoGenders[pokeInfoIndex] & (1 << 3)) != 0)
         {
             var g0 = false;

@@ -102,7 +102,7 @@ public partial class SAV_Inventory : Form
             dgv.Columns.Add(GetCountColumn(pouch, true, ColumnFreeSpaceIndex = dgv.Columns.Count, "Free"));
 
         // Populate with rows
-        var itemarr = Main.HaX ? itemlist : GetStringsForPouch(pouch.LegalItems);
+        var itemarr = Main.HaX ? itemlist : GetStringsForPouch(pouch.GetAllItems());
         item.Items.AddRange(itemarr);
 
         var items = pouch.Items;
@@ -172,7 +172,7 @@ public partial class SAV_Inventory : Form
             var dgv = GetGrid(pouch.Type);
 
             // Sanity Screen
-            var invalid = Array.FindAll(pouch.Items, item => item.Index != 0 && !pouch.LegalItems.Contains((ushort)item.Index));
+            var invalid = Array.FindAll(pouch.Items, item => item.Index != 0 && !pouch.CanContain((ushort)item.Index));
             var outOfBounds = Array.FindAll(invalid, item => item.Index >= itemlist.Length);
             var incorrectPouch = Array.FindAll(invalid, item => item.Index < itemlist.Length);
 
@@ -197,9 +197,13 @@ public partial class SAV_Inventory : Form
 
     private void GetBag(DataGridView dgv, InventoryPouch pouch)
     {
+        var valid = pouch.GetAllItems();
         for (int i = 0; i < dgv.Rows.Count; i++)
         {
             var item = pouch.Items[i];
+            if (item.Index != 0 && !valid.Contains((ushort)item.Index) && !Main.HaX)
+                item = pouch.Items[i] = pouch.GetEmpty();
+
             var cells = dgv.Rows[i].Cells;
             cells[ColumnItem].Value = itemlist[item.Index];
             cells[ColumnCount].Value = item.Count;
@@ -288,7 +292,7 @@ public partial class SAV_Inventory : Form
     // Initialize String Tables
     private readonly string[] itemlist;
 
-    private string[] GetStringsForPouch(ushort[] items, bool sort = true)
+    private string[] GetStringsForPouch(ReadOnlySpan<ushort> items, bool sort = true)
     {
         string[] res = new string[items.Length + 1];
         for (int i = 0; i < res.Length - 1; i++)
@@ -317,12 +321,11 @@ public partial class SAV_Inventory : Form
         if (!GetModifySettings(pouch, out var truncate, out var shuffle))
             return;
 
-        var items = pouch.LegalItems;
+        var items = pouch.GetAllItems().ToArray();
         if (truncate)
         {
-            items = (ushort[])items.Clone();
             if (shuffle)
-                Util.Shuffle(items.AsSpan());
+                Util.Rand.Shuffle(items.AsSpan());
             Array.Resize(ref items, pouch.Items.Length);
         }
 
@@ -362,9 +365,6 @@ public partial class SAV_Inventory : Form
 
     private void ModifyPouch(int pouch, Action<InventoryPouch> func)
     {
-        if (func == null)
-            throw new ArgumentNullException(nameof(func));
-
         var dgv = GetGrid(pouch);
         var p = Pouches[pouch];
         SetBag(dgv, p); // save current

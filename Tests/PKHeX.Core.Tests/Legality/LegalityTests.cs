@@ -1,42 +1,25 @@
 using System;
 using System.Collections.Generic;
 using FluentAssertions;
-using PKHeX.Core;
 using System.IO;
 using System.Linq;
 using Xunit;
 
-namespace PKHeX.Tests.Legality;
+namespace PKHeX.Core.Tests.Legality;
 
 public class LegalityTest
 {
     private static readonly string TestPath = TestUtil.GetRepoPath();
-    private static readonly object InitLock = new();
-    private static bool IsInitialized;
-
-    private static void Init()
-    {
-        lock (InitLock)
-        {
-            if (IsInitialized)
-                return;
-            RibbonStrings.ResetDictionary(GameInfo.Strings.ribbons);
-            if (EncounterEvent.Initialized)
-                return;
-            EncounterEvent.RefreshMGDB();
-            IsInitialized = true;
-        }
-    }
-
-    static LegalityTest() => Init();
+    static LegalityTest() => TestUtil.InitializeLegality();
 
     [Theory]
     [InlineData("censor")]
     [InlineData("buttnugget")]
     [InlineData("18넘")]
-    public void CensorsBadWords(string badword)
+    [InlineData("inoffensive", false)]
+    public void CensorsBadWords(string badword, bool value = true)
     {
-        WordFilter.IsFiltered(badword, out _).Should().BeTrue("the word should have been identified as a bad word");
+        WordFilter.TryMatch(badword, out _).Should().Be(value, "the word should have been identified as a bad word");
     }
 
     [Theory]
@@ -44,7 +27,6 @@ public class LegalityTest
     [InlineData("Illegal", false)]
     public void TestPublicFiles(string name, bool isValid)
     {
-        RibbonStrings.ResetDictionary(GameInfo.Strings.ribbons);
         var folder = TestUtil.GetRepoPath();
         folder = Path.Combine(folder, "Legality");
         VerifyAll(folder, name, isValid);
@@ -57,8 +39,6 @@ public class LegalityTest
     [InlineData("FalseFlags", false)] // legal quirks, to be fixed in the future
     public void TestPrivateFiles(string name, bool isValid)
     {
-        if (!isValid)
-            Init();
         var folder = Path.Combine(TestPath, "Legality", "Private");
         VerifyAll(folder, name, isValid, false);
     }

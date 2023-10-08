@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using static PKHeX.Core.EntityConverterResult;
 
@@ -25,6 +25,11 @@ public static class EntityConverter
     public static IEntityRejuvenator RejuvenatorHOME { get; set; } = new LegalityRejuvenator();
 
     /// <summary>
+    /// Responsible for converting a <see cref="PKM"/> to a <see cref="PKH"/> for HOME.
+    /// </summary>
+    public static IHomeStorage HOME { get; set; } = new HomeStorageFacade();
+
+    /// <summary>
     /// Checks if the input <see cref="PKM"/> file is capable of being converted to the desired format.
     /// </summary>
     /// <param name="pk"></param>
@@ -32,8 +37,8 @@ public static class EntityConverter
     /// <returns>True if can be converted to the requested format value.</returns>
     public static bool IsConvertibleToFormat(PKM pk, int format)
     {
-        if (pk.Format >= 3 && pk.Format > format)
-            return false; // pk3->upward can't go backwards
+        if (pk.Format >= 3 && pk.Format > format && format < 8)
+            return false; // pk3->upward can't go backwards until Gen8+
         if (pk.Format <= 2 && format is > 2 and < 7)
             return false; // pk1/2->upward has to be 7 or greater
         return true;
@@ -119,12 +124,7 @@ public static class EntityConverter
         PK3 pk3 when destType == typeof(CK3) => pk3.ConvertToCK3(),
         PK3 pk3 when destType == typeof(XK3) => pk3.ConvertToXK3(),
         PK4 pk4 when destType == typeof(BK4) => pk4.ConvertToBK4(),
-
-        PB8 pb8 when destType == typeof(PK8) => pb8.ConvertToPK8(),
-        PK8 pk8 when destType == typeof(PB8) => pk8.ConvertToPB8(),
-        G8PKM pk8 when destType == typeof(PA8) => pk8.ConvertToPA8(),
-        PA8 pa8 when destType == typeof(PK8) => pa8.ConvertToPK8(),
-        PA8 pa8 when destType == typeof(PB8) => pa8.ConvertToPB8(),
+        PK4 pk4 when destType == typeof(RK4) => pk4.ConvertToRK4(),
 
         // Sequential
         PK1 pk1 => pk1.ConvertToPK2(),
@@ -133,21 +133,31 @@ public static class EntityConverter
         PK4 pk4 => pk4.ConvertToPK5(),
         PK5 pk5 => pk5.ConvertToPK6(),
         PK6 pk6 => pk6.ConvertToPK7(),
-        PK7 pk7 => pk7.ConvertToPK8(),
-        PB7 pb7 => pb7.ConvertToPK8(),
 
         // Side-Formats back to Mainline
         SK2 sk2 => sk2.ConvertToPK2(),
         CK3 ck3 => ck3.ConvertToPK3(),
         XK3 xk3 => xk3.ConvertToPK3(),
         BK4 bk4 => bk4.ConvertToPK4(),
+        RK4 rk4 => rk4.ConvertToPK4(),
 
-        _ => InvalidTransfer(out result, NoTransferRoute),
+        _ => GetFinalResult(pk, destType, ref result),
     };
 
-    private static PKM? InvalidTransfer(out EntityConverterResult result, EntityConverterResult value)
+    private static PKM? GetFinalResult(PKM pk, Type destType, ref EntityConverterResult result)
     {
-        result = value;
+        // Every format can eventually feed into HOME. Don't bother checking current type.
+        var type = PKH.GetType(destType);
+        if (type is not HomeGameDataFormat.None)
+        {
+            var pkh = HOME.GetEntity(pk);
+            var converted = pkh.ConvertToPKM(type);
+            if (converted is null)
+                result = IncompatibleSpecies;
+            return converted;
+        }
+
+        result = NoTransferRoute;
         return null;
     }
 
@@ -213,11 +223,11 @@ public static class EntityConverter
         if (pk.HeldItem > limit.MaxItemID)
             pk.HeldItem = 0;
 
-        if (pk.Nickname.Length > limit.NickLength)
-            pk.Nickname = pk.Nickname[..pk.NickLength];
+        if (pk.Nickname.Length > limit.MaxStringLengthNickname)
+            pk.Nickname = pk.Nickname[..pk.MaxStringLengthNickname];
 
-        if (pk.OT_Name.Length > limit.OTLength)
-            pk.OT_Name = pk.OT_Name[..pk.OTLength];
+        if (pk.OT_Name.Length > limit.MaxStringLengthOT)
+            pk.OT_Name = pk.OT_Name[..pk.MaxStringLengthOT];
 
         if (pk.Move1 > limit.MaxMoveID || pk.Move2 > limit.MaxMoveID || pk.Move3 > limit.MaxMoveID || pk.Move4 > limit.MaxMoveID)
             pk.ClearInvalidMoves();

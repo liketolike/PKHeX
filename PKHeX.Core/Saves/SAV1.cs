@@ -17,10 +17,11 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
     public string SaveRevisionString => (Japanese ? "J" : "U") + (IsVirtualConsole ? "VC" : "GB");
     public bool Japanese { get; }
     public bool Korean => false;
+    public override int Language => Japanese ? 1 : -1;
 
-    private readonly PersonalTable1 Table;
-    public override IPersonalTable Personal => Table;
-    public override IReadOnlyList<ushort> HeldItems => Array.Empty<ushort>();
+    public override PersonalTable1 Personal { get; }
+
+    public override ReadOnlySpan<ushort> HeldItems => Array.Empty<ushort>();
 
     public override IReadOnlyList<string> PKMExtensions => Array.FindAll(PKM.Extensions, f =>
     {
@@ -33,7 +34,7 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
         Version = version;
         Japanese = japanese;
         Offsets = Japanese ? SAV1Offsets.JPN : SAV1Offsets.INT;
-        Table = version == GameVersion.YW ? PersonalTable.Y : PersonalTable.RB;
+        Personal = version == GameVersion.YW ? PersonalTable.Y : PersonalTable.RB;
         Initialize(version);
         ClearBoxes();
     }
@@ -44,7 +45,7 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
         Offsets = Japanese ? SAV1Offsets.JPN : SAV1Offsets.INT;
 
         Version = versionOverride != GameVersion.Any ? versionOverride : SaveUtil.GetIsG1SAV(data);
-        Table = Version == GameVersion.YW ? PersonalTable.Y : PersonalTable.RB;
+        Personal = Version == GameVersion.YW ? PersonalTable.Y : PersonalTable.RB;
         if (Version == GameVersion.Invalid)
             return;
 
@@ -77,7 +78,7 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
             UnpackBox(Offsets.CurrentBox, baseDest, stored, CurrentBox, capacity);
         }
 
-        var party = GetData(Offsets.Party, SIZE_STOREDPARTY);
+        var party = Data.AsSpan(Offsets.Party, SIZE_STOREDPARTY).ToArray();
         var partyPL = new PokeList1(party, PokeListType.Party, Japanese);
         for (int i = 0; i < partyPL.Pokemon.Length; i++)
         {
@@ -107,7 +108,7 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
 
     private void UnpackBox(int srcOfs, int destOfs, int boxSize, int boxIndex, PokeListType boxCapacity)
     {
-        var boxData = GetData(srcOfs, boxSize);
+        var boxData = Data.AsSpan(srcOfs, boxSize).ToArray();
         var boxDest = destOfs + (boxIndex * SIZE_BOX);
         var boxPL = new PokeList1(boxData, boxCapacity, Japanese);
         for (int i = 0; i < boxPL.Pokemon.Length; i++)
@@ -129,7 +130,7 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
         {
             var slotOfs = boxDest + (i * SIZE_STORED);
             var slotData = Data.AsSpan(slotOfs, SIZE_STORED);
-            PK1 pk = (PK1)GetPKM(slotData.ToArray());
+            PK1 pk = GetPKM(slotData.ToArray());
             if (pk.Species > 0)
                 boxPL[slot++] = pk;
         }
@@ -137,11 +138,11 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
         // copy to box location
         var boxData = boxPL.Write();
         int boxSrc = GetBoxRawDataOffset(boxIndex);
-        SetData(Data, boxData, boxSrc);
+        SetData(Data.AsSpan(boxSrc), boxData);
 
         // copy to active loc if current box
         if (boxIndex == CurrentBox)
-            SetData(Data, boxData, Offsets.CurrentBox);
+            SetData(Data.AsSpan(Offsets.CurrentBox), boxData);
     }
 
     private const int SIZE_RESERVED = 0x8000; // unpacked box data
@@ -176,7 +177,9 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
         int pSlot = 0;
         for (int i = 0; i < 6; i++)
         {
-            PK1 partyPK = (PK1)GetPKM(GetData(GetPartyOffset(i), SIZE_STORED));
+            var ofs = GetPartyOffset(i);
+            var data = Data.AsSpan(ofs, SIZE_STORED).ToArray();
+            PK1 partyPK = GetPKM(data);
             if (partyPK.Species > 0)
                 partyPL[pSlot++] = partyPK;
         }
@@ -192,7 +195,7 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
         dc.CopyTo(Data.AsSpan(Offsets.Daycare));
 
         SetChecksums();
-        return Data.AsSpan()[..^SIZE_RESERVED].ToArray();
+        return Data[..^SIZE_RESERVED];
     }
 
     private int GetBoxRawDataOffset(int box)
@@ -203,7 +206,7 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
     }
 
     // Configuration
-    protected override SaveFile CloneInternal() => new SAV1(Write(), Version);
+    protected override SAV1 CloneInternal() => new(Write(), Version);
 
     protected override int SIZE_STORED => Japanese ? PokeCrypto.SIZE_1JLIST : PokeCrypto.SIZE_1ULIST;
     protected override int SIZE_PARTY => Japanese ? PokeCrypto.SIZE_1JLIST : PokeCrypto.SIZE_1ULIST;
@@ -211,7 +214,7 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
     private int SIZE_STOREDBOX => PokeList1.GetDataLength(Japanese ? PokeListType.StoredJP : PokeListType.Stored, Japanese);
     private int SIZE_STOREDPARTY => PokeList1.GetDataLength(PokeListType.Party, Japanese);
 
-    public override PKM BlankPKM => new PK1(Japanese);
+    public override PK1 BlankPKM => new(Japanese);
     public override Type PKMType => typeof(PK1);
 
     public override ushort MaxMoveID => Legal.MaxMoveID_1;
@@ -224,13 +227,13 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
     public override int MaxCoins => 9999;
 
     public override int BoxCount => Japanese ? 8 : 12;
-    public override int MaxEV => 65535;
+    public override int MaxEV => EffortValues.Max12;
     public override int MaxIV => 15;
     public override int Generation => 1;
     public override EntityContext Context => EntityContext.Gen1;
     protected override int GiftCountMax => 0;
-    public override int OTLength => Japanese ? 5 : 7;
-    public override int NickLength => Japanese ? 5 : 10;
+    public override int MaxStringLengthOT => Japanese ? 5 : 7;
+    public override int MaxStringLengthNickname => Japanese ? 5 : 10;
     public override int BoxSlotCount => Japanese ? 30 : 20;
 
     public override bool HasParty => true;
@@ -257,8 +260,8 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
 
     public override string OT
     {
-        get => GetString(Offsets.OT, OTLength);
-        set => SetString(Data.AsSpan(Offsets.OT, OTLength + 1), value.AsSpan(), OTLength, StringConverterOption.ClearZero);
+        get => GetString(Data.AsSpan(Offsets.OT, MaxStringLengthOT));
+        set => SetString(Data.AsSpan(Offsets.OT, MaxStringLengthOT + 1), value, MaxStringLengthOT, StringConverterOption.ClearZero);
     }
 
     public Span<byte> OT_Trash { get => Data.AsSpan(Offsets.OT, StringLength); set { if (value.Length == StringLength) value.CopyTo(Data.AsSpan(Offsets.OT)); } }
@@ -269,18 +272,24 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
         set { }
     }
 
-    public override int TID
+    public override uint ID32
     {
-        get => ReadUInt16BigEndian(Data.AsSpan(Offsets.TID));
-        set => WriteUInt16BigEndian(Data.AsSpan(Offsets.TID), (ushort)value);
+        get => TID16;
+        set => TID16 = (ushort)value;
     }
 
-    public override int SID { get => 0; set { } }
+    public override ushort TID16
+    {
+        get => ReadUInt16BigEndian(Data.AsSpan(Offsets.TID16));
+        set => WriteUInt16BigEndian(Data.AsSpan(Offsets.TID16), value);
+    }
+
+    public override ushort SID16 { get => 0; set { } }
 
     public string Rival
     {
-        get => GetString(Offsets.Rival, OTLength);
-        set => SetString(Data.AsSpan(Offsets.Rival, OTLength), value.AsSpan(), OTLength, StringConverterOption.Clear50);
+        get => GetString(Data.AsSpan(Offsets.Rival, MaxStringLengthOT));
+        set => SetString(Data.AsSpan(Offsets.Rival, MaxStringLengthOT), value, MaxStringLengthOT, StringConverterOption.Clear50);
     }
 
     public Span<byte> Rival_Trash { get => Data.AsSpan(Offsets.Rival, StringLength); set { if (value.Length == StringLength) value.CopyTo(Data.AsSpan(Offsets.Rival)); } }
@@ -344,7 +353,7 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
     public int Badges
     {
         get => Data[Offsets.Badges];
-        set { if (value < 0) return; Data[Offsets.Badges] = (byte)value; }
+        set => Data[Offsets.Badges] = (byte)value;
     }
 
     private byte Options
@@ -400,17 +409,14 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
         }
     }
 
-    private readonly ushort[] LegalItems = Legal.Pouch_Items_RBY;
-
     public override IReadOnlyList<InventoryPouch> Inventory
     {
         get
         {
-            ushort[] legalItems = LegalItems;
             InventoryPouch[] pouch =
             {
-                new InventoryPouchGB(InventoryType.Items, legalItems, 99, Offsets.Items, 20),
-                new InventoryPouchGB(InventoryType.PCItems, legalItems, 99, Offsets.PCItems, 50),
+                new InventoryPouchGB(InventoryType.Items, ItemStorage1.Instance, 99, Offsets.Items, 20),
+                new InventoryPouchGB(InventoryType.PCItems, ItemStorage1.Instance, 99, Offsets.PCItems, 50),
             };
             return pouch.LoadAll(Data);
         }
@@ -475,19 +481,21 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
 
     public override string GetBoxName(int box)
     {
+        if (Japanese)
+            return $"ボックス{box + 1}";
         return $"BOX {box + 1}";
     }
 
-    public override void SetBoxName(int box, string value)
+    public override void SetBoxName(int box, ReadOnlySpan<char> value)
     {
         // Don't allow for custom box names
     }
 
-    protected override PKM GetPKM(byte[] data)
+    protected override PK1 GetPKM(byte[] data)
     {
         if (data.Length == SIZE_STORED)
             return new PokeList1(data, PokeListType.Single, Japanese)[0];
-        return new PK1(data);
+        return new(data);
     }
 
     protected override byte[] DecryptPKM(byte[] data)
@@ -536,20 +544,20 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
         SetFlag(region + ofs, bit & 7, value);
     }
 
-    public override void WriteSlotFormatStored(PKM pk, Span<byte> data, int offset)
+    public override void WriteSlotFormatStored(PKM pk, Span<byte> data)
     {
         // pk that have never been boxed have yet to save the 'current level' for box indication
         // set this value at this time
         ((PK1)pk).Stat_LevelBox = pk.CurrentLevel;
-        base.WriteSlotFormatStored(pk, Data, offset);
+        base.WriteSlotFormatStored(pk, data);
     }
 
-    public override void WriteBoxSlot(PKM pk, Span<byte> data, int offset)
+    public override void WriteBoxSlot(PKM pk, Span<byte> data)
     {
         // pk that have never been boxed have yet to save the 'current level' for box indication
         // set this value at this time
         ((PK1)pk).Stat_LevelBox = pk.CurrentLevel;
-        base.WriteBoxSlot(pk, Data, offset);
+        base.WriteBoxSlot(pk, data);
     }
 
     private const int SpawnFlagCount = 0xF0;

@@ -36,7 +36,8 @@ public partial class BatchEditor : Form
 
     private void B_Open_Click(object sender, EventArgs e)
     {
-        if (!B_Go.Enabled) return;
+        if (!B_Go.Enabled)
+            return;
         using var fbd = new FolderBrowserDialog();
         if (fbd.ShowDialog() != DialogResult.OK)
             return;
@@ -62,9 +63,11 @@ public partial class BatchEditor : Form
         if (s.Length == 0)
         { WinFormsUtil.Alert(MsgBEPropertyInvalid); return; }
 
-        if (RTB_Instructions.Lines.Length != 0 && RTB_Instructions.Lines[^1].Length > 0)
-            s = Environment.NewLine + s;
-
+        // If we already have text, add a new line (except if the last line is blank).
+        var tb = RTB_Instructions;
+        var batchText = tb.Text;
+        if (batchText.Length > 0 && !batchText.EndsWith('\n'))
+            tb.AppendText(Environment.NewLine);
         RTB_Instructions.AppendText(s);
     }
 
@@ -78,7 +81,7 @@ public partial class BatchEditor : Form
 
     private void TabMain_DragDrop(object? sender, DragEventArgs? e)
     {
-        if (e?.Data?.GetData(DataFormats.FileDrop) is not string[] {Length: not 0} files)
+        if (e?.Data?.GetData(DataFormats.FileDrop) is not string[] { Length: not 0 } files)
             return;
         if (!Directory.Exists(files[0]))
             return;
@@ -91,11 +94,11 @@ public partial class BatchEditor : Form
 
     private void RunBackgroundWorker()
     {
-        var lines = RTB_Instructions.Lines;
-        if (Array.Exists(lines, line => line.Length == 0))
+        ReadOnlySpan<char> text = RTB_Instructions.Text;
+        if (StringInstructionSet.HasEmptyLine(text))
         { WinFormsUtil.Error(MsgBEInstructionInvalid); return; }
 
-        var sets = StringInstructionSet.GetBatchSets(lines).ToArray();
+        var sets = StringInstructionSet.GetBatchSets(text);
         if (Array.Exists(sets, s => s.Filters.Any(z => string.IsNullOrWhiteSpace(z.PropertyValue))))
         { WinFormsUtil.Error(MsgBEFilterEmpty); return; }
 
@@ -171,18 +174,21 @@ public partial class BatchEditor : Form
 
     private void RunBatchEditSaveFile(IReadOnlyCollection<StringInstructionSet> sets, bool boxes = false, bool party = false)
     {
-        var data = new List<SlotCache>();
         if (party)
         {
+            var data = new List<SlotCache>(SAV.PartyCount);
             SlotInfoLoader.AddPartyData(SAV, data);
             process(data);
-            SAV.PartyData = data.ConvertAll(z => z.Entity);
+            foreach (var slot in data)
+                slot.Source.WriteTo(SAV, slot.Entity, PKMImportSetting.Skip);
         }
         if (boxes)
         {
+            var data = new List<SlotCache>(SAV.SlotCount);
             SlotInfoLoader.AddBoxData(SAV, data);
             process(data);
-            SAV.BoxData = data.ConvertAll(z => z.Entity);
+            foreach (var slot in data)
+                slot.Source.WriteTo(SAV, slot.Entity, PKMImportSetting.Skip);
         }
         void process(IList<SlotCache> d)
         {

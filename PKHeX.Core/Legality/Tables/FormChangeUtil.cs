@@ -17,7 +17,7 @@ public static class FormChangeUtil
     /// <param name="option">Conditions we're checking with</param>
     public static bool ShouldIterateForms(ushort species, byte form, int generation, LearnOption option)
     {
-        if (option is not LearnOption.Current)
+        if (option.IsPast())
             return FormChangeMoves.TryGetValue(species, out var func) && func((generation, form));
         return IterateAllForms(species);
     }
@@ -27,7 +27,7 @@ public static class FormChangeUtil
     /// <summary>
     /// Species that can change between their forms and get access to form-specific moves.
     /// </summary>
-    private static readonly HashSet<ushort> FormChangeMovesRetain = new()
+    private static ReadOnlySpan<ushort> FormChangeMovesRetain => new ushort[]
     {
         (int)Species.Deoxys,
         (int)Species.Giratina,

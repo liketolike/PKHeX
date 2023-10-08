@@ -1,27 +1,20 @@
 using System;
 using System.Linq;
 using FluentAssertions;
-using PKHeX.Core;
 using Xunit;
 
-namespace PKHeX.Tests.Simulator;
+namespace PKHeX.Core.Tests.Simulator;
 
 public class ShowdownSetTests
 {
-    static ShowdownSetTests()
-    {
-        if (!EncounterEvent.Initialized)
-            EncounterEvent.RefreshMGDB();
-    }
-
     [Fact]
     public void SimulatorGetParse()
     {
-        foreach (var setstr in Sets)
+        foreach (ReadOnlySpan<char> setstr in Sets)
         {
-            var set = new ShowdownSet(setstr).Text;
-            var lines = set.Split('\n').Select(z => z.Trim());
-            Assert.True(lines.All(z => setstr.Contains(z)), setstr);
+            var set = new ShowdownSet(setstr).GetSetLines();
+            foreach (var line in set)
+                setstr.Contains(line, StringComparison.Ordinal).Should().BeTrue($"Line {line} should be in the set {setstr}");
         }
     }
 
@@ -37,21 +30,34 @@ public class ShowdownSetTests
         var first = encounters.FirstOrDefault();
         Assert.NotNull(first);
 
-        var egg = (EncounterEgg)first!;
+        var egg = (EncounterEgg)first;
         var info = new SimpleTrainerInfo(GameVersion.SN);
         var pk = egg.ConvertToPKM(info);
         Assert.True(pk.Species != set.Species);
 
         var la = new LegalityAnalysis(pk);
-        Assert.True(la.Valid);
+        la.Valid.Should().BeTrue($"Encounter should have generated legally: {egg} {la.Report()}");
 
         var test = EncounterMovesetGenerator.GenerateEncounters(pk7, info, pk7.Moves).ToList();
-        foreach (var t in test)
+        for (var i = 0; i < test.Count; i++)
         {
+            var t = test[i];
             var convert = t.ConvertToPKM(info);
             var la2 = new LegalityAnalysis(convert);
-            Assert.True(la2.Valid);
+            la2.Valid.Should().BeTrue($"Encounter {i} should have generated legally: {t} {la2.Report()}");
         }
+    }
+
+    [Fact]
+    public void SimGetVivillonPostcardSV()
+    {
+        var pk9 = new PK9 { Species = (int)Species.Vivillon, Form = 1 };
+        var encounters = EncounterMovesetGenerator.GenerateEncounters(pk9, Array.Empty<ushort>(), GameVersion.SL);
+        encounters.OfType<EncounterSlot9>().Should().NotBeEmpty();
+
+        pk9 = new PK9 { Species = (int)Species.Vivillon, Form = Vivillon3DS.FancyFormID };
+        encounters = EncounterMovesetGenerator.GenerateEncounters(pk9, Array.Empty<ushort>(), GameVersion.SL);
+        encounters.OfType<EncounterSlot9>().Should().NotBeEmpty();
     }
 
     [Fact]
@@ -65,7 +71,7 @@ public class ShowdownSetTests
         var first = encs.FirstOrDefault();
         Assert.NotNull(first);
 
-        var wc3 = (WC3)first!;
+        var wc3 = (WC3)first;
         var info = new SimpleTrainerInfo(GameVersion.R);
         var pk = wc3.ConvertToPKM(info);
 
@@ -84,9 +90,8 @@ public class ShowdownSetTests
         var first = encs.FirstOrDefault();
         Assert.NotNull(first);
 
-        var enc = first!;
         var info = new SimpleTrainerInfo(GameVersion.SN);
-        var pk = enc.ConvertToPKM(info);
+        var pk = first.ConvertToPKM(info);
 
         var la = new LegalityAnalysis(pk);
         Assert.True(la.Valid);
@@ -136,9 +141,8 @@ public class ShowdownSetTests
         var first = encs.FirstOrDefault();
         Assert.NotNull(first);
 
-        var enc = first!;
         var info = new SimpleTrainerInfo(GameVersion.SN);
-        var pk = enc.ConvertToPKM(info);
+        var pk = first.ConvertToPKM(info);
 
         var la = new LegalityAnalysis(pk);
         Assert.True(la.Valid);
@@ -148,11 +152,10 @@ public class ShowdownSetTests
     public void SimulatorParseMultiple()
     {
         var text = string.Join("\r\n\r\n", Sets);
-        var lines = text.Split(new[] {"\r\n", "\n"}, StringSplitOptions.None);
-        var sets = ShowdownParsing.GetShowdownSets(lines);
+        var sets = ShowdownParsing.GetShowdownSets(text);
         Assert.True(sets.Count() == Sets.Length);
 
-        sets = ShowdownParsing.GetShowdownSets(Enumerable.Empty<string>());
+        sets = ShowdownParsing.GetShowdownSets(string.Empty);
         Assert.True(!sets.Any());
 
         sets = ShowdownParsing.GetShowdownSets(new [] {"", "   ", " "});
@@ -173,13 +176,13 @@ public class ShowdownSetTests
     public void SimulatorParseEncounter(string text)
     {
         var set = new ShowdownSet(text);
-        var pk7 = new PK7 { Species = set.Species, Form = set.Form, Moves = set.Moves, CurrentLevel = set.Level };
+        var pk7 = new PK3 { Species = set.Species, Form = set.Form, Moves = set.Moves, CurrentLevel = set.Level };
         var encs = EncounterMovesetGenerator.GenerateEncounters(pk7, set.Moves);
         var tr3 = encs.First(z => z is EncounterTrade3);
         var pk3 = tr3.ConvertToPKM(new SAV3FRLG());
 
         var la = new LegalityAnalysis(pk3);
-        la.Valid.Should().BeTrue();
+        la.Valid.Should().BeTrue(la.Report());
     }
 
     [Theory]
@@ -189,7 +192,7 @@ public class ShowdownSetTests
     {
         string input = $@"Eevee\nFriendship: {value}";
         var set = new ShowdownSet(input);
-        set.Level.Should().NotBe(value);
+        set.Friendship.Should().NotBe(value);
     }
 
     [Theory]
@@ -241,7 +244,6 @@ Adamant Nature
 IVs: 0 Atk
 EVs: 252 HP / 252 SpA / 4 SpD
 Ability: Ice Body
-Level: 100
 Shiny: Yes
 Modest Nature
 - Blizzard

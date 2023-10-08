@@ -41,7 +41,7 @@ public sealed class LanguageVerifier : Verifier
                 data.AddLine(GetInvalid(string.Format(LOTLanguage, $"!={(LanguageID)currentLanguage}", (LanguageID)currentLanguage)));
 
             // Japanese VC is language locked; cannot obtain Japanese-Blue version as other languages.
-            if (pk.Version == (int)GameVersion.BU && !pk.Japanese)
+            if (pk is { Version: (int)GameVersion.BU, Japanese: false })
                 data.AddLine(GetInvalid(string.Format(LOTLanguage, nameof(LanguageID.Japanese), (LanguageID)currentLanguage)));
         }
     }
@@ -54,7 +54,7 @@ public sealed class LanguageVerifier : Verifier
         if (currentLanguage > maxLanguageID)
             return false; //  Language not available (yet)
 
-        if (currentLanguage <= (int)LanguageID.Hacked && !(enc is EncounterTrade5PID && EncounterTrade5PID.IsValidMissingLanguage(pk)))
+        if (currentLanguage <= (int)LanguageID.Hacked && !(enc is EncounterTrade5BW && EncounterTrade5BW.IsValidMissingLanguage(pk)))
             return false; // Missing Language value is not obtainable
 
         return true; // Language is possible

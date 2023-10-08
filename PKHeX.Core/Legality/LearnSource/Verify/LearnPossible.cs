@@ -17,7 +17,7 @@ public static class LearnPossible
     /// <param name="types">Move types to give</param>
     public static void Get(PKM pk, IEncounterTemplate enc, EvolutionHistory history, Span<bool> result, MoveSourceType types = MoveSourceType.All)
     {
-        if (types.HasFlagFast(MoveSourceType.Encounter))
+        if (types.HasFlag(MoveSourceType.Encounter))
             FlagEncounterMoves(pk, enc, result);
         IterateAndFlag(result, pk, enc, history, types);
     }
@@ -34,7 +34,7 @@ public static class LearnPossible
     {
         if (pk.IsOriginalMovesetDeleted())
             return;
-        if (enc is EncounterSlot8GO g)
+        if (enc is EncounterSlot8GO { OriginFormat: PogoImportFormat.PK7 or PogoImportFormat.PB7 } g)
         {
             Span<ushort> initial = stackalloc ushort[4];
             g.GetInitialMoves(pk.Met_Level, initial);
@@ -42,10 +42,15 @@ public static class LearnPossible
         }
         else if (enc.Generation >= 6)
         {
-            result[pk.RelearnMove1] = true;
-            result[pk.RelearnMove2] = true;
-            result[pk.RelearnMove3] = true;
-            result[pk.RelearnMove4] = true;
+            static void AddIfInRange(ushort move, Span<bool> result)
+            {
+                if (move < result.Length)
+                    result[move] = true;
+            }
+            AddIfInRange(pk.RelearnMove1, result);
+            AddIfInRange(pk.RelearnMove2, result);
+            AddIfInRange(pk.RelearnMove3, result);
+            AddIfInRange(pk.RelearnMove4, result);
         }
     }
 

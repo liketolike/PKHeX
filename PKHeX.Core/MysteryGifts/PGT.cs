@@ -6,11 +6,13 @@ namespace PKHeX.Core;
 /// <summary>
 /// Generation 4 Mystery Gift Template File (Inner Gift Data, no card data)
 /// </summary>
-public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
+public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, IRandomCorrelation
 {
     public const int Size = 0x104; // 260
     public override int Generation => 4;
     public override EntityContext Context => EntityContext.Gen4;
+    public override bool FatefulEncounter => IsManaphyEgg || PK.FatefulEncounter;
+    public override GameVersion Version { get => IsManaphyEgg ? GameVersion.Gen4 : (GameVersion)PK.Version; set => PK.Version = (int)value; }
 
     public override byte Level
     {
@@ -20,7 +22,7 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
 
     public override int Ball
     {
-        get => IsEntity ? PK.Ball : 0;
+        get => IsManaphyEgg ? 4 : IsEntity ? PK.Ball : 0;
         set { if (IsEntity) PK.Ball = value; }
     }
 
@@ -116,8 +118,9 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
     public override bool IsShiny => PK.IsShiny;
     public override int Gender { get => PK.Gender; set => PK.Gender = value; }
     public override byte Form { get => PK.Form; set => PK.Form = value; }
-    public override int TID { get => (ushort)PK.TID; set => PK.TID = value; }
-    public override int SID { get => (ushort)PK.SID; set => PK.SID = value; }
+    public override uint ID32 { get => PK.ID32; set => PK.ID32= value; }
+    public override ushort TID16 { get => PK.TID16; set => PK.TID16 = value; }
+    public override ushort SID16 { get => PK.SID16; set => PK.SID16 = value; }
     public override string OT_Name { get => PK.OT_Name; set => PK.OT_Name = value; }
     public override int Location { get => PK.Met_Location; set => PK.Met_Location = value; }
     public override int EggLocation { get => PK.Egg_Location; set => PK.Egg_Location = value; }
@@ -128,7 +131,7 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
             PK.GetIVs(value);
     }
 
-    public override PKM ConvertToPKM(ITrainerInfo tr, EncounterCriteria criteria)
+    public override PK4 ConvertToPKM(ITrainerInfo tr, EncounterCriteria criteria)
     {
         if (!IsEntity)
             throw new ArgumentException(nameof(IsEntity));
@@ -138,8 +141,8 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
         if (!IsHatched && Detail == 0)
         {
             pk4.OT_Name = tr.OT;
-            pk4.TID = tr.TID;
-            pk4.SID = tr.SID;
+            pk4.TID16 = tr.TID16;
+            pk4.SID16 = tr.SID16;
             pk4.OT_Gender = tr.Gender;
             pk4.Language = tr.Language;
         }
@@ -163,7 +166,7 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
         {
             pk4.Met_Location = pk4.Egg_Location + 3000;
             pk4.Egg_Location = 0;
-            pk4.MetDate = DateTime.Now;
+            pk4.MetDate = EncounterDate.GetDateNDS();
             pk4.IsEgg = false;
         }
         else
@@ -193,6 +196,8 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
         pk4.Language = lang;
         pk4.Egg_Location = 1; // Ranger (will be +3000 later)
         pk4.Nickname = SpeciesName.GetSpeciesNameGeneration((int)Core.Species.Manaphy, lang, 4);
+        pk4.Met_Location = pk4.Version is (int)GameVersion.HG or (int)GameVersion.SS ? Locations.HatchLocationHGSS : Locations.HatchLocationDPPt;
+        pk4.MetDate = EncounterDate.GetDateNDS();
     }
 
     private void SetPINGA(PK4 pk4, EncounterCriteria criteria)
@@ -209,7 +214,7 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
         if ((pk4.IV32 & 0x3FFF_FFFFu) == 0) // Ignore Nickname/Egg flag bits
         {
             uint iv1 = ((seed = LCRNG.Next(seed)) >> 16) & 0x7FFF;
-            uint iv2 = ((LCRNG.Next(seed)) >> 16) & 0x7FFF;
+            uint iv2 = (LCRNG.Next(seed) >> 16) & 0x7FFF;
             pk4.IV32 |= iv1 | (iv2 << 15);
         }
     }
@@ -222,7 +227,7 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
 
         // The games don't decide the Nature/Gender up-front, but we can try to honor requests.
         // Pre-determine the result values, and generate something.
-        var n = (int)criteria.GetNature(Nature.Random);
+        var n = (int)criteria.GetNature();
         // Gender is already pre-determined in the template.
         while (true)
         {
@@ -237,7 +242,7 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
     {
         pk4.IsEgg = false;
         // Met Location & Date is modified when transferred to pk5; don't worry about it.
-        pk4.EggMetDate = DateTime.Now;
+        pk4.EggMetDate = EncounterDate.GetDateNDS();
     }
 
     private void SetUnhatchedEggDetails(PK4 pk4)
@@ -245,7 +250,7 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
         pk4.IsEgg = true;
         pk4.IsNicknamed = false;
         pk4.Nickname = SpeciesName.GetEggName(pk4.Language, Generation);
-        pk4.EggMetDate = DateTime.Now;
+        pk4.EggMetDate = EncounterDate.GetDateNDS();
     }
 
     private static uint GeneratePID(uint seed, PK4 pk4)
@@ -255,23 +260,23 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
             uint pid1 = (seed = LCRNG.Next(seed)) >> 16; // low
             uint pid2 = (seed = LCRNG.Next(seed)) & 0xFFFF0000; // hi
             pk4.PID = pid2 | pid1;
+            while (pk4.IsShiny) // Call the ARNG to change the PID
+                pk4.PID = ARNG.Next(pk4.PID);
             // sanity check gender for non-genderless PID cases
         } while (!pk4.IsGenderValid());
 
-        while (pk4.IsShiny) // Call the ARNG to change the PID
-            pk4.PID = ARNG.Next(pk4.PID);
         return seed;
     }
 
     public static bool IsRangerManaphy(PKM pk)
     {
+        if (pk.Language >= (int)LanguageID.Korean) // never korean
+            return false;
+
         var egg = pk.Egg_Location;
         if (!pk.IsEgg) // Link Trade Egg or Ranger
             return egg is Locations.LinkTrade4 or Locations.Ranger4;
         if (egg != Locations.Ranger4)
-            return false;
-
-        if (pk.Language == (int)LanguageID.Korean) // never korean
             return false;
 
         var met = pk.Met_Location;
@@ -298,4 +303,44 @@ public sealed class PGT : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4
     public bool RibbonWorld { get => PK.RibbonWorld; set => PK.RibbonWorld = value; }
     public bool RibbonChampionWorld { get => PK.RibbonChampionWorld; set => PK.RibbonChampionWorld = value; }
     public bool RibbonSouvenir { get => PK.RibbonSouvenir; set => PK.RibbonSouvenir = value; }
+
+    public bool IsCompatible(PIDType val, PKM pk)
+    {
+        if (IsManaphyEgg)
+            return IsG4ManaphyPIDValid(val, pk);
+        if (PK.PID != 1 && val == PIDType.G5MGShiny)
+            return true;
+        return val == PIDType.None;
+    }
+
+    public PIDType GetSuggestedCorrelation()
+    {
+        if (IsManaphyEgg)
+            return PIDType.Method_1;
+        return PIDType.None;
+    }
+
+    private static bool IsG4ManaphyPIDValid(PIDType val, PKM pk)
+    {
+        if (pk.IsEgg)
+        {
+            if (pk.IsShiny)
+                return false;
+            if (val == PIDType.Method_1)
+                return true;
+            return val == PIDType.G4MGAntiShiny && IsAntiShinyARNG(pk);
+        }
+
+        if (val == PIDType.Method_1)
+            return pk.WasTradedEgg || !pk.IsShiny; // can't be shiny on received game
+        return val == PIDType.G4MGAntiShiny && (pk.WasTradedEgg || IsAntiShinyARNG(pk));
+
+        static bool IsAntiShinyARNG(PKM pk)
+        {
+            var shinyPID = ARNG.Prev(pk.PID);
+            var tmp = pk.ID32 ^ shinyPID;
+            var xor = (ushort)(tmp ^ (tmp >> 16));
+            return xor < 8; // shiny proc
+        }
+    }
 }

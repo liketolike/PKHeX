@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows.Forms;
 using PKHeX.Core;
 using static System.Buffers.Binary.BinaryPrimitives;
@@ -37,10 +37,12 @@ public partial class SAV_PokeBlockORAS : Form
     {
         var span = SAV.Data.AsSpan(SAV6AO.Contest);
         for (int i = 0; i < nup_spec.Length; i++)
-            WriteUInt32LittleEndian(span[(i*4)..], (uint)nup_spec[i].Value);
+            WriteUInt32LittleEndian(span[(i * 4)..], (uint)nup_spec[i].Value);
         Origin.CopyChangesFrom(SAV);
         Close();
     }
+
+    private static ReadOnlySpan<byte> DefaultBerryTree => new byte[] { 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x80, 0x40, 0x01, 0x00, 0x00, 0x00 };
 
     private void B_RandomizeBerries_Click(object sender, EventArgs e)
     {
@@ -48,8 +50,8 @@ public partial class SAV_PokeBlockORAS : Form
             return;
 
         // Randomize the trees.
-        Span<byte> tree = stackalloc byte[] { 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x80, 0x40, 0x01, 0x00, 0x00, 0x00 };
-        var plantable = Legal.Pouch_Berry_XY; // 0 index is None, skip with rand
+        ReadOnlySpan<byte> tree = DefaultBerryTree;
+        var plantable = ItemStorage6XY.Pouch_Berry_XY; // 0 index is None, skip with rand
         var rnd = Util.Rand;
 
         var plots = SAV.Data.AsSpan(SAV.BerryField);

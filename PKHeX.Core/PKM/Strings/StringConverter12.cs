@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace PKHeX.Core;
@@ -39,7 +39,6 @@ public static class StringConverter12
     public const char G1Terminator = '\0';
     public const byte G1TradeOTCode = 0x5D;
     public const char G1TradeOT = '*';
-    public const string G1TradeOTStr = "*";
     public const byte G1SpaceCode = 0x7F;
 
     public static readonly IReadOnlyList<string> G1TradeOTName = new []
@@ -64,11 +63,13 @@ public static class StringConverter12
     {
         foreach (var b in data)
         {
-            if (b is >= 0xC0 and <= 0xC6)
+            if (IsGermanicGlyph(b))
                 return true;
         }
         return false;
     }
+
+    private static bool IsGermanicGlyph(byte b) => b - 0xC0u <= 6;
 
     /// <summary>
     /// Checks if the input byte array is definitely of German origin (any ÄÖÜäöü)
@@ -83,7 +84,7 @@ public static class StringConverter12
             if (!table.TryGetValue(c, out var b))
                 continue;
 
-            if (b is >= 0xC0 and <= 0xC6)
+            if (IsGermanicGlyph(b))
                 return true;
         }
         return false;
@@ -99,12 +100,17 @@ public static class StringConverter12
     {
         Span<char> result = stackalloc char[data.Length];
         int length = LoadString(data, result, jp);
-        return new string(result[..length].ToArray());
+        return new string(result[..length]);
     }
 
-    private static int LoadString(ReadOnlySpan<byte> data, Span<char> result, bool jp)
+    /// <inheritdoc cref="GetString(ReadOnlySpan{byte},bool)"/>
+    /// <param name="data">Encoded data</param>
+    /// <param name="result">Decoded character result buffer</param>
+    /// <param name="jp">Data source is Japanese.</param>
+    /// <returns>Character count loaded.</returns>
+    public static int LoadString(ReadOnlySpan<byte> data, Span<char> result, bool jp)
     {
-        if (data[0] == G1TradeOTCode)
+        if (data[0] == G1TradeOTCode) // In-game Trade
         {
             result[0] = G1TradeOT;
             return 1;
@@ -186,7 +192,7 @@ public static class StringConverter12
 
     #region Gen 1/2 Character Tables
 
-    internal static readonly Dictionary<byte, char> RBY2U_U = new()
+    internal static readonly Dictionary<byte, char> RBY2U_U = new(120)
     {
         {0x50, G1Terminator},
         {0x5D, G1TradeOT},
@@ -308,7 +314,7 @@ public static class StringConverter12
         {0xFF, '9'},
     };
 
-    private static readonly Dictionary<byte, char> RBY2U_J = new()
+    private static readonly Dictionary<byte, char> RBY2U_J = new(180)
     {
         {0x05, 'ガ'},
         {0x06, 'ギ'},
@@ -481,7 +487,7 @@ public static class StringConverter12
         {0xFF, '9'},
     };
 
-    internal static readonly Dictionary<char, byte> U2RBY_U = new()
+    internal static readonly Dictionary<char, byte> U2RBY_U = new(120)
     {
         {G1Terminator, 0x50},
         {G1TradeOT, 0x5D}, // TRAINER (Localized per ROM)
@@ -603,7 +609,7 @@ public static class StringConverter12
         {'9', 0xFF},
     };
 
-    private static readonly Dictionary<char, byte> U2RBY_J = new()
+    private static readonly Dictionary<char, byte> U2RBY_J = new(180)
     {
         {'ガ', 0x05},
         {'ギ', 0x06},

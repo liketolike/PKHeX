@@ -7,7 +7,7 @@ Save Editor für die Pokémon Hauptreihe, geschrieben in [C#](https://de.wikiped
 Die folgenden Dateien werden unterstützt:
 * Spielstände ("main", \*.sav, \*.dsv, \*.dat, \*.gci, \*.bin)
 * GameCube Memory Card Daten (\*.raw, \*.bin), die GC Pokémon Spielstände enthalten.
-* Einzelne Pokémon (.pk\*, \*.ck3, \*.xk3, \*.pb7, \*.sk2, \*.bk4)
+* Einzelne Pokémon (.pk\*, \*.ck3, \*.xk3, \*.pb7, \*.sk2, \*.bk4, \*.rk4)
 * Wunderkarten (\*.pgt, \*.pcd, \*.pgf, .wc\*), inklusive Konvertierung zu .pk\*
 * Import von GO Park Pokémon (\*.gp1) inklusive Konvertierung zu .pb7
 * Import von Teams aus entschlüsselten 3DS Battle Videos.
@@ -24,13 +24,13 @@ PKHeX erwartet entschlüsselte Spielstände. Da diese konsolenspezifisch verschl
 
 ## Screenshots
 
-![Main Window](https://i.imgur.com/5421hUR.png)
+![Main Window](https://i.imgur.com/37SMQSr.png)
 
 ## Erstellen
 
-PKHeX ist eine Windows Forms Anwendung, die das [.NET Framework v4.6](https://www.microsoft.com/de-de/download/details.aspx?id=48137) benötigt, mit experimenteller Unterstützung für [.NET 6.0](https://dotnet.microsoft.com/download/dotnet/6.0).
+PKHeX ist eine Windows Forms Anwendung, welche die [.NET 7.0](https://dotnet.microsoft.com/download/dotnet/7.0) runtime benötigt.
 
-Die Anwendung kann mit jedem Kompiler erstellt werden, der C# 10 unterstützt.
+Die Anwendung kann mit jedem Kompiler erstellt werden, der C# 11 unterstützt.
 
 ### Erstell Konfiguration
 
@@ -47,7 +47,3 @@ PKHeXs Pokémon Legends: Arceus Sprites kommen vom [National Pokédex - Icon Dex
 ### IDE
 
 PKHeX kann mit IDEs wie [Visual Studio](https://visualstudio.microsoft.com/de/downloads/) durch das Öffnen der .sln oder .csproj Dateien geöffnet werden.
-
-### GNU/Linux
-
-Da GNU/Linux nicht das Hauptbetriebssystem der PKHeX Entwickler ist können Bugs auftreten. Manche kommen möglicherweise von GNU/Linux spezifischem Code in Mono/Wine und können deshalb nicht von jedem reproduziert werden kann.

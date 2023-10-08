@@ -287,6 +287,7 @@ public partial class SAV_Pokedex4 : Form
         }
 
         var item = lb.SelectedItem;
+        ArgumentNullException.ThrowIfNull(item);
         lb.Items.RemoveAt(lb.SelectedIndex);
         var dest = lb == LB_Gender ? LB_NGender : LB_Gender;
         dest.Items.Add(item);
@@ -317,6 +318,7 @@ public partial class SAV_Pokedex4 : Form
             return;
 
         var item = lb.SelectedItem;
+        ArgumentNullException.ThrowIfNull(item);
         lb.Items.Remove(item);
         lb.Items.Insert(newIndex, item);
         lb.SelectedIndex = newIndex;
@@ -334,6 +336,7 @@ public partial class SAV_Pokedex4 : Form
         }
 
         var item = lb.SelectedItem;
+        ArgumentNullException.ThrowIfNull(item);
         lb.Items.RemoveAt(lb.SelectedIndex);
         var dest = lb == LB_Form ? LB_NForm : LB_Form;
         dest.Items.Add(item);
@@ -364,6 +367,7 @@ public partial class SAV_Pokedex4 : Form
             return;
 
         var item = lb.SelectedItem;
+        ArgumentNullException.ThrowIfNull(item);
         lb.Items.Remove(item);
         lb.Items.Insert(newIndex, item);
         lb.SelectedIndex = newIndex;

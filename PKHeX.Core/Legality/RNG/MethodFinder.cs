@@ -87,8 +87,8 @@ public static class MethodFinder
     {
         var count = LCRNGReversal.GetSeeds(seeds, bot, top);
         var reg = seeds[..count];
-        var iv1 = GetIVChunk(IVs, 0);
-        var iv2 = GetIVChunk(IVs, 3);
+        var iv1 = GetIVChunk(IVs[..3]);
+        var iv2 = GetIVChunk(IVs[3..]);
         foreach (var seed in reg)
         {
             // A and B are already used by PID
@@ -158,8 +158,8 @@ public static class MethodFinder
         // this is an exact copy of LCRNG 1,2,4 matching, except the PID has its halves switched (BACD, BADE, BACE)
         var count = LCRNGReversal.GetSeeds(seeds, top, bot); // reversed!
         var reg = seeds[..count];
-        var iv1 = GetIVChunk(IVs, 0);
-        var iv2 = GetIVChunk(IVs, 3);
+        var iv1 = GetIVChunk(IVs[..3]);
+        var iv2 = GetIVChunk(IVs[3..]);
         foreach (var seed in reg)
         {
             // A and B are already used by PID
@@ -226,10 +226,10 @@ public static class MethodFinder
 
     private static bool GetLCRNGRoamerMatch(Span<uint> seeds, uint top, uint bot, ReadOnlySpan<uint> IVs, out PIDIV pidiv)
     {
-        if (IVs[2] != 0 || IVs[3] != 0 || IVs[4] != 0 || IVs[5] != 0 || IVs[1] > 7)
+        if (IVs is not [_, <= 7, 0, 0, 0, 0])
             return GetNonMatch(out pidiv);
 
-        var iv1 = GetIVChunk(IVs, 0);
+        var iv1 = GetIVChunk(IVs[..3]);
         var count = LCRNGReversal.GetSeeds(seeds, bot, top);
         var reg = seeds[..count];
         foreach (var seed in reg)
@@ -263,7 +263,7 @@ public static class MethodFinder
             }
 
             // check for anti-shiny against player TSV
-            var tsv = (uint)(pk.TID ^ pk.SID) >> 3;
+            var tsv = (uint)(pk.TID16 ^ pk.SID16) >> 3;
             var psv = (top ^ bot) >> 3;
             if (psv == tsv) // already shiny, wouldn't be anti-shiny
                 continue;
@@ -302,7 +302,7 @@ public static class MethodFinder
             return GetNonMatch(out pidiv);
 
         var undo = (top >> 16) ^ 0x8000;
-        if ((undo > 7 ? 0 : 1) != ((bot >> 16) ^ pk.SID ^ 40122))
+        if ((undo > 7 ? 0 : 1) != ((bot >> 16) ^ pk.SID16 ^ 40122))
             top = (undo << 16);
 
         var count = XDRNG.GetSeeds(seeds, top, bot);
@@ -323,7 +323,7 @@ public static class MethodFinder
             if (!XDRNG.GetSequentialIVsUInt32(E, IVs))
                 continue;
 
-            if (seed >> 16 != pk.SID)
+            if (seed >> 16 != pk.SID16)
                 continue;
 
             pidiv = new PIDIV(Channel, XDRNG.Prev(seed));
@@ -359,7 +359,7 @@ public static class MethodFinder
         if (low <= 0xFF)
         {
             var av = (pid >> 16) & 1;
-            var genPID = PIDGenerator.GetMG5ShinyPID(low, av, pk.TID, pk.SID);
+            var genPID = PIDGenerator.GetMG5ShinyPID(low, av, pk.TID16, pk.SID16);
             if (genPID == pid)
             {
                 pidiv = PIDIV.G5MGShiny;
@@ -369,13 +369,13 @@ public static class MethodFinder
         return GetNonMatch(out pidiv);
     }
 
-    private static bool GetCuteCharmMatch(PKM pk, uint pid, out PIDIV pidiv)
+    internal static bool GetCuteCharmMatch(PKM pk, uint pid, out PIDIV pidiv)
     {
         if (pid > 0xFF)
             return GetNonMatch(out pidiv);
 
         (var species, int genderValue) = GetCuteCharmGenderSpecies(pk, pid, pk.Species);
-        static int getRatio(ushort species)
+        static byte getRatio(ushort species)
         {
             return species <= Legal.MaxSpeciesID_4
                 ? PersonalTable.HGSS[species].Gender
@@ -414,8 +414,8 @@ public static class MethodFinder
         // PIDH & 7
         // PIDL & 7
         // IVs
-        var bot = GetIVChunk(IVs, 0) << 16;
-        var top = GetIVChunk(IVs, 3) << 16;
+        var bot = GetIVChunk(IVs[..3]) << 16;
+        var top = GetIVChunk(IVs[3..]) << 16;
 
         var count = LCRNGReversal.GetSeedsIVs(seeds, bot, top);
         var reg = seeds[..count];
@@ -442,7 +442,7 @@ public static class MethodFinder
             if ((lower >> 16 & 7) != (pid & 7))
                 continue;
 
-            var upid = (((pid & 0xFFFF) ^ pk.TID ^ pk.SID) & 0xFFF8) | ((upper >> 16) & 0x7);
+            var upid = (((pid & 0xFFFF) ^ pk.TID16 ^ pk.SID16) & 0xFFF8) | ((upper >> 16) & 0x7);
             if (upid != pid >> 16)
                 continue;
 
@@ -455,8 +455,8 @@ public static class MethodFinder
 
     private static bool GetBACDMatch(Span<uint> seeds, PKM pk, uint pid, ReadOnlySpan<uint> IVs, out PIDIV pidiv)
     {
-        var bot = GetIVChunk(IVs, 0) << 16;
-        var top = GetIVChunk(IVs, 3) << 16;
+        var bot = GetIVChunk(IVs[..3]) << 16;
+        var top = GetIVChunk(IVs[3..]) << 16;
 
         var count = LCRNGReversal.GetSeedsIVs(seeds, bot, top);
         var reg = seeds[..count];
@@ -470,7 +470,7 @@ public static class MethodFinder
             var PID = (A & 0xFFFF0000) | low;
             if (PID != pid)
             {
-                uint idxor = (uint)(pk.TID ^ pk.SID);
+                uint idxor = (uint)(pk.TID16 ^ pk.SID16);
                 bool isShiny = (idxor ^ PID >> 16 ^ (PID & 0xFFFF)) < 8;
                 if (!isShiny)
                 {
@@ -511,22 +511,30 @@ public static class MethodFinder
         return GetNonMatch(out pidiv);
     }
 
-    private static bool GetPokewalkerMatch(PKM pk, uint oldpid, out PIDIV pidiv)
+    private static bool GetPokewalkerMatch(PKM pk, uint pid, out PIDIV pidiv)
     {
         // check surface compatibility
-        var mid = oldpid & 0x00FFFF00;
-        if (mid != 0 && mid != 0x00FFFF00) // not expected bits
-            return GetNonMatch(out pidiv);
-        var nature = oldpid % 25;
-        if (nature == 24) // impossible nature
+        // Bits 8-24 must all be zero or all be one.
+        const uint midMask = 0x00FFFF00;
+        var mid = pid & midMask;
+        if (mid is not (0 or midMask))
             return GetNonMatch(out pidiv);
 
+        // Quirky Nature is not possible with the algorithm.
+        var nature = pid % 25;
+        if (nature == 24)
+            return GetNonMatch(out pidiv);
+
+        // No Pokewalker Pokémon evolves into a different gender-ratio species.
+        // Besides Azurill, and Froslass
         var gender = pk.Gender;
-        uint pid = PIDGenerator.GetPokeWalkerPID(pk.TID, pk.SID, nature, gender, pk.PersonalInfo.Gender);
-
-        if (pid != oldpid)
+        var gr = pk.PersonalInfo.Gender;
+        if (pk.Species == (int)Species.Froslass)
+            gr = 0x7F; // Snorunt
+        var expect = PokewalkerRNG.GetPID(pk.TID16, pk.SID16, nature, gender, gr);
+        if (expect != pid)
         {
-            if (!(gender == 0 && IsAzurillEdgeCaseM(pk, nature, oldpid)))
+            if (!(gender == 0 && IsAzurillEdgeCaseM(pk, nature, pid)))
                 return GetNonMatch(out pidiv);
         }
         pidiv = PIDIV.Pokewalker;
@@ -541,12 +549,12 @@ public static class MethodFinder
         if (species is not ((int)Species.Marill or (int)Species.Azumarill))
             return false;
 
-        const int AzurillGenderRatio = 0xBF;
-        var gender = EntityGender.GetFromPIDAndRatio(pk.PID, AzurillGenderRatio);
+        const byte AzurillGenderRatio = 0xBF;
+        var gender = EntityGender.GetFromPIDAndRatio(pk.EncryptionConstant, AzurillGenderRatio);
         if (gender != 1)
             return false;
 
-        var pid = PIDGenerator.GetPokeWalkerPID(pk.TID, pk.SID, nature, 1, AzurillGenderRatio);
+        var pid = PokewalkerRNG.GetPID(pk.TID16, pk.SID16, nature, 1, AzurillGenderRatio);
         return pid == oldpid;
     }
 
@@ -561,15 +569,15 @@ public static class MethodFinder
         if (!starter)
             return GetNonMatch(out pidiv);
 
-        var iv1 = GetIVChunk(IVs, 0);
-        var iv2 = GetIVChunk(IVs, 3);
+        var iv1 = GetIVChunk(IVs[..3]);
+        var iv2 = GetIVChunk(IVs[3..]);
 
         var count = XDRNG.GetSeeds(seeds, top, bot);
         var xdc = seeds[..count];
         foreach (var seed in xdc)
         {
             uint origin = seed;
-            if (!LockFinder.IsColoStarterValid(pk.Species, ref origin, pk.TID, pk.SID, pk.PID, iv1, iv2))
+            if (!LockFinder.IsColoStarterValid(pk.Species, ref origin, pk.TID16, pk.SID16, pk.PID, iv1, iv2))
                 continue;
 
             pidiv = new PIDIV(CXD_ColoStarter, origin);
@@ -593,7 +601,7 @@ public static class MethodFinder
     /// <summary>
     /// Checks if the PID is a <see cref="PIDType.BACD_U_S"></see> match.
     /// </summary>
-    /// <param name="idxor"><see cref="PKM.TID"/> ^ <see cref="PKM.SID"/></param>
+    /// <param name="idxor"><see cref="PKM.TID16"/> ^ <see cref="PKM.SID16"/></param>
     /// <param name="pid">Full actual PID</param>
     /// <param name="low">Low portion of PID (B)</param>
     /// <param name="A">First RNG call</param>
@@ -607,7 +615,7 @@ public static class MethodFinder
         // 1-PIDH
         // 2-PIDL (ends up unused)
         // 3-FORCEBITS
-        // PID = PIDH << 16 | (SID ^ TID ^ PIDH)
+        // PID = PIDH << 16 | (SID16 ^ TID16 ^ PIDH)
 
         var X = LCRNG.Prev(A); // unroll once as there's 3 calls instead of 2
         uint PID = (X & 0xFFFF0000) | (idxor ^ X >> 16);
@@ -624,7 +632,7 @@ public static class MethodFinder
     /// <summary>
     /// Checks if the PID is a <see cref="PIDType.BACD_U_AX"></see> match.
     /// </summary>
-    /// <param name="idxor"><see cref="PKM.TID"/> ^ <see cref="PKM.SID"/></param>
+    /// <param name="idxor"><see cref="PKM.TID16"/> ^ <see cref="PKM.SID16"/></param>
     /// <param name="pid">Full actual PID</param>
     /// <param name="low">Low portion of PID (B)</param>
     /// <param name="A">First RNG call</param>
@@ -698,14 +706,14 @@ public static class MethodFinder
         result[0] = (int)r1 & 31;
     }
 
-    private static uint GetIVChunk(ReadOnlySpan<uint> IVs, int start)
+    private static uint GetIVChunk(ReadOnlySpan<uint> arr)
     {
-        uint val = 0;
-        for (int i = 0; i < 3; i++)
-            val |= IVs[i+start] << (5*i);
-        return val;
+        uint result = 0;
+        for (int i = 0; i < arr.Length; i++)
+            result |= arr[i] << (5*i);
+        return result;
     }
-    
+
     public static bool IsPokeSpotActivation(int slot, uint seed, out uint s)
     {
         s = seed;
@@ -739,103 +747,15 @@ public static class MethodFinder
         _ => false,
     };
 
-    public static bool IsCompatible3(this PIDType val, IEncounterTemplate encounter, PKM pk) => encounter switch
+    internal static bool IsCuteCharm4Valid(ISpeciesForm enc, PKM pk)
     {
-        WC3 g                  => IsCompatible3Mystery(val, pk, g),
-        EncounterStatic3 s     => IsCompatible3Static(val, pk, s),
-        EncounterStaticShadow  => val is (CXD or CXDAnti),
-        EncounterSlot3PokeSpot => val is PokeSpot,
-        EncounterSlot3 w       => w.Species != (int)Species.Unown
-            ? val is (Method_1       or Method_2       or Method_3       or Method_4)
-            : val is (Method_1_Unown or Method_2_Unown or Method_3_Unown or Method_4_Unown),
-        _  => val is None,
-    };
-
-    private static bool IsCompatible3Static(PIDType val, PKM pk, EncounterStatic3 s) => pk.Version switch
-    {
-        (int)GameVersion.CXD                        => val is (CXD or CXD_ColoStarter or CXDAnti),
-        (int)GameVersion.E                          => val is Method_1, // no roamer glitch
-        (int)GameVersion.FR or (int) GameVersion.LG => s.Roaming ? val.IsRoamerPIDIV(pk) : val is Method_1, // roamer glitch
-        _ => s.Roaming ? val.IsRoamerPIDIV(pk) : val is (Method_1 or Method_4), // RS, roamer glitch && RSBox s/w emulation => method 4 available
-    };
-
-    private static bool IsCompatible3Mystery(PIDType val, PKM pk, WC3 g) => val == g.Method || val switch
-    {
-        // forced shiny eggs, when hatched, can lose their detectable correlation.
-        None    => (g.Method is (BACD_R_S or BACD_U_S)) && g.IsEgg && !pk.IsEgg,
-        CXDAnti => g.Method is CXD && g.Shiny == Shiny.Never,
-        _       => false,
-    };
-
-    private static bool IsRoamerPIDIV(this PIDType val, PKM pk)
-    {
-        // Roamer PIDIV is always Method 1.
-        // M1 is checked before M1R. A M1R PIDIV can also be a M1 PIDIV, so check that collision.
-        if (Method_1_Roamer == val)
-            return true;
-        if (Method_1 != val)
+        if (pk.Gender is not (0 or 1))
             return false;
-
-        // only 8 bits are stored instead of 32 -- 5 bits HP, 3 bits for ATK.
-        // return pk.IV32 <= 0xFF;
-        return pk.IV_DEF == 0 && pk.IV_SPE == 0 && pk.IV_SPA == 0 && pk.IV_SPD == 0 && pk.IV_ATK <= 7;
-    }
-
-    public static bool IsCompatible4(this PIDType val, IEncounterTemplate encounter, PKM pk) => encounter switch
-    {
-        // Pokewalker can sometimes be confused with CuteCharm due to the PID creation routine. Double check if it is okay.
-        EncounterStatic4Pokewalker when val is CuteCharm => GetCuteCharmMatch(pk, pk.EncryptionConstant, out _) && IsCuteCharm4Valid(encounter, pk),
-        EncounterStatic4Pokewalker => val is Pokewalker,
-
-        EncounterStatic4 {Species: (int)Species.Pichu} => val is Pokewalker,
-        EncounterStatic4 {Shiny: Shiny.Always} => val is ChainShiny,
-        EncounterStatic4 when val is CuteCharm => IsCuteCharm4Valid(encounter, pk),
-        EncounterStatic4 => val is Method_1,
-
-        EncounterSlot4 w => val switch
-        {
-            // Chain shiny with Poké Radar is only possible in DPPt, in grass. Safari Zone does not allow using the Poké Radar
-            ChainShiny => pk.IsShiny && !pk.HGSS && (w.GroundTile & GroundTileAllowed.Grass) != 0 && !Locations.IsSafariZoneLocation4(w.Location),
-            CuteCharm => IsCuteCharm4Valid(encounter, pk),
-            _ => val is Method_1,
-        },
-
-        PGT => IsG4ManaphyPIDValid(val, pk), // Manaphy is the only PGT in the database
-        PCD d when d.Gift.PK.PID != 1 => true, // Already matches PCD's fixed PID requirement
-        _ => val is None,
-    };
-
-    private static bool IsG4ManaphyPIDValid(PIDType val, PKM pk)
-    {
-        if (pk.IsEgg)
-        {
-            if (pk.IsShiny)
-                return false;
-            if (val == Method_1)
-                return true;
-            return val == G4MGAntiShiny && IsAntiShinyARNG();
-        }
-
-        if (val == Method_1)
-            return pk.WasTradedEgg || !pk.IsShiny; // can't be shiny on received game
-        return val == G4MGAntiShiny && (pk.WasTradedEgg || IsAntiShinyARNG());
-
-        bool IsAntiShinyARNG()
-        {
-            var shinyPID = ARNG.Prev(pk.PID);
-            return (pk.TID ^ pk.SID ^ (shinyPID & 0xFFFF) ^ (shinyPID >> 16)) < 8; // shiny proc
-        }
-    }
-
-    private static bool IsCuteCharm4Valid(ISpeciesForm encounter, PKM pk)
-    {
-        if (pk.Species is (int)Species.Marill or (int)Species.Azumarill)
-        {
-            return !IsCuteCharmAzurillMale(pk.PID) // recognized as not Azurill
-                   || encounter.Species == (int)Species.Azurill; // encounter must be male Azurill
-        }
-
-        return true;
+        if (pk.Species is not ((int)Species.Marill or (int)Species.Azumarill))
+            return true;
+        if (!IsCuteCharmAzurillMale(pk.PID)) // recognized as not Azurill
+            return true;
+        return enc.Species == (int)Species.Azurill; // encounter must be male Azurill
     }
 
     private static bool IsCuteCharmAzurillMale(uint pid) => pid is >= 0xC8 and <= 0xE0;

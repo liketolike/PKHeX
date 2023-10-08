@@ -21,7 +21,13 @@ public enum SlotTouchType
     External,
 }
 
+/// <summary>
+/// Extension methods for <see cref="SlotTouchType"/>.
+/// </summary>
 public static class SlotTouchTypeUtil
 {
+    /// <summary>
+    /// Indicates if the <see cref="SlotTouchType"/> happens after a write operation and the underlying data has been changed.
+    /// </summary>
     public static bool IsContentChange(this SlotTouchType t) => t > SlotTouchType.Get;
 }

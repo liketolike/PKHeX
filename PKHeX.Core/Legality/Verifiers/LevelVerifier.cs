@@ -1,4 +1,3 @@
-using System;
 using static PKHeX.Core.LegalityCheckStrings;
 
 namespace PKHeX.Core;
@@ -16,20 +15,10 @@ public sealed class LevelVerifier : Verifier
         var enc = data.EncounterOriginal;
         if (enc is MysteryGift gift)
         {
-            if (gift.Level != pk.Met_Level && pk.HasOriginalMetLocation)
+            if (!IsMetLevelMatchEncounter(gift, pk))
             {
-                switch (gift)
-                {
-                    case WC3 wc3 when wc3.Met_Level == pk.Met_Level || wc3.IsEgg:
-                        break;
-                    case WC7 wc7 when wc7.MetLevel == pk.Met_Level:
-                        break;
-                    case PGT {IsManaphyEgg: true} when pk.Met_Level == 0:
-                        break;
-                    default:
-                        data.AddLine(GetInvalid(LLevelMetGift));
-                        return;
-                }
+                data.AddLine(GetInvalid(LLevelMetGift));
+                return;
             }
             if (gift.Level > pk.CurrentLevel)
             {
@@ -47,7 +36,7 @@ public sealed class LevelVerifier : Verifier
                 return;
             }
 
-            var reqEXP = enc is EncounterStatic2Odd
+            var reqEXP = enc is EncounterStatic2 { DizzyPunchEgg: true }
                 ? 125 // Gen2 Dizzy Punch gifts always have 125 EXP, even if it's more than the Lv5 exp required.
                 : Experience.GetEXP(elvl, pk.PersonalInfo.EXPGrowth);
             if (reqEXP != pk.EXP)
@@ -69,6 +58,22 @@ public sealed class LevelVerifier : Verifier
             data.AddLine(Get(LLevelEXPThreshold, Severity.Fishy));
         else
             data.AddLine(GetValid(LLevelMetSane));
+    }
+
+    private static bool IsMetLevelMatchEncounter(MysteryGift gift, PKM pk)
+    {
+        if (gift.Level == pk.Met_Level)
+            return true;
+        if (!pk.HasOriginalMetLocation)
+            return true;
+
+        return gift switch
+        {
+            WC3 wc3 when wc3.Met_Level == pk.Met_Level || wc3.IsEgg => true,
+            WC7 wc7 when wc7.MetLevel == pk.Met_Level => true,
+            PGT { IsManaphyEgg: true } when pk.Met_Level == 0 => true,
+            _ => false,
+        };
     }
 
     public void VerifyG1(LegalityAnalysis data)
@@ -111,21 +116,23 @@ public sealed class LevelVerifier : Verifier
         var species = pk.Species;
 
         // This check is only applicable if it's a trade evolution that has not been evolved.
-        if (!GBRestrictions.Trade_Evolution1.Contains((byte)enc.Species) || enc.Species != species)
+        if (enc.Species != species)
+            return false;
+        if (!GBRestrictions.IsTradeEvolution1(enc.Species))
             return false;
 
         // Context check is only applicable to gen1/2; transferring to Gen2 is a trade.
         // Stadium 2 can transfer across game/generation boundaries without initiating a trade.
         // Ignore this check if the environment's loaded trainer is not from Gen1/2 or is from GB Era.
-        if (ParseSettings.ActiveTrainer.Generation >= 3 || ParseSettings.AllowGBCartEra)
+        if (ParseSettings.ActiveTrainer.Generation >= 3 || ParseSettings.AllowGBStadium2)
             return false;
 
         var moves = data.Info.Moves;
         // Gen2 stuff can be traded between Gen2 games holding an Everstone, assuming it hasn't been transferred to Gen1 for special moves.
         if (enc.Generation == 2)
-            return Array.Exists(moves, z => z.Generation != 2);
+            return MoveInfo.IsAnyFromGeneration(1, moves);
         // Gen1 stuff can only be un-evolved if it was never traded from the OT.
-        if (Array.Exists(moves, z => z.Generation != 1))
+        if (MoveInfo.IsAnyFromGeneration(2, moves))
             return true; // traded to Gen2 for special moves
         if (pk.Format != 1)
             return true; // traded to Gen2 (current state)

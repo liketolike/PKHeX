@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
-using static PKHeX.Core.Encounters6;
-using static PKHeX.Core.Encounters8;
 using static PKHeX.Core.Move;
 using static PKHeX.Core.Species;
 
@@ -91,7 +88,8 @@ public static class MemoryPermissions
         // Relearns can be wiped via Battle Version. Check for eggs too.
         if (IsSpecialEncounterMoveEggDeleted(pk, enc))
         {
-            var em = MoveEgg.GetEggMoves(enc.Generation, enc.Species, enc.Form, enc.Version);
+            var learn = GameData.GetLearnSource(enc.Version);
+            var em = learn.GetEggMoves(enc.Species, enc.Form);
             if (em.Contains(move))
                 return true;
         }
@@ -151,7 +149,7 @@ public static class MemoryPermissions
     private static bool GetCanKnowMove(PKM pk, ushort move, EntityContext context, EvolutionHistory history, IEncounterTemplate enc)
     {
         if (pk.Species == (int)Smeargle)
-            return MoveInfo.IsValidSketch(move, context);
+            return MoveInfo.IsSketchValid(move, context);
 
         ILearnGroup game;
         if (context == EntityContext.Gen6)
@@ -161,6 +159,11 @@ public static class MemoryPermissions
         else
             return false;
 
+        return GetCanKnowMove(enc, move, history, pk, game);
+    }
+
+    public static bool GetCanKnowMove(IEncounterTemplate enc, ushort move, EvolutionHistory history, PKM pk, ILearnGroup game)
+    {
         Span<MoveResult> result = stackalloc MoveResult[1];
         Span<ushort> moves = stackalloc ushort[] { move };
         LearnVerifierHistory.MarkAndIterate(result, moves, enc, pk, history, game, MoveSourceType.All, LearnOption.AtAnyTime);
@@ -169,36 +172,10 @@ public static class MemoryPermissions
 
     public static bool GetCanBeCaptured(ushort species, EntityContext gen, GameVersion version) => gen switch
     {
-        EntityContext.Gen6 => version switch
-        {
-            GameVersion.Any => GetCanBeCaptured(species, SlotsX, StaticX) || GetCanBeCaptured(species, SlotsY, StaticY)
-                                                                          || GetCanBeCaptured(species, SlotsA, StaticA) || GetCanBeCaptured(species, SlotsO, StaticO),
-
-            GameVersion.X => GetCanBeCaptured(species, SlotsX, StaticX),
-            GameVersion.Y => GetCanBeCaptured(species, SlotsY, StaticY),
-
-            GameVersion.AS => GetCanBeCaptured(species, SlotsA, StaticA),
-            GameVersion.OR => GetCanBeCaptured(species, SlotsO, StaticO),
-            _ => false,
-        },
-        EntityContext.Gen8 => version switch
-        {
-            GameVersion.Any => GetCanBeCaptured(species, SlotsSW.Concat(SlotsSH), StaticSW.Concat(StaticSH)),
-            GameVersion.SW => GetCanBeCaptured(species, SlotsSW, StaticSW),
-            GameVersion.SH => GetCanBeCaptured(species, SlotsSH, StaticSH),
-            _ => false,
-        },
+        EntityContext.Gen6 => MemoryContext6.GetCanBeCaptured(species, version),
+        EntityContext.Gen8 => MemoryContext8.GetCanBeCaptured(species, version),
         _ => false,
     };
-
-    private static bool GetCanBeCaptured(ushort species, IEnumerable<EncounterArea> area, IEnumerable<EncounterStatic> statics)
-    {
-        if (area.Any(loc => loc.HasSpecies(species)))
-            return true;
-        if (statics.Any(enc => enc.Species == species && !enc.Gift))
-            return true;
-        return false;
-    }
 
     public static bool GetCanDynamaxTrainer(ushort species, int gen, GameVersion version)
     {

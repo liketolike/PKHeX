@@ -27,11 +27,6 @@ public sealed class LegalityAnalysis
     public IReadOnlyList<CheckResult> Results => Parse;
 
     /// <summary>
-    /// Only use this when trying to mutate the legality. Not for use when checking legality.
-    /// </summary>
-    public void ResetParse() => Parse.Clear();
-
-    /// <summary>
     /// Matched encounter data for the <see cref="Entity"/>.
     /// </summary>
     public IEncounterable EncounterMatch => Info.EncounterMatch;
@@ -145,7 +140,7 @@ public sealed class LegalityAnalysis
         if (info.EncounterOriginal is not EncounterInvalid enc)
             return false;
         if (enc.Generation <= 3)
-            return true;
+            return pk.Format <= 3;
         if (!pk.FatefulEncounter)
             return false;
         if (enc.Generation < 6)
@@ -160,9 +155,7 @@ public sealed class LegalityAnalysis
         if (Entity.Format <= 2) // prior to storing GameVersion
             return ParsePK1;
 
-        int gen = Entity.Generation;
-        if (gen <= 0)
-            gen = Entity.Format;
+        var gen = GetParseFormat();
         return gen switch
         {
             3 => ParsePK3,
@@ -175,9 +168,20 @@ public sealed class LegalityAnalysis
             7 => ParsePK7,
 
             8 => ParsePK8,
+            9 => ParsePK9,
 
             _ => throw new ArgumentOutOfRangeException(nameof(gen)),
         };
+    }
+
+    private int GetParseFormat()
+    {
+        int gen = Entity.Generation;
+        if (gen > 0)
+            return gen;
+        if (Entity is PK9 { IsUnhatchedEgg: true })
+            return 9;
+        return Entity.Format;
     }
 
     private void ParsePK1()
@@ -219,7 +223,6 @@ public sealed class LegalityAnalysis
     private void ParsePK5()
     {
         UpdateChecks();
-        NHarmonia.Verify(this);
         if (Entity.Format >= 8)
             Transfer.VerifyTransferLegalityG8(this);
     }
@@ -248,13 +251,19 @@ public sealed class LegalityAnalysis
         Transfer.VerifyTransferLegalityG8(this);
     }
 
+    private void ParsePK9()
+    {
+        UpdateChecks();
+        Transfer.VerifyTransferLegalityG9(this);
+    }
+
     /// <summary>
     /// Adds a new Check parse value.
     /// </summary>
     /// <param name="s">Check severity</param>
     /// <param name="c">Check comment</param>
     /// <param name="i">Check type</param>
-    internal void AddLine(Severity s, string c, CheckIdentifier i) => AddLine(new CheckResult(s, c, i));
+    internal void AddLine(Severity s, string c, CheckIdentifier i) => AddLine(new CheckResult(s, i, c));
 
     /// <summary>
     /// Adds a new Check parse value.
@@ -267,7 +276,7 @@ public sealed class LegalityAnalysis
         var enc = (Info.EncounterOriginalGB = EncounterMatch);
         if (enc is EncounterInvalid)
             return;
-        var vc = EncounterStaticGenerator.GetVCStaticTransferEncounter(Entity, enc, Info.EvoChainsAllGens.Gen7);
+        var vc = EncounterGenerator7.GetVCStaticTransferEncounter(Entity, enc.Species, Info.EvoChainsAllGens.Gen7);
         Info.EncounterMatch = vc;
 
         Transfer.VerifyVCEncounter(Entity, enc, vc, this);

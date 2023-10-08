@@ -1,4 +1,4 @@
-﻿namespace PKHeX.WinForms.Controls
+namespace PKHeX.WinForms.Controls
 {
     partial class GenderToggle
     {
@@ -28,16 +28,17 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.SuspendLayout();
+            SuspendLayout();
             // 
             // GenderToggle
             // 
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
-            this.Name = "GenderToggle";
-            this.Size = new System.Drawing.Size(18, 18);
-            this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center;
-            this.Click += new System.EventHandler(this.GenderToggle_Click);
-            this.ResumeLayout(false);
+            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center;
+            Name = "GenderToggle";
+            Size = new System.Drawing.Size(18, 18);
+            Click += new System.EventHandler(GenderToggle_Click);
+            KeyDown += new System.Windows.Forms.KeyEventHandler(GenderToggle_KeyDown);
+            ResumeLayout(false);
 
         }
 

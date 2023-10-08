@@ -6,7 +6,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Media;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -22,14 +21,14 @@ namespace PKHeX.WinForms;
 
 public partial class Main : Form
 {
-    private static readonly Version CurrentProgramVersion = Assembly.GetExecutingAssembly().GetName().Version!;
-
     public Main()
     {
         string[] args = Environment.GetCommandLineArgs();
         FormLoadInitialSettings(args, out bool showChangelog, out bool BAKprompt);
 
         InitializeComponent();
+        if (Settings.Display.DisableScalingDpi)
+            AutoScaleMode = AutoScaleMode.Font;
         C_SAV.SetEditEnvironment(new SaveDataEditor<PictureBox>(new FakeSaveFile(), PKME_Tabs));
         FormLoadAddEvents();
 #if DEBUG // translation updater -- all controls are added at this point -- call translate now
@@ -43,10 +42,11 @@ public partial class Main : Form
         startup.ReadArguments(args);
         startup.ReadSettings(Settings.Startup);
         startup.ReadTemplateIfNoEntity(TemplatePath);
-        FormLoadInitialFiles(startup);
 
         if (Settings.Startup.PluginLoadMethod != PluginLoadSetting.DontLoad)
             FormLoadPlugins();
+
+        FormLoadInitialFiles(startup);
 
         if (HaX)
         {
@@ -96,7 +96,7 @@ public partial class Main : Form
 
     #region Path Variables
 
-    public static readonly string WorkingDirectory = Application.StartupPath;
+    public static readonly string WorkingDirectory = Path.GetDirectoryName(Environment.ProcessPath)!;
     public static readonly string DatabasePath = Path.Combine(WorkingDirectory, "pkmdb");
     public static readonly string MGDatabasePath = Path.Combine(WorkingDirectory, "mgdb");
     public static readonly string ConfigPath = Path.Combine(WorkingDirectory, "cfg.json");
@@ -129,15 +129,12 @@ public partial class Main : Form
     {
         foreach (var x in args)
         {
-            if (string.Equals(x.Trim('-'), nameof(HaX), StringComparison.CurrentCultureIgnoreCase))
+            var arg = x.AsSpan().Trim('-');
+            if (arg.Equals(nameof(HaX), StringComparison.CurrentCultureIgnoreCase))
                 return true;
         }
 
-#if !NET6_0_OR_GREATER
-        var path = Process.GetCurrentProcess().MainModule!.FileName!;
-#else
-        var path = Environment.ProcessPath!;
-#endif
+        ReadOnlySpan<char> path = Environment.ProcessPath!;
         return Path.GetFileNameWithoutExtension(path).EndsWith(nameof(HaX));
     }
 
@@ -186,7 +183,8 @@ public partial class Main : Form
         var sav = SaveUtil.GetBlankSAV(ver, tr, lang);
         if (sav.Version == GameVersion.Invalid) // will fail to load
         {
-            ver = (GameVersion)GameInfo.VersionDataSource.Max(z => z.Value);
+            var max = GameInfo.VersionDataSource.MaxBy(z => z.Value) ?? throw new Exception();
+            ver = (GameVersion)max.Value;
             sav = SaveUtil.GetBlankSAV(ver, tr, lang);
         }
         OpenSAV(sav, string.Empty);
@@ -205,7 +203,7 @@ public partial class Main : Form
                 Debug.WriteLine($"Exception while checking for latest version: {ex}");
                 return;
             }
-            if (latestVersion is null || latestVersion <= CurrentProgramVersion)
+            if (latestVersion is null || latestVersion <= Program.CurrentVersion)
                 return;
 
             while (!IsHandleCreated) // Wait for form to be ready
@@ -217,9 +215,10 @@ public partial class Main : Form
     private void NotifyNewVersionAvailable(Version ver)
     {
         var date = $"{2000 + ver.Major:00}{ver.Minor:00}{ver.Build:00}";
-        L_UpdateAvailable.Text = $"{MsgProgramUpdateAvailable} {date}";
-        L_UpdateAvailable.Click += (_, _) => Process.Start(ThreadPath);
-        L_UpdateAvailable.Visible = true;
+        var lbl = L_UpdateAvailable;
+        lbl.Text = $"{MsgProgramUpdateAvailable} {date}";
+        lbl.Click += (_, _) => Process.Start(new ProcessStartInfo(ThreadPath) { UseShellExecute = true });
+        lbl.Visible = lbl.TabStop = lbl.Enabled = true;
     }
 
     private static void FormLoadConfig(out bool BAKprompt, out bool showChangelog)
@@ -231,9 +230,9 @@ public partial class Main : Form
         if (Settings.Startup.Version.Length > 0 && Settings.Startup.ShowChangelogOnUpdate) // already run on system
         {
             bool parsed = Version.TryParse(Settings.Startup.Version, out var lastrev);
-            showChangelog = parsed && lastrev < CurrentProgramVersion;
+            showChangelog = parsed && lastrev < Program.CurrentVersion;
         }
-        Settings.Startup.Version = CurrentProgramVersion.ToString(); // set current ver so this doesn't happen until the user updates next time
+        Settings.Startup.Version = Program.CurrentVersion.ToString(); // set current ver so this doesn't happen until the user updates next time
 
         // BAK Prompt
         if (!Settings.Backup.BAKPrompt)
@@ -275,7 +274,7 @@ public partial class Main : Form
             return;
         }
         foreach (var p in Plugins.OrderBy(z => z.Priority))
-            p.Initialize(C_SAV, PKME_Tabs, menuStrip1, CurrentProgramVersion);
+            p.Initialize(C_SAV, PKME_Tabs, menuStrip1, Program.CurrentVersion);
     }
 
     // Main Menu Strip UI Functions
@@ -374,7 +373,11 @@ public partial class Main : Form
     {
         var forms = Application.OpenForms.OfType<Form>().Where(IsPopupFormType).ToArray();
         foreach (var f in forms)
+        {
+            if (f.InvokeRequired)
+                continue; // from another thread, not our scope.
             f.Close();
+        }
     }
 
     private static bool IsPopupFormType(Form z) => z is not (Main or SplashScreen or SAV_FolderList);
@@ -420,6 +423,7 @@ public partial class Main : Form
         EntityConverter.AllowIncompatibleConversion = settings.Advanced.AllowIncompatibleConversion;
         EntityConverter.RejuvenateHOME = settings.Advanced.AllowGuessRejuvenateHOME;
         WinFormsUtil.DetectSaveFileOnFileOpen = settings.Startup.TryDetectRecentSave;
+        SelectablePictureBox.FocusBorderDeflate = GenderToggle.FocusBorderDeflate = settings.Display.FocusBorderDeflate;
 
         SpriteBuilder.LoadSettings(settings.Sprite);
     }
@@ -593,6 +597,7 @@ public partial class Main : Form
                 var mcsav = SaveUtil.GetVariantSAV(gc);
                 if (mcsav is null)
                     return false;
+                mcsav.Metadata.SetExtraInfo(path);
                 return OpenSAV(mcsav, path);
         }
         return false;
@@ -670,9 +675,9 @@ public partial class Main : Form
     private static List<ComboItem> GetMemoryCardGameSelectionList(SAV3GCMemoryCard memCard)
     {
         var games = new List<ComboItem>();
-        if (memCard.HasCOLO) games.Add(new ComboItem(MsgGameColosseum, (int) GameVersion.COLO));
-        if (memCard.HasXD) games.Add(new ComboItem(MsgGameXD, (int) GameVersion.XD));
-        if (memCard.HasRSBOX) games.Add(new ComboItem(MsgGameRSBOX, (int) GameVersion.RSBOX));
+        if (memCard.HasCOLO) games.Add(new ComboItem(MsgGameColosseum, (int)GameVersion.COLO));
+        if (memCard.HasXD) games.Add(new ComboItem(MsgGameXD, (int)GameVersion.XD));
+        if (memCard.HasRSBOX) games.Add(new ComboItem(MsgGameRSBOX, (int)GameVersion.RSBOX));
         return games;
     }
 
@@ -698,8 +703,8 @@ public partial class Main : Form
                 memCard.SelectSaveGame(game);
                 break;
 
-            case GCMemoryCardState.SaveGameCOLO:  memCard.SelectSaveGame(GameVersion.COLO);  break;
-            case GCMemoryCardState.SaveGameXD:    memCard.SelectSaveGame(GameVersion.XD);    break;
+            case GCMemoryCardState.SaveGameCOLO: memCard.SelectSaveGame(GameVersion.COLO); break;
+            case GCMemoryCardState.SaveGameXD: memCard.SelectSaveGame(GameVersion.XD); break;
             case GCMemoryCardState.SaveGameRSBOX: memCard.SelectSaveGame(GameVersion.RSBOX); break;
 
             default:
@@ -807,11 +812,12 @@ public partial class Main : Form
     private static string GetProgramTitle()
     {
 #if DEBUG
-        var date = File.GetLastWriteTime(Assembly.GetEntryAssembly()!.Location);
+        // Get the file path that started this exe.
+        var date = File.GetLastWriteTime(Environment.ProcessPath!);
         string version = $"d-{date:yyyyMMdd}";
 #else
-            var ver = CurrentProgramVersion;
-            string version = $"{2000+ver.Major:00}{ver.Minor:00}{ver.Build:00}";
+        var ver = Program.CurrentVersion;
+        string version = $"{2000+ver.Major:00}{ver.Minor:00}{ver.Build:00}";
 #endif
         return $"PKH{(HaX ? "a" : "e")}X ({version})";
     }
@@ -1062,7 +1068,7 @@ public partial class Main : Form
             if (dr != DialogResult.Yes)
                 return;
 #if DEBUG
-            var enc = SummaryPreviewer.GetTextLines(la.EncounterOriginal);
+            var enc = la.EncounterOriginal.GetTextLines();
             report += Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, enc);
 #endif
             WinFormsUtil.SetClipboardText(report);
@@ -1090,7 +1096,9 @@ public partial class Main : Form
     {
         pk ??= PreparePKM(false); // don't perform control loss click
 
-        dragout.ContextMenuStrip.Enabled = pk.Species != 0 || HaX; // Species
+        var menu = dragout.ContextMenuStrip;
+        if (menu != null)
+            menu.Enabled = pk.Species != 0 || HaX; // Species
 
         pb.Image = pk.Sprite(C_SAV.SAV, -1, -1, flagIllegal: false);
         if (pb.BackColor == SlotUtil.BadDataColor)
@@ -1160,7 +1168,7 @@ public partial class Main : Form
         var newfile = FileUtil.GetPKMTempFileName(pk, encrypt);
         try
         {
-            File.WriteAllBytes(newfile, data);
+            await File.WriteAllBytesAsync(newfile, data).ConfigureAwait(true);
 
             var pb = (PictureBox)sender;
             if (pb.Image is Bitmap img)
@@ -1213,7 +1221,7 @@ public partial class Main : Form
         Cursor = DefaultCursor;
     }
 
-    private void Main_FormClosing(object sender, FormClosingEventArgs e)
+    private async void Main_FormClosing(object sender, FormClosingEventArgs e)
     {
         if (C_SAV.SAV.State.Edited || PKME_Tabs.PKMIsUnsaved)
         {
@@ -1225,7 +1233,7 @@ public partial class Main : Form
             }
         }
 
-        PKHeXSettings.SaveSettings(ConfigPath, Settings);
+        await PKHeXSettings.SaveSettings(ConfigPath, Settings).ConfigureAwait(false);
     }
 
     #endregion
@@ -1271,7 +1279,7 @@ public partial class Main : Form
             WinFormsUtil.Alert(MsgBackupSuccess, string.Format(MsgBackupDelete, BackupPath));
         }
         catch (Exception ex)
-            // Maybe they put their exe in a folder that we can't create files/folders to.
+        // Maybe they put their exe in a folder that we can't create files/folders to.
         { WinFormsUtil.Error($"{MsgBackupUnable} @ {BackupPath}", ex); }
     }
 

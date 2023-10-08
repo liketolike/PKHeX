@@ -6,17 +6,20 @@ namespace PKHeX.Core;
 /// <summary>
 /// Generation 5 Mystery Gift Template File
 /// </summary>
-public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, ILangNick, IContestStats, IContestStatsMutable, INature
+public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, ILangNick, IContestStats, INature, IRestrictVersion
 {
     public const int Size = 0xCC;
+    public const int SizeFull = 0x2D0;
     public override int Generation => 5;
     public override EntityContext Context => EntityContext.Gen5;
+    public override bool FatefulEncounter => true;
 
     public PGF() : this(new byte[Size]) { }
     public PGF(byte[] data) : base(data) { }
 
-    public override int TID { get => ReadUInt16LittleEndian(Data.AsSpan(0x00)); set => WriteUInt16LittleEndian(Data.AsSpan(0x00), (ushort)value); }
-    public override int SID { get => ReadUInt16LittleEndian(Data.AsSpan(0x02)); set => WriteUInt16LittleEndian(Data.AsSpan(0x02), (ushort)value); }
+    public override uint ID32 { get => ReadUInt32LittleEndian(Data.AsSpan(0x00)); set => WriteUInt32LittleEndian(Data.AsSpan(0x00), value); }
+    public override ushort TID16 { get => ReadUInt16LittleEndian(Data.AsSpan(0x00)); set => WriteUInt16LittleEndian(Data.AsSpan(0x00), value); }
+    public override ushort SID16 { get => ReadUInt16LittleEndian(Data.AsSpan(0x02)); set => WriteUInt16LittleEndian(Data.AsSpan(0x02), value); }
     public int OriginGame { get => Data[0x04]; set => Data[0x04] = (byte)value; }
     // Unused 0x05 0x06, 0x07
     public uint PID { get => ReadUInt32LittleEndian(Data.AsSpan(0x08)); set => WriteUInt32LittleEndian(Data.AsSpan(0x08), value); }
@@ -53,7 +56,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
     public string Nickname
     {
         get => StringConverter5.GetString(Data.AsSpan(0x1E, 11 * 2));
-        set => StringConverter5.SetString(Data.AsSpan(0x1E, 11 * 2), value.AsSpan(), 11, StringConverterOption.ClearFF);
+        set => StringConverter5.SetString(Data.AsSpan(0x1E, 11 * 2), value, 11, StringConverterOption.ClearFF);
     }
 
     public int Nature { get => (sbyte)Data[0x34]; set => Data[0x34] = (byte)value; }
@@ -79,7 +82,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
     public override string OT_Name
     {
         get => StringConverter5.GetString(Data.AsSpan(0x4A, 8 * 2));
-        set => StringConverter5.SetString(Data.AsSpan(0x4A, 8 * 2), value.AsSpan(), 8, StringConverterOption.ClearFF);
+        set => StringConverter5.SetString(Data.AsSpan(0x4A, 8 * 2), value, 8, StringConverterOption.ClearFF);
     }
 
     public int OTGender { get => Data[0x5A]; set => Data[0x5A] = (byte)value; }
@@ -89,7 +92,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
     public override string CardTitle
     {
         get => StringConverter5.GetString(Data.AsSpan(0x60, 37 * 2));
-        set => StringConverter5.SetString(Data.AsSpan(0x60, 37 * 2), value.AsSpan(), 36, StringConverterOption.ClearZero);
+        set => StringConverter5.SetString(Data.AsSpan(0x60, 37 * 2), value, 36, StringConverterOption.ClearZero);
     }
 
     // Card Attributes
@@ -102,7 +105,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
     /// <summary>
     /// Gets or sets the date of the card.
     /// </summary>
-    public DateTime? Date
+    public DateOnly? Date
     {
         get
         {
@@ -110,7 +113,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
             if (!DateUtil.IsDateValid(Year, Month, Day))
                 return null;
 
-            return new DateTime(Year, Month, Day);
+            return new DateOnly(Year, Month, Day);
         }
         set
         {
@@ -175,14 +178,14 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
     public override bool IsItem { get => CardType == 2; set { if (value) CardType = 2; } }
     public bool IsPower { get => CardType == 3; set { if (value) CardType = 3; } }
 
-    public override PKM ConvertToPKM(ITrainerInfo tr, EncounterCriteria criteria)
+    public override PK5 ConvertToPKM(ITrainerInfo tr, EncounterCriteria criteria)
     {
         if (!IsEntity)
             throw new ArgumentException(nameof(IsEntity));
 
         var rnd = Util.Rand;
 
-        var dt = DateTime.Now;
+        var dt = EncounterDate.GetDateNDS();
         if (Day == 0)
         {
             Day = (byte)dt.Day;
@@ -190,7 +193,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
             Year = (byte)dt.Year;
         }
 
-        int currentLevel = Level > 0 ? Level : rnd.Next(1, 101);
+        int currentLevel = Level > 0 ? Level : 1 + rnd.Next(100);
         var pi = PersonalTable.B2W2.GetFormEntry(Species, Form);
         PK5 pk = new()
         {
@@ -199,7 +202,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
             Met_Level = currentLevel,
             Nature = Nature != -1 ? Nature : rnd.Next(25),
             Form = Form,
-            Version = OriginGame == 0 ? tr.Game : OriginGame,
+            Version = GetVersion(tr, rnd),
             Language = Language == 0 ? tr.Language : Language,
             Ball = Ball,
             Move1 = Move1,
@@ -238,29 +241,30 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
 
             FatefulEncounter = true,
         };
-        if (tr.Generation > 5 && OriginGame == 0) // Gen6+, give random gen5 game
-            pk.Version = (int)GameVersion.W + rnd.Next(4);
 
         if (Move1 == 0) // No moves defined
         {
             Span<ushort> moves = stackalloc ushort[4];
-            MoveLevelUp.GetEncounterMoves(moves, Species, Form, Level, (GameVersion)pk.Version);
+            var source = GameData.GetLearnSource((GameVersion)pk.Version);
+            source.SetEncounterMoves(Species, Form, Level, moves);
             pk.SetMoves(moves);
         }
-
-        pk.SetMaximumPPCurrent();
+        else
+        {
+            pk.SetMaximumPPCurrent();
+        }
 
         if (IsEgg) // User's
         {
-            pk.TID = tr.TID;
-            pk.SID = tr.SID;
+            pk.TID16 = tr.TID16;
+            pk.SID16 = tr.SID16;
             pk.OT_Name = tr.OT;
             pk.OT_Gender = tr.Gender;
         }
         else // Hardcoded
         {
-            pk.TID = TID;
-            pk.SID = SID;
+            pk.TID16 = TID16;
+            pk.SID16 = SID16;
             pk.OT_Name = OT_Name;
             pk.OT_Gender = (OTGender == 3 ? tr.Gender : OTGender) & 1; // some events have variable gender based on receiving SaveFile
         }
@@ -279,6 +283,23 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         return pk;
     }
 
+    private int GetVersion(ITrainerInfo tr, Random rnd)
+    {
+        if (OriginGame != 0)
+            return OriginGame;
+        if (tr.Generation <= 5)
+            return tr.Game;
+        // Gen6+, give random gen5 game
+        var bias = rnd.Next(4);
+        for (int i = 0; i < 4; i++)
+        {
+            var ver = (int)GameVersion.W + ((bias + i) % 4);
+            if (CanBeReceivedByVersion(ver))
+                return ver;
+        }
+        return (int)GameVersion.W; // should never hit this for any distributed card
+    }
+
     private void SetEggMetDetails(PK5 pk)
     {
         pk.IsEgg = true;
@@ -287,11 +308,11 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         pk.IsNicknamed = true;
     }
 
-    private void SetPINGA(PKM pk, EncounterCriteria criteria)
+    private void SetPINGA(PK5 pk, EncounterCriteria criteria)
     {
         var pi = PersonalTable.B2W2.GetFormEntry(Species, Form);
         pk.Nature = (int)criteria.GetNature((Nature)Nature);
-        pk.Gender = pi.Genderless ? 2 : Gender != 2 ? Gender : criteria.GetGender(-1, pi);
+        pk.Gender = pi.Genderless ? 2 : Gender != 2 ? Gender : criteria.GetGender(pi);
         var av = GetAbilityIndex(criteria);
         SetPID(pk, av);
         pk.RefreshAbility(av);
@@ -314,7 +335,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         _ => AbilityPermission.Any12H,
     };
 
-    private void SetPID(PKM pk, int av)
+    private void SetPID(PK5 pk, int av)
     {
         if (PID != 0)
         {
@@ -330,8 +351,8 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
 
         if (PIDType == 2) // Always
         {
-            uint gb = pk.PID & 0xFF;
-            pk.PID = PIDGenerator.GetMG5ShinyPID(gb, (uint)av, pk.TID, pk.SID);
+            var gb = (byte)pk.PID;
+            pk.PID = PIDGenerator.GetMG5ShinyPID(gb, (uint)av, pk.TID16, pk.SID16);
         }
         else if (PIDType != 1) // Force Not Shiny
         {
@@ -352,7 +373,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         _ => Shiny.Random, // 1
     };
 
-    private void SetIVs(PKM pk)
+    private void SetIVs(PK5 pk)
     {
         Span<int> finalIVs = stackalloc int[6];
         GetIVs(finalIVs);
@@ -366,8 +387,8 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
     {
         if (!IsEgg)
         {
-            if (SID != pk.SID) return false;
-            if (TID != pk.TID) return false;
+            if (SID16 != pk.SID16) return false;
+            if (TID16 != pk.TID16) return false;
             if (OT_Name != pk.OT_Name) return false;
             if (OTGender < 3 && OTGender != pk.OT_Gender) return false;
             if (PID != 0 && pk.PID != PID) return false;
@@ -391,11 +412,11 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
                 return false; // can't be traded away for un-shiny
             }
 
-            if (pk.IsEgg && !pk.IsNative)
+            if (pk is { IsEgg: true, IsNative: false })
                 return false;
         }
 
-        if (Form != evo.Form && !FormInfo.IsFormChangeable(Species, Form, pk.Form, pk.Format))
+        if (Form != evo.Form && !FormInfo.IsFormChangeable(Species, Form, pk.Form, Context, pk.Context))
             return false;
 
         if (Level != pk.Met_Level) return false;
@@ -404,13 +425,14 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
             return false;
         if (Gender != 2 && Gender != pk.Gender) return false;
 
-        if (pk is IContestStats s && s.IsContestBelow(this))
+        if (pk is IContestStatsReadOnly s && s.IsContestBelow(this))
             return false;
 
         return true;
     }
 
-    protected override bool IsMatchDeferred(PKM pk) => Species != pk.Species;
-    protected override bool IsMatchPartial(PKM pk) => CanBeReceivedBy(pk.Version);
-    private static bool CanBeReceivedBy(int _) => true;
+    protected override bool IsMatchDeferred(PKM pk) => false;
+    protected override bool IsMatchPartial(PKM pk) => !CanBeReceivedByVersion(pk.Version);
+
+    public bool CanBeReceivedByVersion(int game) => OriginGame == 0 || OriginGame == game;
 }

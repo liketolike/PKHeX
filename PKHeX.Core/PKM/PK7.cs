@@ -1,23 +1,22 @@
 using System;
-using System.Collections.Generic;
+using System.Numerics;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
 
 /// <summary> Generation 7 <see cref="PKM"/> format. </summary>
-public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetCommon6, IRibbonSetMemory6, IRibbonSetCommon7,
-    IContestStats, IContestStatsMutable, IHyperTrain, IGeoTrack, ISuperTrain, IFormArgument, ITrainerMemories, IAffection
+public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetCommon6, IRibbonSetMemory6, IRibbonSetCommon7, IRibbonSetRibbons,
+    IContestStats, IHyperTrain, IGeoTrack, ISuperTrain, IFormArgument, ITrainerMemories, IAffection, IPokerusStatus
 {
-    private static readonly ushort[] Unused =
+    public override ReadOnlySpan<ushort> ExtraBytes => new ushort[]
     {
         0x2A, // Old Marking Value (PelagoEventStatus)
         // 0x36, 0x37, // Unused Ribbons
         0x58, 0x59, 0x73, 0x90, 0x91, 0x9E, 0x9F, 0xA0, 0xA1, 0xA7, 0xAA, 0xAB, 0xAC, 0xAD, 0xC8, 0xC9, 0xD7, 0xE4, 0xE5, 0xE6, 0xE7,
     };
 
-    public override IReadOnlyList<ushort> ExtraBytes => Unused;
     public override EntityContext Context => EntityContext.Gen7;
-    public override PersonalInfo PersonalInfo => PersonalTable.USUM.GetFormEntry(Species, Form);
+    public override PersonalInfo7 PersonalInfo => PersonalTable.USUM.GetFormEntry(Species, Form);
 
     public PK7() : base(PokeCrypto.SIZE_6PARTY) { }
     public PK7(byte[] data) : base(DecryptParty(data)) { }
@@ -29,7 +28,7 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
         return data;
     }
 
-    public override PKM Clone() => new PK7((byte[])Data.Clone());
+    public override PK7 Clone() => new((byte[])Data.Clone());
 
     // Structure
     #region Block A
@@ -63,16 +62,22 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
         set => WriteUInt16LittleEndian(Data.AsSpan(0x0A), (ushort)value);
     }
 
-    public override int TID
+    public override uint ID32
     {
-        get => ReadUInt16LittleEndian(Data.AsSpan(0x0C));
-        set => WriteUInt16LittleEndian(Data.AsSpan(0x0C), (ushort)value);
+        get => ReadUInt32LittleEndian(Data.AsSpan(0x0C));
+        set => WriteUInt32LittleEndian(Data.AsSpan(0x0C), value);
     }
 
-    public override int SID
+    public override ushort TID16
+    {
+        get => ReadUInt16LittleEndian(Data.AsSpan(0x0C));
+        set => WriteUInt16LittleEndian(Data.AsSpan(0x0C), value);
+    }
+
+    public override ushort SID16
     {
         get => ReadUInt16LittleEndian(Data.AsSpan(0x0E));
-        set => WriteUInt16LittleEndian(Data.AsSpan(0x0E), (ushort)value);
+        set => WriteUInt16LittleEndian(Data.AsSpan(0x0E), value);
     }
 
     public override uint EXP
@@ -108,7 +113,7 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public byte CNT_Tough  { get => Data[0x28]; set => Data[0x28] = value; }
     public byte CNT_Sheen  { get => Data[0x29]; set => Data[0x29] = value; }
     public ResortEventState ResortEventStatus { get => (ResortEventState)Data[0x2A]; set => Data[0x2A] = (byte)value; }
-    private byte PKRS { get => Data[0x2B]; set => Data[0x2B] = value; }
+    public byte PKRS { get => Data[0x2B]; set => Data[0x2B] = value; }
     public override int PKRS_Days { get => PKRS & 0xF; set => PKRS = (byte)((PKRS & ~0xF) | value); }
     public override int PKRS_Strain { get => PKRS >> 4; set => PKRS = (byte)((PKRS & 0xF) | (value << 4)); }
     private byte ST1 { get => Data[0x2C]; set => Data[0x2C] = value; }
@@ -227,6 +232,8 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public byte FormArgumentRemain { get => (byte)FormArgument; set => FormArgument = (FormArgument & ~0xFFu) | value; }
     public byte FormArgumentElapsed { get => (byte)(FormArgument >> 8); set => FormArgument = (FormArgument & ~0xFF00u) | (uint)(value << 8); }
     public byte FormArgumentMaximum { get => (byte)(FormArgument >> 16); set => FormArgument = (FormArgument & ~0xFF0000u) | (uint)(value << 16); }
+
+    public int RibbonCount     => BitOperations.PopCount(ReadUInt64LittleEndian(Data.AsSpan(0x30)) & 0b00000000_00000011__11111111_11111111__11111111_11111111__11111111_11111111);
     #endregion
     #region Block B
     public override string Nickname
@@ -239,11 +246,11 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
                 int lang = SpeciesName.GetSpeciesNameLanguage(Species, Language, value, 7);
                 if (lang is (int)LanguageID.ChineseS or (int)LanguageID.ChineseT)
                 {
-                    StringConverter7.SetString(Nickname_Trash, value.AsSpan(), 12, lang, StringConverterOption.None, chinese: true);
+                    StringConverter7.SetString(Nickname_Trash, value, 12, lang, StringConverterOption.None, chinese: true);
                     return;
                 }
             }
-            StringConverter7.SetString(Nickname_Trash, value.AsSpan(), 12, 0, StringConverterOption.None);
+            StringConverter7.SetString(Nickname_Trash, value, 12, 0, StringConverterOption.None);
         }
     }
 
@@ -307,7 +314,7 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public bool SecretSuperTrainingUnlocked { get => (Data[0x72] & 1) == 1; set => Data[0x72] = (byte)((Data[0x72] & ~1) | (value ? 1 : 0)); }
     public bool SecretSuperTrainingComplete { get => (Data[0x72] & 2) == 2; set => Data[0x72] = (byte)((Data[0x72] & ~2) | (value ? 2 : 0)); }
     // 0x73 Unused
-    private uint IV32 { get => ReadUInt32LittleEndian(Data.AsSpan(0x74)); set => WriteUInt32LittleEndian(Data.AsSpan(0x74), value); }
+    protected override uint IV32 { get => ReadUInt32LittleEndian(Data.AsSpan(0x74)); set => WriteUInt32LittleEndian(Data.AsSpan(0x74), value); }
     public override int IV_HP  { get => (int)(IV32 >> 00) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 00)) | ((value > 31 ? 31u : (uint)value) << 00); }
     public override int IV_ATK { get => (int)(IV32 >> 05) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 05)) | ((value > 31 ? 31u : (uint)value) << 05); }
     public override int IV_DEF { get => (int)(IV32 >> 10) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 10)) | ((value > 31 ? 31u : (uint)value) << 10); }
@@ -321,7 +328,7 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public override string HT_Name
     {
         get => StringConverter7.GetString(HT_Trash);
-        set => StringConverter7.SetString(HT_Trash, value.AsSpan(), 12, 0, StringConverterOption.None);
+        set => StringConverter7.SetString(HT_Trash, value, 12, 0, StringConverterOption.None);
     }
 
     public override int HT_Gender { get => Data[0x92]; set => Data[0x92] = (byte)value; }
@@ -358,7 +365,7 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public override string OT_Name
     {
         get => StringConverter7.GetString(OT_Trash);
-        set => StringConverter7.SetString(OT_Trash, value.AsSpan(), 12, 0, StringConverterOption.None);
+        set => StringConverter7.SetString(OT_Trash, value, 12, 0, StringConverterOption.None);
     }
 
     public override int OT_Friendship { get => Data[0xCA]; set => Data[0xCA] = (byte)value; }
@@ -407,23 +414,8 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public override int Stat_SPD { get => ReadUInt16LittleEndian(Data.AsSpan(0xFC)); set => WriteUInt16LittleEndian(Data.AsSpan(0xFC), (ushort)value); }
     #endregion
 
-    public int SuperTrainingMedalCount(int maxCount = 30)
-    {
-        uint value = SuperTrainBitFlags >> 2;
-#if NET6_0_OR_GREATER
-        return System.Numerics.BitOperations.PopCount(value);
-#else
-        int TrainCount = 0;
-        for (int i = 0; i < maxCount; i++)
-        {
-            if ((value & 1) != 0)
-                TrainCount++;
-            value >>= 1;
-        }
-
-        return TrainCount;
-#endif
-    }
+    private const int MedalCount = 30;
+    public int SuperTrainingMedalCount(int lowBitCount = MedalCount) => BitOperations.PopCount((SuperTrainBitFlags >> 2) & (uint.MaxValue >> (MedalCount - lowBitCount)));
 
     public bool IsUntradedEvent6 => Geo1_Country == 0 && Geo1_Region == 0 && Met_Location / 10000 == 4 && Gen6;
 
@@ -474,7 +466,7 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     protected override bool TradeOT(ITrainerInfo tr)
     {
         // Check to see if the OT matches the SAV's OT info.
-        if (!(tr.TID == TID && tr.SID == SID && tr.Gender == OT_Gender && tr.OT == OT_Name))
+        if (!(tr.ID32 == ID32 && tr.Gender == OT_Gender && tr.OT == OT_Name))
             return false;
 
         CurrentHandler = 0;
@@ -507,158 +499,42 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public override int MaxBallID => Legal.MaxBallID_7;
     public override int MaxGameID => Legal.MaxGameID_7;
 
-    public PK8 ConvertToPK8()
+    internal void SetTransferLocale(int lang)
     {
-        var pk8 = new PK8
+        this.SetTradeMemoryHT6(bank: true); // oh no, memories on gen7 pk
+        RecentTrainerCache.SetConsoleRegionData3DS(this);
+        RecentTrainerCache.SetFirstCountryRegion(this);
+        if (lang == 1 && Country != 1) // Japan Only
         {
-            EncryptionConstant = EncryptionConstant,
-            Species = Species,
-            TID = TID,
-            SID = SID,
-            EXP = EXP,
-            PID = PID,
-            Ability = Ability,
-            AbilityNumber = AbilityNumber,
-            MarkValue = MarkValue & 0b1111_1111_1111,
-            Language = Language,
-            EV_HP = EV_HP,
-            EV_ATK = EV_ATK,
-            EV_DEF = EV_DEF,
-            EV_SPA = EV_SPA,
-            EV_SPD = EV_SPD,
-            EV_SPE = EV_SPE,
-            Move1 = Move1,
-            Move2 = Move2,
-            Move3 = Move3,
-            Move4 = Move4,
-            Move1_PPUps = Move1_PPUps,
-            Move2_PPUps = Move2_PPUps,
-            Move3_PPUps = Move3_PPUps,
-            Move4_PPUps = Move4_PPUps,
-            RelearnMove1 = RelearnMove1,
-            RelearnMove2 = RelearnMove2,
-            RelearnMove3 = RelearnMove3,
-            RelearnMove4 = RelearnMove4,
-            IV_HP = IV_HP,
-            IV_ATK = IV_ATK,
-            IV_DEF = IV_DEF,
-            IV_SPA = IV_SPA,
-            IV_SPD = IV_SPD,
-            IV_SPE = IV_SPE,
-            IsEgg = IsEgg,
-            IsNicknamed = IsNicknamed,
-            FatefulEncounter = FatefulEncounter,
-            Gender = Gender,
-            Form = Form,
-            Nature = Nature,
-            Nickname = IsNicknamed ? Nickname : SpeciesName.GetSpeciesNameGeneration(Species, Language, 8),
-            Version = Version,
-            OT_Name = OT_Name,
-            MetDate = MetDate,
-            EggMetDate = EggMetDate,
-            Met_Location = Met_Location,
-            Egg_Location = Egg_Location,
-            Ball = Ball,
-            Met_Level = Met_Level,
-            OT_Gender = OT_Gender,
-            HyperTrainFlags = HyperTrainFlags,
+            ConsoleRegion = 1;
+            Country = 1;
+            Region = 0;
+        }
+    }
 
-            // Locale does not transfer. All Zero
-            // Country = Country,
-            // Region = Region,
-            // ConsoleRegion = ConsoleRegion,
+    internal void SetTransferIVs(int flawless, Random rnd)
+    {
+        Span<int> finalIVs = stackalloc int[6];
+        for (var i = 0; i < finalIVs.Length; i++)
+            finalIVs[i] = rnd.Next(32);
+        for (var i = 0; i < flawless; i++)
+            finalIVs[i] = 31;
+        rnd.Shuffle(finalIVs);
+        SetIVs(finalIVs);
+    }
 
-            OT_Memory = OT_Memory,
-            OT_TextVar = OT_TextVar,
-            OT_Feeling = OT_Feeling,
-            OT_Intensity = OT_Intensity,
-
-            PKRS_Strain = PKRS_Strain,
-            PKRS_Days = PKRS_Days,
-            CNT_Cool = CNT_Cool,
-            CNT_Beauty = CNT_Beauty,
-            CNT_Cute = CNT_Cute,
-            CNT_Smart = CNT_Smart,
-            CNT_Tough = CNT_Tough,
-            CNT_Sheen = CNT_Sheen,
-
-            RibbonChampionG3 = RibbonChampionG3,
-            RibbonChampionSinnoh = RibbonChampionSinnoh,
-            RibbonEffort = RibbonEffort,
-            RibbonAlert = RibbonAlert,
-            RibbonShock = RibbonShock,
-            RibbonDowncast = RibbonDowncast,
-            RibbonCareless = RibbonCareless,
-            RibbonRelax = RibbonRelax,
-            RibbonSnooze = RibbonSnooze,
-            RibbonSmile = RibbonSmile,
-            RibbonGorgeous = RibbonGorgeous,
-            RibbonRoyal = RibbonRoyal,
-            RibbonGorgeousRoyal = RibbonGorgeousRoyal,
-            RibbonArtist = RibbonArtist,
-            RibbonFootprint = RibbonFootprint,
-            RibbonRecord = RibbonRecord,
-            RibbonLegend = RibbonLegend,
-            RibbonCountry = RibbonCountry,
-            RibbonNational = RibbonNational,
-            RibbonEarth = RibbonEarth,
-            RibbonWorld = RibbonWorld,
-            RibbonClassic = RibbonClassic,
-            RibbonPremier = RibbonPremier,
-            RibbonEvent = RibbonEvent,
-            RibbonBirthday = RibbonBirthday,
-            RibbonSpecial = RibbonSpecial,
-            RibbonSouvenir = RibbonSouvenir,
-            RibbonWishing = RibbonWishing,
-            RibbonChampionBattle = RibbonChampionBattle,
-            RibbonChampionRegional = RibbonChampionRegional,
-            RibbonChampionNational = RibbonChampionNational,
-            RibbonChampionWorld = RibbonChampionWorld,
-            RibbonChampionKalos = RibbonChampionKalos,
-            RibbonChampionG6Hoenn = RibbonChampionG6Hoenn,
-            RibbonBestFriends = RibbonBestFriends,
-            RibbonTraining = RibbonTraining,
-            RibbonBattlerSkillful = RibbonBattlerSkillful,
-            RibbonBattlerExpert = RibbonBattlerExpert,
-            RibbonContestStar = RibbonContestStar,
-            RibbonMasterCoolness = RibbonMasterCoolness,
-            RibbonMasterBeauty = RibbonMasterBeauty,
-            RibbonMasterCuteness = RibbonMasterCuteness,
-            RibbonMasterCleverness = RibbonMasterCleverness,
-            RibbonMasterToughness = RibbonMasterToughness,
-            RibbonCountMemoryContest = RibbonCountMemoryContest,
-            RibbonCountMemoryBattle = RibbonCountMemoryBattle,
-            RibbonChampionAlola = RibbonChampionAlola,
-            RibbonBattleRoyale = RibbonBattleRoyale,
-            RibbonBattleTreeGreat = RibbonBattleTreeGreat,
-            RibbonBattleTreeMaster = RibbonBattleTreeMaster,
-
-            OT_Friendship = OT_Friendship,
-
-            // No Ribbons or Markings on transfer.
-
-            StatNature = Nature,
-            // HeightScalar = 0,
-            // WeightScalar = 0,
-
-            // Copy Form Argument data for Furfrou and Hoopa, since we're nice.
-            FormArgumentRemain = FormArgumentRemain,
-            FormArgumentElapsed = FormArgumentElapsed,
-            FormArgumentMaximum = FormArgumentMaximum,
-        };
-
-        // Wipe Totem Forms
-        var species = Species;
-        if (FormInfo.IsTotemForm(species, Form))
-            pk8.Form = FormInfo.GetTotemBaseForm(species, Form);
-
-        // Fix PP and Stats
-        pk8.Heal();
-
-        // Fix Checksum
-        pk8.RefreshChecksum();
-
-        return pk8; // Done!
+    internal void SetTransferPID(bool isShiny)
+    {
+        switch (isShiny ? Shiny.Always : Shiny.Never)
+        {
+            case Shiny.Always when !IsShiny: // Force Square
+                var low = PID & 0xFFFF;
+                PID = (low ^ TID16 ^ 0u) << 16 | low;
+                break;
+            case Shiny.Never when IsShiny: // Force Not Shiny
+                PID ^= 0x1000_0000;
+                break;
+        }
     }
 }
 

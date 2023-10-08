@@ -37,21 +37,6 @@ public sealed class BallVerifier : Verifier
         if (ball != 0)
             return VerifyBallEquals(data, ball);
 
-        // Fixed ball cases -- can be only one ball ever
-        switch (enc)
-        {
-            case MysteryGift g:
-                return VerifyBallMysteryGift(data, g);
-            case EncounterTrade t:
-                return VerifyBallEquals(data, t.Ball);
-            case EncounterStatic {Gift: true} s:
-                return VerifyBallEquals(data, s.Ball);
-            case EncounterSlot8GO: // Already a strict match
-                return GetResult(true);
-            case EncounterSlot8b {IsMarsh: true}:
-                return VerifyBallEquals(data, (int)Safari);
-        }
-
         // Capture / Inherit cases -- can be one of many balls
         var pk = data.Entity;
         if (pk.Species == (int)Species.Shedinja && enc.Species != (int)Species.Shedinja) // Shedinja. For gen3, copy the ball from Nincada
@@ -59,47 +44,32 @@ public sealed class BallVerifier : Verifier
             // Only a Gen3 origin Shedinja can copy the wild ball.
             // Evolution chains will indicate if it could have existed as Shedinja in Gen3.
             // The special move verifier has a similar check!
-            if (pk.HGSS && pk.Ball == (int)Sport) // Can evolve in DP to retain the HG/SS ball (separate byte) -- not able to be captured in any other ball
+            if (pk is { HGSS: true, Ball: (int)Sport }) // Can evolve in DP to retain the HG/SS ball (separate byte) -- not able to be captured in any other ball
                 return VerifyBallEquals(data, (int)Sport);
             if (Info.Generation != 3 || Info.EvoChainsAllGens.Gen3.Length != 2) // not evolved in Gen3 Nincada->Shedinja
                 return VerifyBallEquals(data, (int)Poke); // Poké ball Only
         }
 
+        // Fixed ball cases -- can be only one ball ever
+        switch (enc)
+        {
+            case IFixedBall { FixedBall: not None } s:
+                return VerifyBallEquals(data, (byte)s.FixedBall);
+            case EncounterSlot8GO: // Already a strict match
+                return GetResult(true);
+        }
+
         // Capturing with Heavy Ball is impossible in Sun/Moon for specific species.
-        if (pk.Ball == (int)Heavy && pk.SM && enc is not EncounterEgg && BallBreedLegality.AlolanCaptureNoHeavyBall.Contains(enc.Species))
+        if (pk is { Ball: (int)Heavy, SM: true } && enc is not EncounterEgg && BallBreedLegality.AlolanCaptureNoHeavyBall.Contains(enc.Species))
             return GetInvalid(LBallHeavy); // Heavy Ball, can inherit if from egg (US/UM fixed catch rate calc)
 
         return enc switch
         {
-            EncounterStatic e => VerifyBallStatic(data, e),
-            EncounterSlot w => VerifyBallWild(data, w),
+            EncounterStatic5Entree => VerifyBallEquals(data, BallUseLegality.DreamWorldBalls),
             EncounterEgg => VerifyBallEgg(data),
             EncounterInvalid => VerifyBallEquals(data, pk.Ball), // ignore ball, pass whatever
-            _ => VerifyBallEquals(data, (int)Poke),
+            _ => VerifyBallEquals(data, BallUseLegality.GetWildBalls(data.Info.Generation, enc.Version)),
         };
-    }
-
-    private CheckResult VerifyBallMysteryGift(LegalityAnalysis data, MysteryGift g)
-    {
-        if (g.Generation == 4 && g.Species == (int)Species.Manaphy && g.Ball == 0) // there is no ball data in Manaphy PGT Mystery Gift from Gen4
-            return VerifyBallEquals(data, (int)Poke); // Pokeball
-        return VerifyBallEquals(data, g.Ball);
-    }
-
-    private CheckResult VerifyBallStatic(LegalityAnalysis data, EncounterStatic s)
-    {
-        if (s.Location == 75 && s.Generation == 5) // Entree Forest (Dream World)
-            return VerifyBallEquals(data, BallUseLegality.DreamWorldBalls);
-        return VerifyBallEquals(data, BallUseLegality.GetWildBalls(data.Info.Generation, s.Version));
-    }
-
-    private CheckResult VerifyBallWild(LegalityAnalysis data, EncounterSlot w)
-    {
-        var req = w.FixedBall;
-        if (req != None)
-            return VerifyBallEquals(data, (int) req);
-
-        return VerifyBallEquals(data, BallUseLegality.GetWildBalls(data.Info.Generation, w.Version));
     }
 
     private CheckResult VerifyBallEgg(LegalityAnalysis data)
@@ -122,6 +92,7 @@ public sealed class BallVerifier : Verifier
         EntityContext.Gen7 => VerifyBallEggGen7(data), // Gen7 Inheritance Rules
         EntityContext.Gen8 => VerifyBallEggGen8(data),
         EntityContext.Gen8b => VerifyBallEggGen8BDSP(data),
+        EntityContext.Gen9 => VerifyBallEggGen9(data),
         _ => NONE,
     };
 
@@ -299,6 +270,11 @@ public sealed class BallVerifier : Verifier
             if (IsBallPermitted(BallUseLegality.WildPokeballs8, (int)ball))
                 return GetValid(LBallSpeciesPass);
         }
+        if (IsPaldeaCatchAndBreed(species))
+        {
+            if (IsBallPermitted(BallUseLegality.WildPokeballs9, (int)ball))
+                return GetValid(LBallSpeciesPass);
+        }
 
         if (ball == Safari)
         {
@@ -331,17 +307,9 @@ public sealed class BallVerifier : Verifier
             return GetInvalid(LBallSpecies);
         }
         if (ball is >= Dusk and <= Quick) // Dusk Heal Quick
-        {
-            if (!BallBreedLegality.Ban_Gen4Ball_7.Contains(species))
-                return GetValid(LBallSpeciesPass);
-            return GetInvalid(LBallSpecies);
-        }
+            return GetValid(LBallSpeciesPass);
         if (ball is >= Ultra and <= Premier) // Don't worry, Safari was already checked.
-        {
-            if (!BallBreedLegality.Ban_Gen3Ball_7.Contains(species))
-                return GetValid(LBallSpeciesPass);
-            return GetInvalid(LBallSpecies);
-        }
+            return GetValid(LBallSpeciesPass);
 
         if (ball == Beast)
         {
@@ -365,15 +333,15 @@ public sealed class BallVerifier : Verifier
             return GetValid(LBallEnc); // Poké Ball
 
         var species = data.EncounterMatch.Species;
-        if (species is >= (int)Species.Grookey and <= (int)Species.Inteleon) // G8 Starters
-            return VerifyBallEquals(data, (int)Poke);
-
         if (IsGalarCatchAndBreed(species))
         {
             if (IsBallPermitted(BallUseLegality.WildPokeballs8, pk.Ball))
                 return GetValid(LBallSpeciesPass);
-            if (species >= (int)Species.Grookey)
-                return GetInvalid(LBallSpecies);
+        }
+        if (IsPaldeaCatchAndBreed(species))
+        {
+            if (IsBallPermitted(BallUseLegality.WildPokeballs9, pk.Ball))
+                return GetValid(LBallSpeciesPass);
         }
 
         Ball ball = (Ball)pk.Ball;
@@ -444,6 +412,35 @@ public sealed class BallVerifier : Verifier
         return NONE;
     }
 
+    private CheckResult VerifyBallEggGen9(LegalityAnalysis data)
+    {
+        var enc = data.EncounterMatch;
+        var species = enc.Species;
+        if (species == (int)Species.Phione)
+            return VerifyBallEquals(data, (int)Poke);
+
+        // Paldea Starters: Only via GO (Adventures Abound)
+        if (species is >= (int)Species.Sprigatito and <= (int)Species.Quaquaval)
+            return VerifyBallEquals(data, BallUseLegality.WildPokeballs8g_WithoutRaid);
+
+        // PLA Voltorb: Only via PLA (transfer only, not wild) and GO
+        if (enc is { Species: (ushort)Species.Voltorb, Form: 1 })
+            return VerifyBallEquals(data, BallUseLegality.WildPokeballs8g_WithRaid);
+
+        // S/V Tauros forms > 1: Only local Wild Balls for Blaze/Aqua breeds -- can't inherit balls from Kantonian/Combat.
+        if (enc is { Species: (ushort)Species.Tauros, Form: > 1 })
+            return VerifyBallEquals(data, BallUseLegality.WildPokeballs9);
+
+        var pk = data.Entity;
+        if (IsPaldeaCatchAndBreed(species) && IsBallPermitted(BallUseLegality.WildPokeballs9, pk.Ball))
+            return GetValid(LBallSpeciesPass);
+
+        if (species > Legal.MaxSpeciesID_8)
+            return VerifyBallEquals(data, BallUseLegality.WildPokeballs9);
+
+        return VerifyBallEggGen8(data);
+    }
+
     private static bool IsHiddenAndNotPossible(PKM pk)
     {
         if (pk.AbilityNumber != 4)
@@ -467,6 +464,20 @@ public sealed class BallVerifier : Verifier
         if (species is >= (int)Species.Treecko and <= (int)Species.Swampert) // Dynamax Adventures
             return true;
         if (species is >= (int)Species.Rowlet and <= (int)Species.Primarina) // Distribution Raids
+            return true;
+
+        return false;
+    }
+
+    private static bool IsPaldeaCatchAndBreed(ushort species)
+    {
+        if (species is >= (int)Species.Sprigatito and <= (int)Species.Quaquaval) // paldea starter
+            return false;
+        if (species is >= (int)Species.Turtwig and <= (int)Species.Empoleon) // sinnoh starter
+            return false;
+        var pt = PersonalTable.SV;
+        var pi = pt.GetFormEntry(species, 0);
+        if (pi.IsPresentInGame)
             return true;
 
         return false;

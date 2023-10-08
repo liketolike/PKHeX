@@ -23,10 +23,10 @@ public sealed class SAV6AO : SAV6, ISaveBlock6AO, IMultiplayerSprite
         ClearBoxes();
     }
 
-    public override IPersonalTable Personal => PersonalTable.AO;
-    public override IReadOnlyList<ushort> HeldItems => Legal.HeldItem_AO;
+    public override PersonalTable6AO Personal => PersonalTable.AO;
+    public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_AO;
     public SaveBlockAccessor6AO Blocks { get; }
-    protected override SaveFile CloneInternal() => new SAV6AO((byte[])Data.Clone());
+    protected override SAV6AO CloneInternal() => new((byte[])Data.Clone());
     public override ushort MaxMoveID => Legal.MaxMoveID_6_AO;
     public override int MaxItemID => Legal.MaxItemID_6_AO;
     public override int MaxAbilityID => Legal.MaxAbilityID_6_AO;
@@ -175,7 +175,7 @@ public sealed class SAV6AO : SAV6, ISaveBlock6AO, IMultiplayerSprite
     }
 
     public override string JPEGTitle => !HasJPPEGData ? string.Empty : StringConverter6.GetString(Data.AsSpan(JPEG, 0x1A));
-    public override byte[] GetJPEGData() => !HasJPPEGData ? Array.Empty<byte>() : GetData(JPEG + 0x54, 0xE004);
+    public override byte[] GetJPEGData() => !HasJPPEGData ? Array.Empty<byte>() : Data.AsSpan(JPEG + 0x54, 0xE004).ToArray();
     private bool HasJPPEGData => Data[JPEG + 0x54] == 0xFF;
 
     protected override bool[] MysteryGiftReceivedFlags { get => Blocks.MysteryGift.GetReceivedFlags(); set => Blocks.MysteryGift.SetReceivedFlags(value); }

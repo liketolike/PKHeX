@@ -15,6 +15,54 @@ public static class SaveUtil
 {
     public const int BEEF = 0x42454546;
 
+    public const int SIZE_G9_0   = 0x31626F; // 1.0.0 fresh
+    public const int SIZE_G9_0a  = 0x31627C; // 1.0.0 after multiplayer
+    public const int SIZE_G9_1   = 0x319DB3; // 1.0.1 fresh
+    public const int SIZE_G9_1a  = 0x319DC0; // 1.0.1 after multiplayer
+    public const int SIZE_G9_3   = 0x319DC3; // 1.1.0 fresh
+    public const int SIZE_G9_1Ba = 0x319DD0; // 1.0.1 -> 1.1.0
+    public const int SIZE_G9_1A  = 0x31A2C0; // 1.0.0 -> 1.0.1
+    public const int SIZE_G9_1Aa = 0x31A2CD; // 1.0.0 -> 1.0.1 -> 1.0.1 after multiplayer
+    public const int SIZE_G9_1Ab = 0x31A2DD; // 1.0.0 -> 1.0.1 -> 1.0.1 after multiplayer -> 1.1.0
+    public const int SIZE_G9_2   = 0x31A2D0; // 1.0.0 -> 1.1.0
+
+    // 1.2.0: add 0x2C9F; clean upgrade (1.1.0->1.2.0 is same as *1.2.0)
+    public const int SIZE_G9_3A0 = 0x31CF7C; // 1.0.0 -> 1.0.1 -> 1.1.0 -> 1.2.0 AM
+    public const int SIZE_G9_3A1 = 0x31CA6F; //          1.0.1 -> 1.1.0 -> 1.2.0 AM
+    public const int SIZE_G9_3B0 = SIZE_G9_3A0 - 0xD; // BM
+    public const int SIZE_G9_3B1 = SIZE_G9_3A1 - 0xD; // BM
+    public const int SIZE_G9_3G0 = SIZE_G9_3A0 + 0x5; // GO
+    public const int SIZE_G9_3G1 = SIZE_G9_3A1 + 0x5; // GO
+    public const int SIZE_G9_3P0 = SIZE_G9_3B0 + 0x5; // GO (before Multiplayer)
+    public const int SIZE_G9_3P1 = SIZE_G9_3B1 + 0x5; // GO (before Multiplayer)
+
+    // 2.0.1 (2.0.0 skipped): Teal Mask
+    public const int SIZE_G9_DLC1_B = 0x4329A0;
+    public const int SIZE_G9_DLC1_T = 0x4329A5; // +5
+    public const int SIZE_G9_DLC1_0 = 0x4329A9; // +4
+    public const int SIZE_G9_DLC1_E = 0x4329AD; // +1
+    public const int SIZE_G9_DLC1_1 = 0x4329AE; // +1
+    public const int SIZE_G9_DLC1_D = 0x4329B2; // +4
+    public const int SIZE_G9_DLC1_F = 0x4329B3; // +1
+    public const int SIZE_G9_DLC1_A = 0x4329B6; // +3
+    public const int SIZE_G9_DLC1_Q = 0x4329B7; // +1
+    public const int SIZE_G9_DLC1_2 = 0x4329BB; // +5
+    public const int SIZE_G9_DLC1_U = 0x4329BC; // +1
+    public const int SIZE_G9_DLC1_W = 0x4329BF; // +4
+    public const int SIZE_G9_DLC1_3 = 0x4329C0; // +5
+    public const int SIZE_G9_DLC1_9 = 0x4329C4;
+    public const int SIZE_G9_DLC1_4 = 0x432EB6;
+    public const int SIZE_G9_DLC1_C = 0x432EBB; // +5
+    public const int SIZE_G9_DLC1_5 = 0x432EBF; // +4
+    public const int SIZE_G9_DLC1_H = 0x432EC0; // +1
+    public const int SIZE_G9_DLC1_6 = 0x432EC3; // +4
+    public const int SIZE_G9_DLC1_G = 0x432EC4; // +1
+    public const int SIZE_G9_DLC1_7 = 0x432EC8; // +5
+    public const int SIZE_G9_DLC1_I = 0x432EC9; // +1
+    public const int SIZE_G9_DLC1_R = 0x432ECC; // +1
+    public const int SIZE_G9_DLC1_8 = 0x432ECD; // +5
+    public const int SIZE_G9_DLC1_Y = 0x432ED1; // +1
+
     public const int SIZE_G8LA = 0x136DDE;
     public const int SIZE_G8LA_1 = 0x13AD06;
 
@@ -47,8 +95,9 @@ public static class SaveUtil
     public const int SIZE_G3COLO = 0x60000;
     public const int SIZE_G3XD = 0x56000;
     public const int SIZE_G3RAW = 0x20000;
+    public const int SIZE_G3EMU = 0x20010;
     public const int SIZE_G3RAWHALF = 0x10000;
-    public const int SIZE_G2STAD = 0x20000; // same as G3RAW_U
+    public const int SIZE_G2STAD = 0x20000; // same as G3RAW
     public const int SIZE_G2STADF = 0x1FF00;
     public const int SIZE_G2RAW_U = 0x8000;
     public const int SIZE_G2VC_U = 0x8010;
@@ -58,7 +107,7 @@ public static class SaveUtil
     public const int SIZE_G2VC_J = 0x10010;
     public const int SIZE_G2BAT_J = 0x1002C;
     public const int SIZE_G2EMU_J = 0x10030;
-    public const int SIZE_G1STAD = 0x20000; // same as G3RAW_U
+    public const int SIZE_G1STAD = 0x20000; // same as G3RAW
     public const int SIZE_G1STADF = 0x1FF00;
     public const int SIZE_G1STADJ = 0x8000; // same as G1RAW
     public const int SIZE_G1RAW = 0x8000;
@@ -93,17 +142,57 @@ public static class SaveUtil
     };
 #endif
 
-    internal static readonly HashSet<int> SizesSWSH = new()
+    private static readonly HashSet<long> SizesSV = new()
+    {
+        SIZE_G9_0, SIZE_G9_0a,
+        SIZE_G9_1, SIZE_G9_1a,
+        SIZE_G9_1A, SIZE_G9_1Aa,
+        SIZE_G9_1Ba, SIZE_G9_1Ab,
+        SIZE_G9_2, SIZE_G9_3,
+
+        SIZE_G9_3A0, SIZE_G9_3A1,
+        SIZE_G9_3B0, SIZE_G9_3B1,
+        SIZE_G9_3G0, SIZE_G9_3G1,
+        SIZE_G9_3P0, SIZE_G9_3P1,
+
+        SIZE_G9_DLC1_0,
+        SIZE_G9_DLC1_1,
+        SIZE_G9_DLC1_2,
+        SIZE_G9_DLC1_3,
+        SIZE_G9_DLC1_4,
+        SIZE_G9_DLC1_5,
+        SIZE_G9_DLC1_6,
+        SIZE_G9_DLC1_7,
+        SIZE_G9_DLC1_8,
+        SIZE_G9_DLC1_9,
+        SIZE_G9_DLC1_A,
+        SIZE_G9_DLC1_B,
+        SIZE_G9_DLC1_C,
+        SIZE_G9_DLC1_D,
+        SIZE_G9_DLC1_E,
+        SIZE_G9_DLC1_F,
+        SIZE_G9_DLC1_G,
+        SIZE_G9_DLC1_H,
+        SIZE_G9_DLC1_I,
+        SIZE_G9_DLC1_Q,
+        SIZE_G9_DLC1_W,
+        SIZE_G9_DLC1_R,
+        SIZE_G9_DLC1_T,
+        SIZE_G9_DLC1_Y,
+        SIZE_G9_DLC1_U,
+    };
+
+    private static readonly HashSet<long> SizesSWSH = new()
     {
         SIZE_G8SWSH, SIZE_G8SWSH_1, SIZE_G8SWSH_2, SIZE_G8SWSH_2B, SIZE_G8SWSH_3, SIZE_G8SWSH_3A, SIZE_G8SWSH_3B, SIZE_G8SWSH_3C,
     };
 
-    private static readonly HashSet<int> SizesGen2 = new()
+    private static readonly HashSet<long> SizesGen2 = new()
     {
         SIZE_G2RAW_U, SIZE_G2VC_U, SIZE_G2BAT_U, SIZE_G2EMU_U, SIZE_G2RAW_J, SIZE_G2BAT_J, SIZE_G2EMU_J, SIZE_G2VC_J,
     };
 
-    private static readonly HashSet<int> Sizes = new(SizesGen2.Concat(SizesSWSH))
+    private static readonly HashSet<long> Sizes = new(SizesGen2.Concat(SizesSWSH).Concat(SizesSV))
     {
         SIZE_G8LA, SIZE_G8LA_1, SIZE_G8BDSP, SIZE_G8BDSP_1, SIZE_G8BDSP_2, SIZE_G8BDSP_3,
         // SizesSWSH covers gen8 sizes since there's so many
@@ -111,7 +200,7 @@ public static class SaveUtil
         SIZE_G6XY, SIZE_G6ORAS, SIZE_G6ORASDEMO,
         SIZE_G5RAW, SIZE_G5BW, SIZE_G5B2W2,
         SIZE_G4BR, SIZE_G4RAW,
-        SIZE_G3BOX, SIZE_G3COLO, SIZE_G3XD, SIZE_G3RAW, SIZE_G3RAWHALF,
+        SIZE_G3BOX, SIZE_G3COLO, SIZE_G3XD, SIZE_G3RAW, SIZE_G3EMU, SIZE_G3RAWHALF,
         // SizesGen2 covers gen2 sizes since there's so many
         SIZE_G1RAW, SIZE_G1BAT,
 
@@ -121,7 +210,7 @@ public static class SaveUtil
     /// <summary>Determines the type of the provided save data.</summary>
     /// <param name="data">Save data of which to determine the origins of</param>
     /// <returns>Version Identifier or Invalid if type cannot be determined.</returns>
-    private static GameVersion GetSAVType(byte[] data)
+    private static GameVersion GetSAVType(ReadOnlySpan<byte> data)
     {
         GameVersion ver;
         if ((ver = GetIsG1SAV(data)) != Invalid)
@@ -170,6 +259,8 @@ public static class SaveUtil
         if ((ver = GetIsG8SAV_BDSP(data)) != Invalid)
             return ver;
         if ((ver = GetIsG8SAV_LA(data)) != Invalid)
+            return ver;
+        if ((ver = GetIsG9SAV(data)) != Invalid)
             return ver;
 
         return Invalid;
@@ -280,7 +371,7 @@ public static class SaveUtil
     /// <returns>Version Identifier or Invalid if type cannot be determined.</returns>
     private static GameVersion GetIsG3SAV(ReadOnlySpan<byte> data)
     {
-        if (data.Length is not (SIZE_G3RAW or SIZE_G3RAWHALF))
+        if (data.Length is not (SIZE_G3RAW or SIZE_G3EMU or SIZE_G3RAWHALF))
             return Invalid;
 
         // check the save file(s)
@@ -315,11 +406,9 @@ public static class SaveUtil
             case 0: return RS; // save has no battle tower record data
             default:
                 // RS data structure only extends 0x890 bytes; check if any data is present afterwards.
-                for (int i = 0x890; i < 0xF2C; i += 4)
-                {
-                    if (ReadUInt64LittleEndian(data[i..]) != 0)
-                        return E;
-                }
+                var remainder = data[0x890..0xF2C];
+                if (remainder.IndexOfAnyExcept<byte>(0) != -1)
+                    return E;
                 return RS;
         }
     }
@@ -501,7 +590,7 @@ public static class SaveUtil
     /// <summary>Checks to see if the data belongs to a Gen8 save</summary>
     /// <param name="data">Save data of which to determine the type</param>
     /// <returns>Version Identifier or Invalid if type cannot be determined.</returns>
-    private static GameVersion GetIsG8SAV(byte[] data)
+    private static GameVersion GetIsG8SAV(ReadOnlySpan<byte> data)
     {
         if (!SizesSWSH.Contains(data.Length))
             return Invalid;
@@ -521,12 +610,23 @@ public static class SaveUtil
         return BDSP;
     }
 
-    private static GameVersion GetIsG8SAV_LA(byte[] data)
+    private static GameVersion GetIsG8SAV_LA(ReadOnlySpan<byte> data)
     {
         if (data.Length is not (SIZE_G8LA or SIZE_G8LA_1))
             return Invalid;
 
         return SwishCrypto.GetIsHashValid(data) ? PLA : Invalid;
+    }
+
+    /// <summary>Checks to see if the data belongs to a Gen8 save</summary>
+    /// <param name="data">Save data of which to determine the type</param>
+    /// <returns>Version Identifier or Invalid if type cannot be determined.</returns>
+    private static GameVersion GetIsG9SAV(ReadOnlySpan<byte> data)
+    {
+        if (!SizesSV.Contains(data.Length))
+            return Invalid;
+
+        return SwishCrypto.GetIsHashValid(data) ? SV : Invalid;
     }
 
     private static bool GetIsBank7(ReadOnlySpan<byte> data) => data.Length == SIZE_G7BANK && data[0] != 0;
@@ -636,6 +736,8 @@ public static class SaveUtil
             BDSP => new SAV8BS(data),
             PLA => new SAV8LA(data),
 
+            SV => new SAV9SV(data),
+
             // Side Games
             COLO => new SAV3Colosseum(data),
             XD => new SAV3XD(data),
@@ -659,13 +761,12 @@ public static class SaveUtil
     public static SaveFile? GetVariantSAV(SAV3GCMemoryCard memCard)
     {
         // Pre-check for header/footer signatures
-        byte[] data = memCard.ReadSaveGameData();
-        if (data.Length == 0)
+        var memory = memCard.ReadSaveGameData();
+        if (memory.Length == 0)
             return null;
 
-        var split = DolphinHandler.TrySplit(data);
-        if (split != null)
-            data = split.Data;
+        var split = DolphinHandler.TrySplit(memory.Span);
+        var data = split != null ? split.Data : memory.ToArray();
 
         SaveFile sav;
         switch (memCard.SelectedGameVersion)
@@ -719,21 +820,13 @@ public static class SaveUtil
             sav.Language = (int)language;
 
         // Secondary Properties may not be used but can be filled in as template.
-        if (sav.Generation >= 7)
-        {
-            sav.TrainerID7 = 123456;
-            sav.TrainerSID7 = 1234;
-        }
-        else
-        {
-            sav.TID = 12345;
-            sav.SID = 54321;
-        }
+        (uint tid, uint sid) = sav.Generation >= 7 ? (123456u, 1234u) : (12345u, 54321u);
+        sav.SetDisplayID(tid, sid);
         sav.Language = (int)language;
 
         // Only set geolocation data for 3DS titles
         if (sav is IRegionOrigin o)
-            o.SetDefaultRegionOrigins();
+            o.SetDefaultRegionOrigins((int)language);
 
         return sav;
     }
@@ -782,6 +875,8 @@ public static class SaveUtil
         BD or SP or BDSP => new SAV8BS(),
         PLA => new SAV8LA(),
 
+        SL or VL or SV => new SAV9SV(),
+
         _ => throw new ArgumentOutOfRangeException(nameof(game)),
     };
 
@@ -816,10 +911,9 @@ public static class SaveUtil
         try
         {
             var searchOption = deep ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-            // force evaluation so that an invalid path will throw before we return true/false.
-            // EnumerateFiles throws an exception while iterating, which won't be caught by the try-catch here.
-            var files = Directory.GetFiles(folderPath, "*", searchOption);
-            result = files.Where(f => !(ignoreBackups && IsBackup(f)) && IsSizeValid(FileUtil.GetFileSize(f)));
+            var files = Directory.EnumerateFiles(folderPath, "*", searchOption)
+                .IterateSafe(log: z => System.Diagnostics.Debug.WriteLine(z));
+            result = FilterSaveFiles(ignoreBackups, files);
             return true;
         }
         catch (Exception ex)
@@ -834,24 +928,47 @@ public static class SaveUtil
         }
     }
 
-    public static bool IsBackup(string path) => Path.GetFileNameWithoutExtension(path).Equals("backup", StringComparison.OrdinalIgnoreCase) || Path.GetExtension(path) is ".bak";
+    private static IEnumerable<string> FilterSaveFiles(bool ignoreBackups, IEnumerable<string> files)
+    {
+        foreach (string file in files)
+        {
+            if (ignoreBackups && IsBackup(file))
+                continue;
+
+            var size = FileUtil.GetFileSize(file);
+            if (!IsSizeValid(size))
+                continue;
+
+            yield return file;
+        }
+    }
+
+    public static bool IsBackup(ReadOnlySpan<char> path)
+    {
+        var fn = Path.GetFileNameWithoutExtension(path);
+        if (fn is "backup")
+            return true;
+
+        var ext = Path.GetExtension(path);
+        return ext is ".bak";
+    }
 
     /// <summary>
     /// Determines whether the save data size is valid for automatically detecting saves.
     /// </summary>
     /// <param name="size">Size in bytes of the save data</param>
     /// <returns>A boolean indicating whether or not the save data size is valid.</returns>
-    public static bool IsSizeValid(int size) => IsSizeValidNoHandler(size) || IsSizeValidHandler(size);
+    public static bool IsSizeValid(long size) => IsSizeValidNoHandler(size) || IsSizeValidHandler(size) || SAV3GCMemoryCard.IsMemoryCardSize(size);
 
     /// <summary>
     /// Determines whether the save data size is valid for automatically detecting saves.
     /// </summary>
     /// <remarks>Only checks the <see cref="Handlers"/> list.</remarks>
-    public static bool IsSizeValidHandler(int size) => Handlers.Any(z => z.IsRecognized(size));
+    public static bool IsSizeValidHandler(long size) => Handlers.Any(z => z.IsRecognized(size));
 
     /// <summary>
     /// Determines whether the save data size is valid for automatically detecting saves.
     /// </summary>
     /// <remarks>Does not check the <see cref="Handlers"/> list.</remarks>
-    public static bool IsSizeValidNoHandler(int size) => Sizes.Contains(size);
+    public static bool IsSizeValidNoHandler(long size) => Sizes.Contains(size);
 }

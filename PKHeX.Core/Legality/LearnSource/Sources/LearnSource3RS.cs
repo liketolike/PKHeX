@@ -2,19 +2,17 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using static PKHeX.Core.LearnMethod;
 using static PKHeX.Core.LearnEnvironment;
-using static PKHeX.Core.LearnSource3;
 
 namespace PKHeX.Core;
 
 /// <summary>
 /// Exposes information about how moves are learned in <see cref="RS"/>.
 /// </summary>
-public sealed class LearnSource3RS : ILearnSource, IEggSource
+public sealed class LearnSource3RS : LearnSource3, ILearnSource<PersonalInfo3>, IEggSource
 {
     public static readonly LearnSource3RS Instance = new();
     private static readonly PersonalTable3 Personal = PersonalTable.RS;
-    private static readonly Learnset[] Learnsets = Legal.LevelUpRS;
-    private static readonly EggMoves6[] EggMoves = Legal.EggMovesRS; // same for all Gen3 games
+    private static readonly Learnset[] Learnsets = LearnsetReader.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("lvlmove_rs.pkl"), "rs"));
     private const int MaxSpecies = Legal.MaxSpeciesID_3;
     private const LearnEnvironment Game = RS;
     private const int Generation = 3;
@@ -22,10 +20,10 @@ public sealed class LearnSource3RS : ILearnSource, IEggSource
 
     public Learnset GetLearnset(ushort species, byte form) => Learnsets[species];
 
-    public bool TryGetPersonal(ushort species, byte form, [NotNullWhen(true)] out PersonalInfo? pi)
+    public bool TryGetPersonal(ushort species, byte form, [NotNullWhen(true)] out PersonalInfo3? pi)
     {
         pi = null;
-        if ((uint)species > MaxSpecies)
+        if (species > MaxSpecies)
             return false;
         pi = Personal[species];
         return true;
@@ -33,7 +31,7 @@ public sealed class LearnSource3RS : ILearnSource, IEggSource
 
     public bool GetIsEggMove(ushort species, byte form, ushort move)
     {
-        if ((uint)species > MaxSpecies)
+        if (species > MaxSpecies)
             return false;
         var moves = EggMoves[species];
         return moves.GetHasEggMove(move);
@@ -41,14 +39,14 @@ public sealed class LearnSource3RS : ILearnSource, IEggSource
 
     public ReadOnlySpan<ushort> GetEggMoves(ushort species, byte form)
     {
-        if ((uint)species > MaxSpecies)
+        if (species > MaxSpecies)
             return ReadOnlySpan<ushort>.Empty;
         return EggMoves[species].Moves;
     }
 
-    public MoveLearnInfo GetCanLearn(PKM pk, PersonalInfo pi, EvoCriteria evo, ushort move, MoveSourceType types = MoveSourceType.All, LearnOption option = LearnOption.Current)
+    public MoveLearnInfo GetCanLearn(PKM pk, PersonalInfo3 pi, EvoCriteria evo, ushort move, MoveSourceType types = MoveSourceType.All, LearnOption option = LearnOption.Current)
     {
-        if (types.HasFlagFast(MoveSourceType.LevelUp))
+        if (types.HasFlag(MoveSourceType.LevelUp))
         {
             var learn = GetLearnset(evo.Species, evo.Form);
             var level = learn.GetLevelLearnMove(move);
@@ -56,7 +54,7 @@ public sealed class LearnSource3RS : ILearnSource, IEggSource
                 return new(LevelUp, Game, (byte)level);
         }
 
-        if (types.HasFlagFast(MoveSourceType.Machine))
+        if (types.HasFlag(MoveSourceType.Machine))
         {
             if (GetIsTM(pi, move))
                 return new(TMHM, Game);
@@ -64,7 +62,7 @@ public sealed class LearnSource3RS : ILearnSource, IEggSource
                 return new(TMHM, Game);
         }
 
-        if (types.HasFlagFast(MoveSourceType.SpecialTutor) && GetIsTutor(evo.Species, move))
+        if (types.HasFlag(MoveSourceType.SpecialTutor) && GetIsTutor(evo.Species, move))
             return new(Tutor, Game);
 
         return default;
@@ -73,29 +71,29 @@ public sealed class LearnSource3RS : ILearnSource, IEggSource
     private static bool GetIsTutor(ushort species, ushort move)
     {
         // XD (Mew)
-        if (species == (int)Species.Mew && Tutor_3Mew.AsSpan().IndexOf(move) != -1)
+        if (species == (int)Species.Mew && Tutor_3Mew.Contains(move))
             return true;
 
         return move switch
         {
-            (int)Move.SelfDestruct => Array.BinarySearch(SpecialTutors_XD_SelfDestruct, species) >= 0,
-            (int)Move.SkyAttack => Array.BinarySearch(SpecialTutors_XD_SkyAttack, species) >= 0,
-            (int)Move.Nightmare => Array.BinarySearch(SpecialTutors_XD_Nightmare, species) >= 0,
+            (int)Move.SelfDestruct => SpecialTutors_XD_SelfDestruct.BinarySearch(species) >= 0,
+            (int)Move.SkyAttack => SpecialTutors_XD_SkyAttack.BinarySearch(species) >= 0,
+            (int)Move.Nightmare => SpecialTutors_XD_Nightmare.BinarySearch(species) >= 0,
             _ => false,
         };
     }
 
-    private static bool GetIsTM(PersonalInfo info, ushort move)
+    private static bool GetIsTM(PersonalInfo3 info, ushort move)
     {
-        var index = Array.IndexOf(TM_3, move);
+        var index = TM_3.IndexOf(move);
         if (index == -1)
             return false;
         return info.TMHM[index];
     }
 
-    private static bool GetIsHM(PersonalInfo info, ushort move)
+    private static bool GetIsHM(PersonalInfo3 info, ushort move)
     {
-        var index = Array.IndexOf(HM_3, move);
+        var index = HM_3.IndexOf(move);
         if (index == -1)
             return false;
         return info.TMHM[CountTM + index];
@@ -106,19 +104,15 @@ public sealed class LearnSource3RS : ILearnSource, IEggSource
         if (!TryGetPersonal(evo.Species, evo.Form, out var pi))
             return;
 
-        if (types.HasFlagFast(MoveSourceType.LevelUp))
+        if (types.HasFlag(MoveSourceType.LevelUp))
         {
             var learn = GetLearnset(evo.Species, evo.Form);
-            (bool hasMoves, int start, int end) = learn.GetMoveRange(evo.LevelMax);
-            if (hasMoves)
-            {
-                var moves = learn.Moves;
-                for (int i = end; i >= start; i--)
-                    result[moves[i]] = true;
-            }
+            var span = learn.GetMoveRange(evo.LevelMax);
+            foreach (var move in span)
+                result[move] = true;
         }
 
-        if (types.HasFlagFast(MoveSourceType.Machine))
+        if (types.HasFlag(MoveSourceType.Machine))
         {
             var flags = pi.TMHM;
             var moves = TM_3;
@@ -139,7 +133,7 @@ public sealed class LearnSource3RS : ILearnSource, IEggSource
             }
         }
 
-        if (types.HasFlagFast(MoveSourceType.SpecialTutor))
+        if (types.HasFlag(MoveSourceType.SpecialTutor))
         {
             if (evo.Species == (int)Species.Mew)
             {
@@ -147,16 +141,16 @@ public sealed class LearnSource3RS : ILearnSource, IEggSource
                     result[move] = true;
             }
 
-            if (Array.BinarySearch(SpecialTutors_XD_SelfDestruct, evo.Species) >= 0)
+            if (SpecialTutors_XD_SelfDestruct.BinarySearch(evo.Species) >= 0)
                 result[(int)Move.SelfDestruct] = true;
-            if (Array.BinarySearch(SpecialTutors_XD_SkyAttack, evo.Species) >= 0)
+            if (SpecialTutors_XD_SkyAttack.BinarySearch(evo.Species) >= 0)
                 result[(int)Move.SkyAttack] = true;
-            if (Array.BinarySearch(SpecialTutors_XD_Nightmare, evo.Species) >= 0)
+            if (SpecialTutors_XD_Nightmare.BinarySearch(evo.Species) >= 0)
                 result[(int)Move.Nightmare] = true;
         }
     }
 
-    private static readonly ushort[] Tutor_3Mew =
+    private static ReadOnlySpan<ushort> Tutor_3Mew => new ushort[]
     {
         (int)Move.FeintAttack,
         (int)Move.FakeOut,
@@ -166,7 +160,7 @@ public sealed class LearnSource3RS : ILearnSource, IEggSource
         (int)Move.ZapCannon,
     };
 
-    private static readonly ushort[] SpecialTutors_XD_SelfDestruct =
+    private static ReadOnlySpan<ushort> SpecialTutors_XD_SelfDestruct => new ushort[]
     {
         074, 075, 076, 088, 089, 090, 091, 092, 093, 094, 095,
         100, 101, 102, 103, 109, 110, 143, 150, 151, 185, 204,
@@ -175,14 +169,14 @@ public sealed class LearnSource3RS : ILearnSource, IEggSource
         376, 377, 378, 379,
     };
 
-    private static readonly ushort[] SpecialTutors_XD_SkyAttack =
+    private static ReadOnlySpan<ushort> SpecialTutors_XD_SkyAttack => new ushort[]
     {
         016, 017, 018, 021, 022, 084, 085, 142, 144, 145, 146,
         151, 163, 164, 176, 177, 178, 198, 225, 227, 250, 276,
         277, 278, 279, 333, 334,
     };
 
-    private static readonly ushort[] SpecialTutors_XD_Nightmare =
+    private static ReadOnlySpan<ushort> SpecialTutors_XD_Nightmare => new ushort[]
     {
         012, 035, 036, 039, 040, 052, 053, 063, 064, 065, 079,
         080, 092, 093, 094, 096, 097, 102, 103, 108, 121, 122,

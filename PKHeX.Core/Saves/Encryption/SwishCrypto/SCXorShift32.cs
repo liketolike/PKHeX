@@ -11,32 +11,28 @@ namespace PKHeX.Core;
 public ref struct SCXorShift32
 {
     private int Counter;
-    private uint Seed;
+    private uint State;
 
-    public SCXorShift32(uint seed)
+    public SCXorShift32(uint seed) => State = GetInitialState(seed);
+
+    private static uint GetInitialState(uint state)
     {
-#if NET6_0_OR_GREATER
-        var pop_count = System.Numerics.BitOperations.PopCount(seed);
-#else
-        var pop_count = PopCount(seed);
-#endif
+        var pop_count = System.Numerics.BitOperations.PopCount(state);
         for (var i = 0; i < pop_count; i++)
-            seed = XorshiftAdvance(seed);
-
-        Counter = 0;
-        Seed = seed;
+            state = XorshiftAdvance(state);
+        return state;
     }
 
     /// <summary>
     /// Gets a <see cref="byte"/> from the current state.
     /// </summary>
-    public uint Next()
+    public byte Next()
     {
         var c = Counter;
-        var result = (Seed >> (c << 3)) & 0xFF;
+        var result = (byte)(State >> (c << 3));
         if (c == 3)
         {
-            Seed = XorshiftAdvance(Seed);
+            State = XorshiftAdvance(State);
             Counter = 0;
         }
         else
@@ -47,34 +43,16 @@ public ref struct SCXorShift32
     }
 
     /// <summary>
-    /// Gets a <see cref="uint"/> from the current state.
+    /// Gets a <see cref="int"/> from the current state.
     /// </summary>
-    public uint Next32()
-    {
-        return Next() | (Next() << 8) | (Next() << 16) | (Next() << 24);
-    }
+    public int Next32() => Next() | (Next() << 8) | (Next() << 16) | (Next() << 24);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static uint XorshiftAdvance(uint key)
+    private static uint XorshiftAdvance(uint state)
     {
-        key ^= key << 2;
-        key ^= key >> 15;
-        key ^= key << 13;
-        return key;
+        state ^= state << 2;
+        state ^= state >> 15;
+        state ^= state << 13;
+        return state;
     }
-
-#if !NET6_0_OR_GREATER
-    /// <summary>
-    /// Count of bits set in value
-    /// </summary>
-    private static uint PopCount(uint x)
-    {
-        x -= ((x >> 1) & 0x55555555u);
-        x = (x & 0x33333333u) + ((x >> 2) & 0x33333333u);
-        x = (x + (x >> 4)) & 0x0F0F0F0Fu;
-        x += (x >> 8);
-        x += (x >> 16);
-        return x & 0x0000003Fu;
-    }
-#endif
 }

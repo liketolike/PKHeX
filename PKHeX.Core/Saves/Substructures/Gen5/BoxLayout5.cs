@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace PKHeX.Core;
 
@@ -34,9 +34,20 @@ public sealed class BoxLayout5 : SaveBlock<SAV5>
         return SAV.GetString(GetBoxNameSpan(box));
     }
 
-    public void SetBoxName(int box, string value)
+    public void SetBoxName(int box, ReadOnlySpan<char> value)
     {
-        SAV.SetString(GetBoxNameSpan(box), value.AsSpan(), 13, StringConverterOption.ClearZero);
+        SAV.SetString(GetBoxNameSpan(box), value, 13, StringConverterOption.ClearZero);
+    }
+
+    public byte BoxesUnlocked
+    {
+        get => Data[Offset + 0x3DD];
+        set
+        {
+            if (value > SAV.BoxCount)
+                value = (byte)SAV.BoxCount;
+            Data[Offset + 0x3DD] = value;
+        }
     }
 
     public string this[int i]

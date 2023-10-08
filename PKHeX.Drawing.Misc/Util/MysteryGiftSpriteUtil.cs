@@ -24,7 +24,7 @@ public static class MysteryGiftSpriteUtil
 
     private static Image GetBaseImage(MysteryGift gift)
     {
-        if (gift.IsEgg && gift.Species == (int)Species.Manaphy) // Manaphy Egg
+        if (gift is { IsEgg: true, Species: (int)Species.Manaphy }) // Manaphy Egg
             return SpriteUtil.GetMysteryGiftPreviewPoke(gift);
         if (gift.IsEntity)
             return SpriteUtil.GetMysteryGiftPreviewPoke(gift);
@@ -32,7 +32,7 @@ public static class MysteryGiftSpriteUtil
         if (gift.IsItem)
         {
             var item = (ushort)gift.ItemID;
-            if (Legal.ZCrystalDictionary.TryGetValue(item, out var value))
+            if (ItemStorage7USUM.GetCrystalHeld(item, out var value))
                 item = value;
             return SpriteUtil.GetItemSprite(item) ?? Resources.Bag_Key;
         }

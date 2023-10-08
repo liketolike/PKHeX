@@ -2,14 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Drawing;
 using System.IO;
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 using PKHeX.Core;
 using PKHeX.Drawing.PokeSprite;
 
 namespace PKHeX.WinForms;
 
+[JsonSerializable(typeof(PKHeXSettings))]
+public sealed partial class PKHeXSettingsContext : JsonSerializerContext { }
+
 [Serializable]
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]
 public sealed class PKHeXSettings
 {
     public StartupSettings Startup { get; set; } = new();
@@ -36,6 +44,19 @@ public sealed class PKHeXSettings
     public MysteryGiftDatabaseSettings MysteryDb { get; set; } = new();
     public BulkAnalysisSettings Bulk { get; set; } = new();
 
+    private static PKHeXSettingsContext GetContext() => new(new()
+    {
+        WriteIndented = true,
+        Converters = { new ColorJsonConverter() },
+    });
+
+    public sealed class ColorJsonConverter : JsonConverter<Color>
+    {
+        public override Color Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => ColorTranslator.FromHtml(reader.GetString() ?? string.Empty);
+
+        public override void Write(Utf8JsonWriter writer, Color value, JsonSerializerOptions options) => writer.WriteStringValue($"#{value.R:x2}{value.G:x2}{value.B:x2}");
+    }
+
     public static PKHeXSettings GetSettings(string configPath)
     {
         if (!File.Exists(configPath))
@@ -44,7 +65,7 @@ public sealed class PKHeXSettings
         try
         {
             var lines = File.ReadAllText(configPath);
-            return JsonConvert.DeserializeObject<PKHeXSettings>(lines) ?? new PKHeXSettings();
+            return JsonSerializer.Deserialize(lines, GetContext().PKHeXSettings) ?? new PKHeXSettings();
         }
         catch (Exception x)
         {
@@ -53,18 +74,13 @@ public sealed class PKHeXSettings
         }
     }
 
-    public static void SaveSettings(string configPath, PKHeXSettings cfg)
+    public static async Task SaveSettings(string configPath, PKHeXSettings cfg)
     {
         try
         {
-            var settings = new JsonSerializerSettings
-            {
-                Formatting = Formatting.Indented,
-                DefaultValueHandling = DefaultValueHandling.Populate,
-                NullValueHandling = NullValueHandling.Ignore,
-            };
-            var text = JsonConvert.SerializeObject(cfg, settings);
-            File.WriteAllText(configPath, text);
+            // Serialize the object asynchronously and write it to the path.
+            await using var fs = File.Create(configPath);
+            await JsonSerializer.SerializeAsync(fs, cfg, GetContext().PKHeXSettings).ConfigureAwait(false);
         }
         catch (Exception x)
         {
@@ -72,11 +88,11 @@ public sealed class PKHeXSettings
         }
     }
 
-    private static void DumpConfigError(Exception x)
+    private static async void DumpConfigError(Exception x)
     {
         try
         {
-            File.WriteAllLines("config error.txt", new[] { x.ToString() });
+            await File.WriteAllTextAsync("config error.txt", x.ToString());
         }
         catch (Exception)
         {
@@ -95,10 +111,10 @@ public sealed class BackupSettings
     public bool BAKPrompt { get; set; }
 
     [LocalizedDescription("List of extra locations to look for Save Files.")]
-    public string[] OtherBackupPaths { get; set; } = Array.Empty<string>();
+    public List<string> OtherBackupPaths { get; set; } = new();
 
     [LocalizedDescription("Save File file-extensions (no period) that the program should also recognize.")]
-    public string[] OtherSaveFileExtensions { get; set; } = Array.Empty<string>();
+    public List<string> OtherSaveFileExtensions { get; set; } = new();
 }
 
 [Serializable]
@@ -127,7 +143,7 @@ public sealed class StartupSettings : IStartupSettings
     public List<string> RecentlyLoaded { get; set; } = new(MaxRecentCount);
 
     // Don't let invalid values slip into the startup version.
-    private GameVersion _defaultSaveVersion = GameVersion.PLA;
+    private GameVersion _defaultSaveVersion = PKX.Version;
     private string _language = GameLanguage.DefaultLanguage;
 
     [Browsable(false)]
@@ -240,7 +256,7 @@ public sealed class AdvancedSettings
 }
 
 [Serializable]
-public class EntityDatabaseSettings
+public sealed class EntityDatabaseSettings
 {
     [LocalizedDescription("When loading content for the PKM Database, search within backup save files.")]
     public bool SearchBackups { get; set; } = true;
@@ -353,6 +369,12 @@ public sealed class DisplaySettings
 
     [LocalizedDescription("Flag Illegal Slots in Save File")]
     public bool FlagIllegal { get; set; } = true;
+
+    [LocalizedDescription("Focus border indentation for custom drawn image controls.")]
+    public int FocusBorderDeflate { get; set; } = 1;
+
+    [LocalizedDescription("Disables the GUI scaling based on Dpi on program startup, falling back to font scaling.")]
+    public bool DisableScalingDpi { get; set; }
 }
 
 [Serializable]
@@ -382,11 +404,23 @@ public sealed class SpriteSettings : ISpriteSettings
     [LocalizedDescription("Opacity for the Encounter Type stripe layer.")]
     public byte ShowEncounterOpacityStripe { get; set; } = 0x5F; // 0xFF opaque
 
+    [LocalizedDescription("Amount of pixels thick to show when displaying the encounter type color stripe.")]
+    public int ShowEncounterThicknessStripe { get; set; } = 4; // pixels
+
     [LocalizedDescription("Show a thin stripe to indicate the percent of level-up progress")]
     public bool ShowExperiencePercent { get; set; }
 
-    [LocalizedDescription("Amount of pixels thick to show when displaying the encounter type color stripe.")]
-    public int ShowEncounterThicknessStripe { get; set; } = 4; // pixels
+    [LocalizedDescription("Show a background to differentiate the Tera Type for PKM slots")]
+    public SpriteBackgroundType ShowTeraType { get; set; } = SpriteBackgroundType.BottomStripe;
+
+    [LocalizedDescription("Amount of pixels thick to show when displaying the Tera Type color stripe.")]
+    public int ShowTeraThicknessStripe { get; set; } = 4; // pixels
+
+    [LocalizedDescription("Opacity for the Tera Type background layer.")]
+    public byte ShowTeraOpacityBackground { get; set; } = 0xFF; // 0xFF opaque
+
+    [LocalizedDescription("Opacity for the Tera Type stripe layer.")]
+    public byte ShowTeraOpacityStripe { get; set; } = 0xAF; // 0xFF opaque
 }
 
 [Serializable]

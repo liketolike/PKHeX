@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace PKHeX.Core;
@@ -26,17 +26,25 @@ public sealed class PoffinCase4
 
     private static Poffin4[] ReadPoffins(SAV4Sinnoh sav, int offset)
     {
-        var Poffins = new Poffin4[Count];
-        for (int i = 0; i < Poffins.Length; i++)
-            Poffins[i] = new Poffin4(sav.General, offset + (i * Poffin4.SIZE));
-        return Poffins;
+        var result = new Poffin4[Count];
+        for (int i = 0; i < result.Length; i++)
+        {
+            var ofs = offset + (i * Poffin4.SIZE);
+            var span = sav.General.Slice(ofs, Poffin4.SIZE);
+            result[i] = new Poffin4(span.ToArray());
+        }
+        return result;
     }
 
     private static void WritePoffins(SAV4Sinnoh sav, int offset, IReadOnlyList<Poffin4> poffins)
     {
         Debug.Assert(poffins.Count == Count);
         for (int i = 0; i < poffins.Count; i++)
-            sav.SetData(sav.General, poffins[i].Data, offset + (i * Poffin4.SIZE));
+        {
+            var ofs = offset + (i * Poffin4.SIZE);
+            var span = sav.General.Slice(ofs, Poffin4.SIZE);
+            sav.SetData(span, poffins[i].Data);
+        }
     }
 
     public void FillCase()

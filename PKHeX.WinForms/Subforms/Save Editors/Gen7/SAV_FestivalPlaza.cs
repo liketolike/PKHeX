@@ -83,7 +83,7 @@ public partial class SAV_FestivalPlaza : Form
         DateTime dt = SAV.Festa.FestaDate ?? new DateTime(2000, 1, 1);
         CAL_FestaStartDate.Value = CAL_FestaStartTime.Value = dt;
 
-        string[] res2 = { "Rank 4: missions","Rank 8: facility","Rank 10: fashion","Rank 20: rename","Rank 30: special menu","Rank 40: BGM","Rank 50: theme Glitz","Rank 60: theme Fairy","Rank 70: theme Tone","Rank 100: phrase","Current Rank" };
+        string[] res2 = { "Rank 4: missions", "Rank 8: facility", "Rank 10: fashion", "Rank 20: rename", "Rank 30: special menu", "Rank 40: BGM", "Rank 50: theme Glitz", "Rank 60: theme Fairy", "Rank 70: theme Tone", "Rank 100: phrase", "Current Rank" };
         CLB_Reward.Items.Clear();
         CLB_Reward.Items.Add(res2[^1], (CheckState)RewardState[SAV.Festa.GetFestPrizeReceived(10)]); //add CurrentRank before const-rewards
         for (int i = 0; i < res2.Length - 1; i++)
@@ -174,7 +174,7 @@ public partial class SAV_FestivalPlaza : Form
     }
 
     private bool editing;
-    private readonly byte[] RewardState = { 0, 2, 1 }; // CheckState.Indeterminate <-> CheckState.Checked
+    private static ReadOnlySpan<byte> RewardState => new byte[] { 0, 2, 1 }; // CheckState.Indeterminate <-> CheckState.Checked
     private readonly int typeMAX;
     private readonly FestaFacility[] f = new FestaFacility[7];
     private readonly string[] RES_Color = Enum.GetNames(typeof(FestivalPlazaFacilityColor));
@@ -300,9 +300,9 @@ public partial class SAV_FestivalPlaza : Form
 
     private void LoadBattleAgency()
     {
-        p[0] = SAV.GetStoredSlot(SAV.Data, 0x6C200);
-        p[1] = SAV.GetPartySlot(SAV.Data, 0x6C2E8);
-        p[2] = SAV.GetPartySlot(SAV.Data, 0x6C420);
+        p[0] = SAV.GetStoredSlot(SAV.Data.AsSpan(0x6C200));
+        p[1] = SAV.GetPartySlot(SAV.Data.AsSpan(0x6C2E8));
+        p[2] = SAV.GetPartySlot(SAV.Data.AsSpan(0x6C420));
         LoadPictureBox();
         B_ImportParty.Visible = SAV.HasParty;
         CHK_Choosed.Checked = SAV.GetFlag(0x6C55E, 1);
@@ -673,7 +673,8 @@ public partial class SAV_FestivalPlaza : Form
 
     private void B_DelVisitor_Click(object sender, EventArgs e)
     {
-        if (entry < 0) return;
+        if (entry < 0)
+            return;
         var facility = f[entry];
         // there is a unknown value when not introduced...no reproducibility, just mistake?
         if (facility.IsIntroduced)
@@ -690,7 +691,8 @@ public partial class SAV_FestivalPlaza : Form
 
     private void B_ImportParty_Click(object sender, EventArgs e)
     {
-        if (!SAV.HasParty) return;
+        if (!SAV.HasParty)
+            return;
         var party = SAV.PartyData;
         string msg = string.Empty;
         for (int i = 0; i < 3; i++)
@@ -719,7 +721,8 @@ public partial class SAV_FestivalPlaza : Form
 
     private void NUD_Grade_ValueChanged(object sender, EventArgs e)
     {
-        if (editing) return;
+        if (editing)
+            return;
         int max = (Math.Min(49, (int)NUD_Grade.Value) / 10 * 3) + 2;
         editing = true;
         if (NUD_Defeated.Value > max)

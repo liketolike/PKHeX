@@ -37,6 +37,7 @@ public static class MoveInfo
         Gen6 => MoveInfo6.MovePP,
         Gen7 => MoveInfo7.MovePP_SM,
         Gen8 => MoveInfo8.MovePP_SWSH,
+        Gen9 => MoveInfo9.MovePP_SV,
 
         Gen7b => MoveInfo7b.MovePP_GG,
         Gen8a => MoveInfo8a.MovePP_LA,
@@ -47,12 +48,13 @@ public static class MoveInfo
     /// <summary>
     /// Gets a collection that can be used to check if a move cannot be used in battle.
     /// </summary>
-    public static ICollection<ushort> GetDummiedMovesHashSet(EntityContext context) => context switch
+    public static IReadOnlySet<ushort>? GetDummiedMovesHashSet(EntityContext context) => context switch
     {
         Gen8 => MoveInfo8.DummiedMoves_SWSH,
         Gen8a => MoveInfo8a.DummiedMoves_LA,
         Gen8b => MoveInfo8b.DummiedMoves_BDSP,
-        _ => Array.Empty<ushort>(),
+        Gen9 => MoveInfo9.DummiedMoves_SV,
+        _ => null,
     };
 
     /// <summary>
@@ -79,27 +81,12 @@ public static class MoveInfo
     public static bool IsMoveKnowable(ushort move) => !IsMoveZ(move) && !IsMoveDynamax(move);
 
     /// <summary>
-    /// Checks if the move can be sketched in any game.
-    /// </summary>
-    public static bool IsMoveSketch(ushort move) => move switch
-    {
-        // Can't Sketch
-        (int)Struggle => false,
-        (int)Chatter => false,
-
-        // Unreleased
-        (int)LightofRuin => false,
-
-        _ => IsMoveKnowable(move),
-    };
-
-    /// <summary>
     /// Checks if the <see cref="move"/> is unable to be used in battle.
     /// </summary>
     public static bool IsDummiedMove(PKM pk, ushort move)
     {
         var hashSet = GetDummiedMovesHashSet(pk.Context);
-        return hashSet.Contains(move);
+        return hashSet?.Contains(move) ?? false;
     }
 
     /// <summary>
@@ -108,7 +95,7 @@ public static class MoveInfo
     public static bool IsDummiedMoveAny(PKM pk)
     {
         var hs = GetDummiedMovesHashSet(pk.Context);
-        if (hs.Count == 0)
+        if (hs is null)
             return false;
 
         for (int i = 0; i < 4; i++)
@@ -126,22 +113,43 @@ public static class MoveInfo
     /// <param name="move">Move ID</param>
     /// <param name="context">Generation to check</param>
     /// <returns>True if can be sketched, false if not available.</returns>
-    public static bool IsValidSketch(ushort move, EntityContext context)
+    public static bool IsSketchValid(ushort move, EntityContext context)
     {
-        if (!IsMoveSketch(move))
+        if (move > GetMaxMoveID(context))
             return false;
-        if (context is Gen6 && move is ((int)ThousandArrows or (int)ThousandWaves))
+        if (!IsSketchPossible(move))
             return false;
-        if (context is Gen8b) // can't Sketch unusable moves in BDSP, no Sketch in PLA
-        {
-            if (MoveInfo8b.DummiedMoves_BDSP.Contains(move))
-                return false;
-            if (move > Legal.MaxMoveID_8)
-                return false;
-        }
-
-        return move <= GetMaxMoveID(context);
+        if (!IsSketchPossible(move, context))
+            return false;
+        return true;
     }
+
+    /// <summary>
+    /// Checks if the move can be sketched in any game.
+    /// </summary>
+    private static bool IsSketchPossible(ushort move) => move switch
+    {
+        // Can't Sketch
+        (int)Struggle => false,
+        (int)Chatter => false,
+
+        // Unreleased
+        (int)LightofRuin => false,
+
+        _ => IsMoveKnowable(move),
+    };
+
+    /// <summary>
+    /// Checks if the move can be sketched in a specific game context. Pre-check with <see cref="IsSketchPossible(ushort)"/>.
+    /// </summary>
+    /// <param name="move"></param>
+    /// <param name="context"></param>
+    private static bool IsSketchPossible(ushort move, EntityContext context) => context switch
+    {
+        Gen6 when move is (int)ThousandArrows or (int)ThousandWaves => false,
+        Gen8b when MoveInfo8b.DummiedMoves_BDSP.Contains(move) => false,
+        _ => true,
+    };
 
     private static int GetMaxMoveID(EntityContext context) => context switch
     {
@@ -156,6 +164,31 @@ public static class MoveInfo
         Gen8 => Legal.MaxMoveID_8a,
         Gen8a => Legal.MaxMoveID_8a,
         Gen8b => Legal.MaxMoveID_8b,
+        Gen9 => Legal.MaxMoveID_9,
         _ => -1,
     };
+
+    public static byte GetType(ushort move, EntityContext context) => context switch
+    {
+        Gen1 => GetType(move, MoveInfo1.MoveType_RBY), // Bite, Gust, Karate Chop, Sand Attack
+        >= Gen2 and <= Gen5 => GetType(move, MoveInfo5.MoveType_BW), // Charm, Moonlight, Sweet Kiss
+        _ => GetType(move, MoveInfo9.MoveType_SV),
+    };
+
+    private static byte GetType(ushort move, ReadOnlySpan<byte> types)
+    {
+        if (move >= types.Length)
+            return 0;
+        return types[move];
+    }
+
+    public static bool IsAnyFromGeneration(int generation, ReadOnlySpan<MoveResult> moves)
+    {
+        foreach (var move in moves)
+        {
+            if (move.Generation == generation)
+                return true;
+        }
+        return false;
+    }
 }

@@ -13,16 +13,16 @@ public sealed class SAV7b : SAV_BEEF, ISaveBlock7b, IGameSync, IEventFlagArray
     public override IReadOnlyList<string> PKMExtensions => EntityFileExtension.Extensions7b;
 
     public override Type PKMType => typeof(PB7);
-    public override PKM BlankPKM => new PB7();
+    public override PB7 BlankPKM => new();
     protected override int SIZE_STORED => PokeCrypto.SIZE_6PARTY;
     protected override int SIZE_PARTY => PokeCrypto.SIZE_6PARTY;
     public override int SIZE_BOXSLOT => PokeCrypto.SIZE_6PARTY;
     public override byte[] GetDataForBox(PKM pk) => pk.EncryptedPartyData;
 
-    public override IPersonalTable Personal => PersonalTable.GG;
-    public override IReadOnlyList<ushort> HeldItems => Legal.HeldItems_GG;
+    public override PersonalTable7GG Personal => PersonalTable.GG;
+    public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_GG;
 
-    protected override SaveFile CloneInternal() => new SAV7b((byte[])Data.Clone());
+    protected override SAV7b CloneInternal() => new((byte[])Data.Clone());
 
     public SaveBlockAccessor7b Blocks { get; }
     public override IReadOnlyList<BlockInfo> AllBlocks => Blocks.BlockInfo;
@@ -74,9 +74,9 @@ public sealed class SAV7b : SAV_BEEF, ISaveBlock7b, IGameSync, IEventFlagArray
     public override int MaxAbilityID => Legal.MaxAbilityID_7b;
 
     public override int MaxIV => 31;
-    public override int MaxEV => 252;
-    public override int OTLength => 12;
-    public override int NickLength => 12;
+    public override int MaxEV => EffortValues.Max252;
+    public override int MaxStringLengthOT => 12;
+    public override int MaxStringLengthNickname => 12;
     protected override int GiftCountMax => 48;
     protected override int GiftFlagMax => 0x100 * 8;
     public int EventFlagCount => 4160; // 0xDC0 (true max may be up to 0x7F less. 23A8 starts u64 hashvals)
@@ -93,8 +93,8 @@ public sealed class SAV7b : SAV_BEEF, ISaveBlock7b, IGameSync, IEventFlagArray
     {
         var pb7 = (PB7)pk;
         // Apply to this Save File
-        var Date = DateTime.Now;
-        pb7.Trade(this, Date.Day, Date.Month, Date.Year);
+        var now = EncounterDate.GetDateSwitch();
+        pb7.Trade(this, now.Day, now.Month, now.Year);
         pb7.RefreshChecksum();
     }
 
@@ -102,7 +102,7 @@ public sealed class SAV7b : SAV_BEEF, ISaveBlock7b, IGameSync, IEventFlagArray
     public override bool GetCaught(ushort species) => Blocks.Zukan.GetCaught(species);
     public override bool GetSeen(ushort species) => Blocks.Zukan.GetSeen(species);
 
-    protected override PKM GetPKM(byte[] data) => new PB7(data);
+    protected override PB7 GetPKM(byte[] data) => new(data);
     protected override byte[] DecryptPKM(byte[] data) => PokeCrypto.DecryptArray6(data);
     public override int GetBoxOffset(int box) => Box + (box * BoxSlotCount * SIZE_BOXSLOT);
     protected override IList<int>[] SlotPointers => new[] { Blocks.Storage.PokeListInfo };
@@ -124,7 +124,7 @@ public sealed class SAV7b : SAV_BEEF, ISaveBlock7b, IGameSync, IEventFlagArray
     }
 
     public override string GetBoxName(int box) => $"Box {box + 1}";
-    public override void SetBoxName(int box, string value) { }
+    public override void SetBoxName(int box, ReadOnlySpan<char> value) { }
 
     public override string GetString(ReadOnlySpan<byte> data) => StringConverter8.GetString(data);
 
@@ -141,8 +141,9 @@ public sealed class SAV7b : SAV_BEEF, ISaveBlock7b, IGameSync, IEventFlagArray
     };
 
     // Player Information
-    public override int TID { get => Blocks.Status.TID; set => Blocks.Status.TID = value; }
-    public override int SID { get => Blocks.Status.SID; set => Blocks.Status.SID = value; }
+    public override uint ID32 { get => Blocks.Status.ID32; set => Blocks.Status.ID32 = value; }
+    public override ushort TID16 { get => Blocks.Status.TID16; set => Blocks.Status.TID16 = value; }
+    public override ushort SID16 { get => Blocks.Status.SID16; set => Blocks.Status.SID16 = value; }
     public override int Game { get => Blocks.Status.Game; set => Blocks.Status.Game = value; }
     public override int Gender { get => Blocks.Status.Gender; set => Blocks.Status.Gender = value; }
     public override int Language { get => Blocks.Status.Language; set => Blocks.Config.Language = Blocks.Status.Language = value; } // stored in multiple places

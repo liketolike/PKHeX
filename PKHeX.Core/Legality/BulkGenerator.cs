@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -9,9 +10,13 @@ namespace PKHeX.Core;
 /// </summary>
 public static class BulkGenerator
 {
+    /// <summary>
+    /// Gets a list of <see cref="PKM"/> data that are valid for the provided <see cref="sav"/>.
+    /// </summary>
     public static List<PKM> GetLivingDex(this SaveFile sav)
     {
         var speciesToGenerate = GetAll(1, sav.MaxSpeciesID);
+        speciesToGenerate = speciesToGenerate.Where(sav.Personal.IsSpeciesInGame);
         return GetLivingDex(sav, speciesToGenerate);
     }
 
@@ -55,11 +60,18 @@ public static class BulkGenerator
         template.Form = form;
         template.Gender = template.GetSaneGender();
 
-        var f = EncounterMovesetGenerator.GeneratePKMs(template, tr, template.Moves).FirstOrDefault();
-        if (f == null)
+        var moves = ArrayPool<ushort>.Shared.Rent(4);
+        var memory = moves.AsMemory(0, 4);
+        var span = memory.Span;
+        template.GetMoves(span);
+        var first = EncounterMovesetGenerator.GenerateEncounters(template, tr, memory).FirstOrDefault();
+        span.Clear();
+        ArrayPool<ushort>.Shared.Return(moves);
+        if (first == null)
             return null;
 
-        var result = EntityConverter.ConvertToType(f, destType, out _);
+        var pk = first.ConvertToPKM(tr);
+        var result = EntityConverter.ConvertToType(pk, destType, out _);
         if (result == null)
             return null;
 

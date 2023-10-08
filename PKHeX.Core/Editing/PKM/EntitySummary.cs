@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PKHeX.Core;
 
 /// <summary>
 /// Bindable summary object that can fetch strings that summarize a <see cref="PKM"/>.
 /// </summary>
-public class EntitySummary // do NOT seal, allow inheritance
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]
+public class EntitySummary : IFatefulEncounterReadOnly // do NOT seal, allow inheritance
 {
     private static readonly IReadOnlyList<string> GenderSymbols = GameInfo.GenderSymbolASCII;
 
@@ -58,12 +60,12 @@ public class EntitySummary // do NOT seal, allow inheritance
     public int SPA_EV => pk.EV_SPA;
     public int SPD_EV => pk.EV_SPD;
     public int SPE_EV => pk.EV_SPE;
-    public int Cool => pk is IContestStats s ? s.CNT_Cool : 0;
-    public int Beauty => pk is IContestStats s ? s.CNT_Beauty : 0;
-    public int Cute => pk is IContestStats s ? s.CNT_Cute : 0;
-    public int Smart => pk is IContestStats s ? s.CNT_Smart : 0;
-    public int Tough => pk is IContestStats s ? s.CNT_Tough : 0;
-    public int Sheen => pk is IContestStats s ? s.CNT_Sheen : 0;
+    public int Cool => pk is IContestStatsReadOnly s ? s.CNT_Cool : 0;
+    public int Beauty => pk is IContestStatsReadOnly s ? s.CNT_Beauty : 0;
+    public int Cute => pk is IContestStatsReadOnly s ? s.CNT_Cute : 0;
+    public int Smart => pk is IContestStatsReadOnly s ? s.CNT_Smart : 0;
+    public int Tough => pk is IContestStatsReadOnly s ? s.CNT_Tough : 0;
+    public int Sheen => pk is IContestStatsReadOnly s ? s.CNT_Sheen : 0;
     public int Markings => pk.MarkValue;
 
     public string NotOT => pk.Format > 5 ? pk.HT_Name : "N/A";
@@ -76,14 +78,14 @@ public class EntitySummary // do NOT seal, allow inheritance
     public int MetLevel => pk.Met_Level;
     public int OT_Gender => pk.OT_Gender;
 
-    public bool FatefulFlag => pk.FatefulEncounter;
+    public bool FatefulEncounter => pk.FatefulEncounter;
     public bool IsEgg => pk.IsEgg;
     public bool IsNicknamed => pk.IsNicknamed;
     public bool IsShiny => pk.IsShiny;
 
-    public int TID => pk.DisplayTID;
-    public int SID => pk.DisplaySID;
-    public int TSV => pk.TSV;
+    public ushort TID16 => pk.TID16;
+    public ushort SID16 => pk.SID16;
+    public uint TSV => pk.TSV;
     public int Move1_PP => pk.Move1_PP;
     public int Move2_PP => pk.Move2_PP;
     public int Move3_PP => pk.Move3_PP;

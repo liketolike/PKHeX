@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using static PKHeX.Core.GameVersion;
 
 namespace PKHeX.Core.Searching;
@@ -12,7 +13,7 @@ public sealed class SearchSettings
 {
     public int Format { get; init; }
     public int Generation { get; init; }
-    public ushort Species { get; init; }
+    public required ushort Species { get; init; }
     public int Ability { get; init; } = -1;
     public int Nature { get; init; } = -1;
     public int Item { get; init; } = -1;
@@ -32,8 +33,9 @@ public sealed class SearchSettings
     public int EVType { get; init; }
 
     public CloneDetectionMethod SearchClones { get; set; }
-    public IList<string> BatchInstructions { get; init; } = Array.Empty<string>();
-    private StringInstruction[] BatchFilters { get; set; } = Array.Empty<StringInstruction>();
+    public string BatchInstructions { get; init; } = string.Empty;
+    private IReadOnlyList<StringInstruction> BatchFilters { get; set; } = Array.Empty<StringInstruction>();
+    private IReadOnlyList<StringInstruction> BatchFiltersMeta { get; set; } = Array.Empty<StringInstruction>();
 
     public readonly List<ushort> Moves = new();
 
@@ -61,7 +63,7 @@ public sealed class SearchSettings
     /// <returns>Search results that match all criteria</returns>
     public IEnumerable<PKM> Search(IEnumerable<PKM> list)
     {
-        BatchFilters = StringInstruction.GetFilters(BatchInstructions).ToArray();
+        InitializeFilters();
         var result = SearchInner(list);
 
         if (SearchClones != CloneDetectionMethod.None)
@@ -80,7 +82,7 @@ public sealed class SearchSettings
     /// <returns>Search results that match all criteria</returns>
     public IEnumerable<SlotCache> Search(IEnumerable<SlotCache> list)
     {
-        BatchFilters = StringInstruction.GetFilters(BatchInstructions).ToArray();
+        InitializeFilters();
         var result = SearchInner(list);
 
         if (SearchClones != CloneDetectionMethod.None)
@@ -91,6 +93,16 @@ public sealed class SearchSettings
         }
 
         return result;
+    }
+
+    private void InitializeFilters()
+    {
+        var filters = StringInstruction.GetFilters(BatchInstructions);
+        var meta = filters.Where(z => Core.BatchFilters.FilterMeta.Any(x => x.IsMatch(z.PropertyName))).ToList();
+        if (meta.Count != 0)
+            filters.RemoveAll(meta.Contains);
+        BatchFilters = filters;
+        BatchFiltersMeta = meta;
     }
 
     private IEnumerable<PKM> SearchInner(IEnumerable<PKM> list)
@@ -108,6 +120,8 @@ public sealed class SearchSettings
         foreach (var entry in list)
         {
             var pk = entry.Entity;
+            if (BatchFiltersMeta.Count != 0 && !BatchEditing.IsFilterMatchMeta(BatchFiltersMeta, entry))
+                continue;
             if (!IsSearchMatch(pk))
                 continue;
             yield return entry;
@@ -150,23 +164,33 @@ public sealed class SearchSettings
 
     private bool SearchIntermediate(PKM pk)
     {
-        if (Generation > 0 && !SearchUtil.SatisfiesFilterGeneration(pk, Generation)) return false;
-        if (Moves.Count > 0 && !SearchUtil.SatisfiesFilterMoves(pk, Moves)) return false;
-        if (HiddenPowerType > -1 && pk.HPType != HiddenPowerType) return false;
-        if (SearchShiny != null && pk.IsShiny != SearchShiny) return false;
+        if (Generation > 0 && !SearchUtil.SatisfiesFilterGeneration(pk, Generation))
+            return false;
+        if (Moves.Count > 0 && !SearchUtil.SatisfiesFilterMoves(pk, CollectionsMarshal.AsSpan(Moves)))
+            return false;
+        if (HiddenPowerType > -1 && pk.HPType != HiddenPowerType)
+            return false;
+        if (SearchShiny != null && pk.IsShiny != SearchShiny)
+            return false;
 
-        if (IVType > 0 && !SearchUtil.SatisfiesFilterIVs(pk, IVType)) return false;
-        if (EVType > 0 && !SearchUtil.SatisfiesFilterEVs(pk, EVType)) return false;
+        if (IVType > 0 && !SearchUtil.SatisfiesFilterIVs(pk, IVType))
+            return false;
+        if (EVType > 0 && !SearchUtil.SatisfiesFilterEVs(pk, EVType))
+            return false;
 
         return true;
     }
 
     private bool SearchComplex(PKM pk)
     {
-        if (SearchEgg != null && !FilterResultEgg(pk)) return false;
-        if (Level is { } x and not 0 && !SearchUtil.SatisfiesFilterLevel(pk, SearchLevel, x)) return false;
-        if (SearchLegal != null && new LegalityAnalysis(pk).Valid != SearchLegal) return false;
-        if (BatchFilters.Length != 0 && !SearchUtil.SatisfiesFilterBatchInstruction(pk, BatchFilters)) return false;
+        if (SearchEgg != null && !FilterResultEgg(pk))
+            return false;
+        if (Level is { } x and not 0 && !SearchUtil.SatisfiesFilterLevel(pk, SearchLevel, x))
+            return false;
+        if (SearchLegal != null && new LegalityAnalysis(pk).Valid != SearchLegal)
+            return false;
+        if (BatchFilters.Count != 0 && !SearchUtil.SatisfiesFilterBatchInstruction(pk, BatchFilters))
+            return false;
 
         return true;
     }

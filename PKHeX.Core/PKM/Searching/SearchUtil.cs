@@ -45,8 +45,8 @@ public static class SearchUtil
     {
         1 => pk.EVTotal == 0, // None (0)
         2 => pk.EVTotal is (not 0) and < 128, // Some (127-1)
-        3 => pk.EVTotal is >= 128 and < 508, // Half (128-507)
-        4 => pk.EVTotal >= 508, // Full (508+)
+        3 => pk.EVTotal is >= 128 and < EffortValues.MaxEffective, // Half (128-507)
+        4 => pk.EVTotal >= EffortValues.MaxEffective, // Full (508+)
         _ => true,
     };
 
@@ -61,7 +61,7 @@ public static class SearchUtil
         _ => true,
     };
 
-    public static bool SatisfiesFilterMoves(PKM pk, IReadOnlyList<ushort> requiredMoves)
+    public static bool SatisfiesFilterMoves(PKM pk, ReadOnlySpan<ushort> requiredMoves)
     {
         foreach (var m in requiredMoves)
         {
@@ -82,20 +82,18 @@ public static class SearchUtil
         _ => HashByDetails,
     };
 
-    public static string HashByDetails(PKM pk) => pk.Format switch
+    public static string HashByDetails(PKM pk) => pk switch
     {
-        1 => $"{pk.Species:000}{((PK1) pk).DV16:X4}",
-        2 => $"{pk.Species:000}{((PK2) pk).DV16:X4}",
-        _ => $"{pk.Species:000}{pk.PID:X8}{GetIVString(pk)}{pk.Form:00}",
+        GBPKM gb => $"{pk.Species:000}{gb.DV16:X4}",
+        _ => $"{pk.Species:0000}{pk.PID:X8}{GetIVString(pk)}{pk.Form:00}",
     };
 
     // use a space so we don't merge single digit IVs and potentially get incorrect collisions
     private static string GetIVString(PKM pk) => $"{pk.IV_HP} {pk.IV_ATK} {pk.IV_DEF} {pk.IV_SPE} {pk.IV_SPA} {pk.IV_SPD}";
 
-    public static string HashByPID(PKM pk) => pk.Format switch
+    public static string HashByPID(PKM pk) => pk switch
     {
-        1 => $"{((PK1) pk).DV16:X4}",
-        2 => $"{((PK2) pk).DV16:X4}",
+        GBPKM gb => $"{gb.DV16:X4}",
         _ => $"{pk.PID:X8}",
     };
 

@@ -53,8 +53,8 @@ public sealed class SAV8SWSH : SaveFile, ISaveBlock8SWSH, ITrainerStatRecord, IS
     protected override void SetChecksums() { } // None!
     protected override byte[] GetFinalData() => SwishCrypto.Encrypt(AllBlocks);
 
-    public override IPersonalTable Personal => PersonalTable.SWSH;
-    public override IReadOnlyList<ushort> HeldItems => Legal.HeldItems_SWSH;
+    public override PersonalTable8SWSH Personal => PersonalTable.SWSH;
+    public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_SWSH;
 
     #region Blocks
     public SCBlockAccessor Accessor => Blocks;
@@ -64,7 +64,7 @@ public sealed class SAV8SWSH : SaveFile, ISaveBlock8SWSH, ITrainerStatRecord, IS
     public void SetValue<T>(uint key, T value) where T : struct => Blocks.SetBlockValueSafe(key, value);
     public Box8 BoxInfo => Blocks.BoxInfo;
     public Party8 PartyInfo => Blocks.PartyInfo;
-    public MyItem Items => Blocks.Items;
+    public MyItem8 Items => Blocks.Items;
     public MyStatus8 MyStatus => Blocks.MyStatus;
     public Misc8 Misc => Blocks.Misc;
     public Zukan8 Zukan => Blocks.Zukan;
@@ -74,6 +74,7 @@ public sealed class SAV8SWSH : SaveFile, ISaveBlock8SWSH, ITrainerStatRecord, IS
     public Daycare8 Daycare => Blocks.Daycare;
     public Record8 Records => Blocks.Records;
     public TrainerCard8 TrainerCard => Blocks.TrainerCard;
+    public FashionUnlock8 Fashion => Blocks.Fashion;
     public RaidSpawnList8 Raid => Blocks.Raid;
     public RaidSpawnList8 RaidArmor => Blocks.RaidArmor;
     public RaidSpawnList8 RaidCrown => Blocks.RaidCrown;
@@ -81,12 +82,12 @@ public sealed class SAV8SWSH : SaveFile, ISaveBlock8SWSH, ITrainerStatRecord, IS
     public TeamIndexes8 TeamIndexes => Blocks.TeamIndexes;
     #endregion
 
-    protected override SaveFile CloneInternal()
+    protected override SAV8SWSH CloneInternal()
     {
         var blockCopy = new SCBlock[AllBlocks.Count];
         for (int i = 0; i < AllBlocks.Count; i++)
             blockCopy[i] = AllBlocks[i].Clone();
-        return new SAV8SWSH(blockCopy);
+        return new(blockCopy);
     }
 
     private ushort m_spec, m_item, m_move, m_abil;
@@ -142,16 +143,16 @@ public sealed class SAV8SWSH : SaveFile, ISaveBlock8SWSH, ITrainerStatRecord, IS
     protected override int SIZE_STORED => PokeCrypto.SIZE_8STORED;
     protected override int SIZE_PARTY => PokeCrypto.SIZE_8PARTY;
     public override int SIZE_BOXSLOT => PokeCrypto.SIZE_8PARTY;
-    public override PKM BlankPKM => new PK8();
+    public override PK8 BlankPKM => new();
     public override Type PKMType => typeof(PK8);
 
     public override int BoxCount => BoxLayout8.BoxCount;
-    public override int MaxEV => 252;
+    public override int MaxEV => EffortValues.Max252;
     public override int Generation => 8;
     public override EntityContext Context => EntityContext.Gen8;
-    public override int OTLength => 12;
-    public override int NickLength => 12;
-    protected override PKM GetPKM(byte[] data) => new PK8(data);
+    public override int MaxStringLengthOT => 12;
+    public override int MaxStringLengthNickname => 12;
+    protected override PK8 GetPKM(byte[] data) => new(data);
     protected override byte[] DecryptPKM(byte[] data) => PokeCrypto.DecryptArray8(data);
 
     public override GameVersion Version => Game switch
@@ -166,8 +167,9 @@ public sealed class SAV8SWSH : SaveFile, ISaveBlock8SWSH, ITrainerStatRecord, IS
         => StringConverter8.SetString(destBuffer, value, maxLength, option);
 
     // Player Information
-    public override int TID { get => MyStatus.TID; set => MyStatus.TID = value; }
-    public override int SID { get => MyStatus.SID; set => MyStatus.SID = value; }
+    public override uint ID32 { get => MyStatus.ID32; set => MyStatus.ID32 = value; }
+    public override ushort TID16 { get => MyStatus.TID16; set => MyStatus.TID16 = value; }
+    public override ushort SID16 { get => MyStatus.SID16; set => MyStatus.SID16 = value; }
     public override int Game { get => MyStatus.Game; set => MyStatus.Game = value; }
     public override int Gender { get => MyStatus.Gender; set => MyStatus.Gender = value; }
     public override int Language { get => MyStatus.Language; set => MyStatus.Language = value; }
@@ -186,15 +188,15 @@ public sealed class SAV8SWSH : SaveFile, ISaveBlock8SWSH, ITrainerStatRecord, IS
     public override int GetPartyOffset(int slot) => Party + (SIZE_PARTY * slot);
     public override int GetBoxOffset(int box) => Box + (SIZE_PARTY * box * 30);
     public override string GetBoxName(int box) => BoxLayout[box];
-    public override void SetBoxName(int box, string value) => BoxLayout[box] = value;
+    public override void SetBoxName(int box, ReadOnlySpan<char> value) => BoxLayout.SetBoxName(box, value);
     public override byte[] GetDataForBox(PKM pk) => pk.EncryptedPartyData;
 
     protected override void SetPKM(PKM pk, bool isParty = false)
     {
         PK8 pk8 = (PK8)pk;
         // Apply to this Save File
-        DateTime Date = DateTime.Now;
-        pk8.Trade(this, Date.Day, Date.Month, Date.Year);
+        var now = EncounterDate.GetDateSwitch();
+        pk8.Trade(this, now.Day, now.Month, now.Year);
 
         if (FormArgumentUtil.IsFormArgumentTypeDatePair(pk8.Species, pk8.Form))
         {
@@ -245,10 +247,10 @@ public sealed class SAV8SWSH : SaveFile, ISaveBlock8SWSH, ITrainerStatRecord, IS
         protected set => PartyInfo.PartyCount = value;
     }
 
-    protected override byte[] BoxBuffer => BoxInfo.Data;
-    protected override byte[] PartyBuffer => PartyInfo.Data;
-    public override PKM GetDecryptedPKM(byte[] data) => GetPKM(DecryptPKM(data));
-    public override PKM GetBoxSlot(int offset) => GetDecryptedPKM(GetData(BoxInfo.Data, offset, SIZE_PARTY)); // party format in boxes!
+    protected override Span<byte> BoxBuffer => BoxInfo.Data;
+    protected override Span<byte> PartyBuffer => PartyInfo.Data;
+    public override PK8 GetDecryptedPKM(byte[] data) => GetPKM(DecryptPKM(data));
+    public override PK8 GetBoxSlot(int offset) => GetDecryptedPKM(BoxInfo.Data.AsSpan(offset, SIZE_PARTY).ToArray()); // party format in boxes!
 
     public int GetRecord(int recordID) => Records.GetRecord(recordID);
     public void SetRecord(int recordID, int value) => Records.SetRecord(recordID, value);

@@ -214,13 +214,13 @@ namespace PKHeX.WinForms.Properties {
         ///   Looks up a localized string similar to PKHeX - By Kaphotics
         ///http://projectpokemon.org/pkhex/
         ///
-        ///22/03/18 - New Update:
-        /// - Added support for BDSP v1.3 save data format.
-        /// - Legality:
-        /// - - Added: Experience above level 100 is now checked.
-        /// - - Fixed: PLA Massive Mass Outbreak now correctly identify Overqwil/etc evolutions captured directly in the wild.
-        /// - Added: Batch editor can now copy properties using * -- for example, .PID=*EncryptionConstant will copy the EC to PID.
-        /// - Added: Sprites now show an orange-colored line (instead of yellow) i [rest of string was truncated]&quot;;.
+        ///23/02/27 - New Update:
+        /// - Added: Support for S/V 1.2.0
+        /// - Added: SV style menu sprites for all species/forms. Thanks @sora10pls &amp; @SciresM!
+        /// - Added: Gen5 Black/White City data can now be imported/exported, and Roamer status can be reset. Thanks @frefire!
+        /// - Added: Gen4/5 Geonet Location save file settings can now be viewed/changed. Thanks @abcboy101!
+        /// - Added: Gen4 Ranch now supports Toys from the Platinum game update. Thanks @Zazsona!
+        /// - Fixe [rest of string was truncated]&quot;;.
         /// </summary>
         public static string changelog {
             get {
@@ -461,6 +461,16 @@ namespace PKHeX.WinForms.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        public static System.Drawing.Bitmap gen_sv {
+            get {
+                object obj = ResourceManager.GetObject("gen_sv", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         public static System.Drawing.Bitmap gen_vc {
             get {
                 object obj = ResourceManager.GetObject("gen_vc", resourceCulture);
@@ -572,10 +582,10 @@ namespace PKHeX.WinForms.Properties {
         ///   Looks up a localized string similar to About=Über
         ///BatchEditor=Batch Editor
         ///ErrorWindow=Fehler
-        ///KChart=KTabelle
+        ///KChart=Tabelle
         ///Main=PKHeX
         ///MemoryAmie=Erinnerung / Ami Editor
-        ///MoveShopEditor=Move Shop Editor
+        ///MoveShopEditor=Attacken Tutor Editor
         ///RibbonEditor=Band Editor
         ///SAV_Apricorn=Aprikoko Editor
         ///SAV_BerryField=Beerenfeld Ansicht
@@ -585,9 +595,9 @@ namespace PKHeX.WinForms.Properties {
         ///SAV_Capture7GG=Fang Statistik Editor
         ///SAV_CGearSkin=C-Gear Skin
         ///SAV_Database=Datenbank
-        ///SAV_Encounters=Datenbank
+        ///SAV_Encounters=Begegnungen
         ///SAV_EventFlags=Event Flag Editor
-        ///SAV_EventReset1=Event [rest of string was truncated]&quot;;.
+        ///SAV_EventReset1 [rest of string was truncated]&quot;;.
         /// </summary>
         public static string lang_de {
             get {
@@ -629,7 +639,7 @@ namespace PKHeX.WinForms.Properties {
         ///KChart=KChart
         ///Main=PKHeX
         ///MemoryAmie=Editor de Memorias / Poké Recreo
-        ///MoveShopEditor=Move Shop Editor
+        ///MoveShopEditor=Editor de la Tienda de Movimientos
         ///RibbonEditor=Editor de Cintas
         ///SAV_Apricorn=Editor de Bonguri
         ///SAV_BerryField=Visor de Campos de Bayas
@@ -638,8 +648,7 @@ namespace PKHeX.WinForms.Properties {
         ///SAV_BoxList=Visor de Almacenamiento
         ///SAV_Capture7GG=Editor de Récord de Captura
         ///SAV_CGearSkin=Editor de la apariencia C-Gear
-        ///SAV_Database=Base de Datos
-        ///SAV_E [rest of string was truncated]&quot;;.
+        ///SAV_Database=Ba [rest of string was truncated]&quot;;.
         /// </summary>
         public static string lang_es {
             get {
@@ -649,12 +658,12 @@ namespace PKHeX.WinForms.Properties {
         
         /// <summary>
         ///   Looks up a localized string similar to About=À propos
-        ///BatchEditor=Éditeur Batch
+        ///BatchEditor=Éditeur en vrac
         ///ErrorWindow=Erreur
         ///KChart=KChart
         ///Main=PKHeX
         ///MemoryAmie=Memory / Amie Editor
-        ///MoveShopEditor=Move Shop Editor
+        ///MoveShopEditor=Éditeur de capacités
         ///RibbonEditor=Rubans
         ///SAV_Apricorn=Noigrumes
         ///SAV_BerryField=Champs de Baies
@@ -665,7 +674,7 @@ namespace PKHeX.WinForms.Properties {
         ///SAV_CGearSkin=Fonds C-Gear
         ///SAV_Database=Base de Données
         ///SAV_Encounters=Base de données
-        ///SAV_EventFlags=Événement [rest of string was truncated]&quot;;.
+        ///SAV_EventFlags=Évé [rest of string was truncated]&quot;;.
         /// </summary>
         public static string lang_fr {
             get {
@@ -674,25 +683,24 @@ namespace PKHeX.WinForms.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to About=About
-        ///BatchEditor=Batch Editor
-        ///ErrorWindow=Error
+        ///   Looks up a localized string similar to About=Info
+        ///BatchEditor=Editor Batch
+        ///ErrorWindow=Errore
         ///KChart=KChart
         ///Main=PKHeX
-        ///MemoryAmie=Memory / Amie Editor
-        ///MoveShopEditor=Move Shop Editor
-        ///RibbonEditor=Ribbon Editor
-        ///SAV_Apricorn=Apricorn Editor
-        ///SAV_BerryField=Berry Field Viewer
-        ///SAV_BlockDump8=Savedata Block Dump
-        ///SAV_BoxLayout=Box Layout Editor
-        ///SAV_BoxList=Storage Viewer
-        ///SAV_Capture7GG=Capture Record Editor
+        ///MemoryAmie=Editor Memorie / Poké Io e Te
+        ///MoveShopEditor=Editor Negozio Mosse
+        ///RibbonEditor=Editor Fiocchi
+        ///SAV_Apricorn=Editor Ghicocche
+        ///SAV_BerryField=Visualizzatore Campi di Bacche
+        ///SAV_BlockDump8=Dump Blocchi di Salvataggio
+        ///SAV_BoxLayout=Editor Disposizione Box
+        ///SAV_BoxList=Visualizzatore Storage
+        ///SAV_Capture7GG=Editor Record di Catture
         ///SAV_CGearSkin=C-Gear Skin
         ///SAV_Database=Database
         ///SAV_Encounters=Database
-        ///SAV_EventFlags=Event Flag Editor
-        ///SAV_EventReset1=Event Re [rest of string was truncated]&quot;;.
+        ///SAV_Ev [rest of string was truncated]&quot;;.
         /// </summary>
         public static string lang_it {
             get {
@@ -791,6 +799,41 @@ namespace PKHeX.WinForms.Properties {
         public static string lang_zh {
             get {
                 return ResourceManager.GetString("lang_zh", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to About=關於
+        ///BatchEditor=批量編輯器
+        ///ErrorWindow=錯誤
+        ///KChart=信息清單
+        ///Main=PKHeX
+        ///MemoryAmie=回憶編輯器
+        ///MoveShopEditor=招式商店編輯器
+        ///RibbonEditor=獎章
+        ///SAV_Apricorn=球果編輯
+        ///SAV_BerryField=樹果田檢視器
+        ///SAV_BlockDump8=存檔轉儲
+        ///SAV_BoxLayout=盒子外觀
+        ///SAV_BoxList=寄放系統
+        ///SAV_Capture7GG=捕獲記錄編輯
+        ///SAV_CGearSkin=C裝置皮膚
+        ///SAV_Database=資料庫
+        ///SAV_Encounters=遇見資料庫
+        ///SAV_EventFlags=事件旗標編輯
+        ///SAV_EventReset1=事件重置
+        ///SAV_EventWork=事件標誌編輯器
+        ///SAV_FlagWork8b=事件標誌編輯器
+        ///SAV_FolderList=資料夾清單
+        ///SAV_GameSelect=遊戲選擇
+        ///SAV_HallOfFame=名人堂
+        ///SAV_HallOfFame7=名人堂
+        ///SAV_HoneyTree=甜甜蜜樹編輯
+        /// [rest of string was truncated]&quot;;.
+        /// </summary>
+        public static string lang_zh2 {
+            get {
+                return ResourceManager.GetString("lang_zh2", resourceCulture);
             }
         }
         
@@ -970,6 +1013,16 @@ namespace PKHeX.WinForms.Properties {
         public static System.Drawing.Bitmap research_bonus_points {
             get {
                 object obj = ResourceManager.GetObject("research_bonus_points", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap ribbon_affix_none {
+            get {
+                object obj = ResourceManager.GetObject("ribbon_affix_none", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

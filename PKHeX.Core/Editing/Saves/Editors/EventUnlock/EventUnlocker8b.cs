@@ -1,6 +1,6 @@
-﻿namespace PKHeX.Core;
+namespace PKHeX.Core;
 
-public class EventUnlocker8b : EventUnlocker<SAV8BS>
+public sealed class EventUnlocker8b : EventUnlocker<SAV8BS>
 {
     public EventUnlocker8b(SAV8BS sav) : base(sav) { }
 
@@ -96,5 +96,13 @@ public class EventUnlocker8b : EventUnlocker<SAV8BS>
         SAV.FlagWork.SetFlag(245, false); // clear met
         SAV.FlagWork.SetFlag(532, false); // clear vanish
         SAV.Encounter.Roamer2Encount = 0; // not actively roaming
+    }
+
+    public void UnlockFashion()
+    {
+        const int FASHION_START = 1246;
+        const int FASHION_END = 1257;
+        for (int i = FASHION_START; i <= FASHION_END; i++)
+            SAV.FlagWork.SetFlag(i, true);
     }
 }

@@ -37,7 +37,7 @@ public static class Overworld8RNG
 
         // PID
         var pid = (uint) xoro.NextInt(uint.MaxValue);
-        var xor = GetShinyXor(pk.TID, pk.SID, pid);
+        var xor = GetShinyXor(pk.ID32, pid);
         var type = GetRareType(xor);
         if (shiny == Shiny.Never)
         {
@@ -72,10 +72,10 @@ public static class Overworld8RNG
         for (int i = 0; i < ivs.Length; i++)
         {
             if (ivs[i] == UNSET)
-                ivs[i] = (int) xoro.NextInt(32);
+                ivs[i] = (int)xoro.NextInt(MAX + 1);
         }
 
-        if (!criteria.IsIVsCompatible(ivs, 8))
+        if (!criteria.IsIVsCompatibleSpeedLast(ivs, 8))
             return false;
 
         pk.IV_HP = ivs[0];
@@ -136,15 +136,15 @@ public static class Overworld8RNG
         // Check forced shiny
         if (pk.IsShiny)
         {
-            if (GetIsShiny(pk.TID, pk.SID, pid))
+            if (GetIsShiny(pk.ID32, pid))
                 return false;
 
-            pid = GetShinyPID(pk.TID, pk.SID, pid, 0);
+            pid = GetShinyPID(pk.TID16, pk.SID16, pid, 0);
             return pid == pk.PID;
         }
 
         // Check forced non-shiny
-        if (!GetIsShiny(pk.TID, pk.SID, pid))
+        if (!GetIsShiny(pk.ID32, pid))
             return false;
 
         pid ^= 0x1000_0000;
@@ -199,24 +199,12 @@ public static class Overworld8RNG
         return NoMatchIVs;
     }
 
-    private static uint GetShinyPID(int tid, int sid, uint pid, int type)
-    {
-        return (uint)(((tid ^ sid ^ (pid & 0xFFFF) ^ type) << 16) | (pid & 0xFFFF));
-    }
+    private static bool GetIsShiny(uint id32, uint pid) => GetShinyXor(pid, id32) < 16;
+    private static uint GetShinyPID(ushort tid, ushort sid, uint pid, uint type) => (((pid & 0xFFFF) ^ tid ^ sid ^ type) << 16) | (pid & 0xFFFF);
 
-    private static bool GetIsShiny(int tid, int sid, uint pid)
+    private static uint GetShinyXor(uint pid, uint id32)
     {
-        return GetShinyXor(pid, (uint)((sid << 16) | tid)) < 16;
-    }
-
-    private static uint GetShinyXor(int tid, int sid, uint pid)
-    {
-        return GetShinyXor(pid, (uint)((sid << 16) | tid));
-    }
-
-    private static uint GetShinyXor(uint pid, uint oid)
-    {
-        var xor = pid ^ oid;
+        var xor = pid ^ id32;
         return (xor ^ (xor >> 16)) & 0xFFFF;
     }
 
@@ -227,16 +215,18 @@ public static class Overworld8RNG
     /// <returns>Seed</returns>
     public static uint GetOriginalSeed(PKM pk)
     {
-        var seed = pk.EncryptionConstant - unchecked((uint)Xoroshiro128Plus.XOROSHIRO_CONST);
-        if (seed == 0xD5B9C463) // Collision seed with the 0xFFFFFFFF re-roll.
-        {
-            var xoro = new Xoroshiro128Plus(seed);
-            /*  ec */ xoro.NextInt(uint.MaxValue);
-            var pid = xoro.NextInt(uint.MaxValue);
-            if (pid != pk.PID)
-                return 0xDD6295A4;
-        }
+        // The seed is always 32 bits, so we know 96 bits of the seed (zeroes and the 64bit const).
+        // Since the 32-bit EC is generated first by adding the two 64-bit RNG states, we can calc the other 32bits.
+        var enc = pk.EncryptionConstant;
+        const uint TwoSeedsEC = 0xF8572EBE;
+        if (enc != TwoSeedsEC)
+            return enc - unchecked((uint)Xoroshiro128Plus.XOROSHIRO_CONST);
 
-        return seed;
+        // Two seeds can result in an EC of 0xF8572EBE, so we need to check the PID as well.
+        // Seed => EC => PID
+        const uint Seed_1 = 0xD5B9C463; // First rand()
+        const uint Seed_2 = 0xDD6295A4; // First rand() is uint.MaxValue, rolls again.
+        const uint PID_1  = 0x8E72DCF6; // 0x7CE0596A for PID_2
+        return pk.PID == PID_1 ? Seed_1 : Seed_2; // don't care if the PID != second's case. Other validation will check.
     }
 }

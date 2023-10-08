@@ -17,21 +17,27 @@ public partial class MemoryAmie : Form
         MemStrings = new MemoryStrings(GameInfo.Strings);
         PrevCountries = new[] { CB_Country0, CB_Country1, CB_Country2, CB_Country3, CB_Country4 };
         PrevRegions = new[] { CB_Region0, CB_Region1, CB_Region2, CB_Region3, CB_Region4 };
-        string[] arguments = L_Arguments.Text.Split(new[] {" ; "}, StringSplitOptions.None);
+        string[] arguments = L_Arguments.Text.Split(new[] { " ; " }, StringSplitOptions.None);
 
         TextArgs = new TextMarkup(arguments);
-        foreach (ComboBox comboBox in PrevCountries)
+
+        if (Entity is IGeoTrack)
         {
-            comboBox.InitializeBinding();
-            Main.SetCountrySubRegion(comboBox, "countries");
+            foreach (var cb in PrevRegions)
+                cb.InitializeBinding();
+            foreach (var cb in PrevCountries)
+            {
+                cb.InitializeBinding();
+                Main.SetCountrySubRegion(cb, "countries");
+            }
         }
-        foreach (var region in PrevRegions)
-            region.InitializeBinding();
+        else
+        {
+            tabControl1.TabPages.Remove(Tab_Residence);
+        }
+
         GetLangStrings();
         LoadFields();
-
-        if (pk is not IGeoTrack)
-            tabControl1.TabPages.Remove(Tab_Residence);
     }
 
     private bool init;
@@ -50,11 +56,11 @@ public partial class MemoryAmie : Form
             CB_Country2.SelectedValue = (int)g.Geo3_Country;
             CB_Country3.SelectedValue = (int)g.Geo4_Country;
             CB_Country4.SelectedValue = (int)g.Geo5_Country;
-            CB_Region0.SelectedValue  = (int)g.Geo1_Region;
-            CB_Region1.SelectedValue  = (int)g.Geo2_Region;
-            CB_Region2.SelectedValue  = (int)g.Geo3_Region;
-            CB_Region3.SelectedValue  = (int)g.Geo4_Region;
-            CB_Region4.SelectedValue  = (int)g.Geo5_Region;
+            CB_Region0.SelectedValue = (int)g.Geo1_Region;
+            CB_Region1.SelectedValue = (int)g.Geo2_Region;
+            CB_Region2.SelectedValue = (int)g.Geo3_Region;
+            CB_Region3.SelectedValue = (int)g.Geo4_Region;
+            CB_Region4.SelectedValue = (int)g.Geo5_Region;
         }
 
         // Load the Fullness, and Enjoyment
@@ -101,7 +107,7 @@ public partial class MemoryAmie : Form
         GB_M_OT.Enabled = GB_M_CT.Enabled = GB_Residence.Enabled =
             BTN_Save.Enabled = M_Fullness.Enabled = M_Enjoyment.Enabled =
                 L_Sociability.Enabled = MT_Sociability.Enabled =
-                    L_Fullness.Enabled = L_Enjoyment.Enabled = !(Entity.IsEgg && Entity.IsUntraded && Entity.HT_Friendship == 0);
+                    L_Fullness.Enabled = L_Enjoyment.Enabled = Entity is not { IsEgg: true, IsUntraded: true, HT_Friendship: 0 };
 
         if (!Entity.IsEgg)
         {
@@ -149,7 +155,7 @@ public partial class MemoryAmie : Form
 
         // Affection no longer stored in gen8+, so only show in gen6/7.
         L_OT_Affection.Visible = L_CT_Affection.Visible = M_OT_Affection.Visible = M_CT_Affection.Visible = Entity.Format <= 7;
-        L_Sociability.Visible = MT_Sociability.Visible = Entity.Format >= 8;
+        L_Sociability.Visible = MT_Sociability.Visible = Entity is ISociability;
     }
 
     private void SaveFields()
@@ -157,11 +163,11 @@ public partial class MemoryAmie : Form
         // Save Region & Country Data
         if (Entity is IGeoTrack g)
         {
-            g.Geo1_Region  = (byte)WinFormsUtil.GetIndex(CB_Region0);
-            g.Geo2_Region  = (byte)WinFormsUtil.GetIndex(CB_Region1);
-            g.Geo3_Region  = (byte)WinFormsUtil.GetIndex(CB_Region2);
-            g.Geo4_Region  = (byte)WinFormsUtil.GetIndex(CB_Region3);
-            g.Geo5_Region  = (byte)WinFormsUtil.GetIndex(CB_Region4);
+            g.Geo1_Region = (byte)WinFormsUtil.GetIndex(CB_Region0);
+            g.Geo2_Region = (byte)WinFormsUtil.GetIndex(CB_Region1);
+            g.Geo3_Region = (byte)WinFormsUtil.GetIndex(CB_Region2);
+            g.Geo4_Region = (byte)WinFormsUtil.GetIndex(CB_Region3);
+            g.Geo5_Region = (byte)WinFormsUtil.GetIndex(CB_Region4);
             g.Geo1_Country = (byte)WinFormsUtil.GetIndex(CB_Country0);
             g.Geo2_Country = (byte)WinFormsUtil.GetIndex(CB_Country1);
             g.Geo3_Country = (byte)WinFormsUtil.GetIndex(CB_Country2);
@@ -299,7 +305,8 @@ public partial class MemoryAmie : Form
         if (m == CB_CTMemory || m == CB_OTMemory)
             UpdateMemoryDisplay(m);
 
-        if (!init) return;
+        if (!init)
+            return;
         RTB_OT.Text = GetMemoryString(CB_OTMemory, CB_OTVar, CB_OTQual, CB_OTFeel, Entity.OT_Name);
         RTB_CT.Text = GetMemoryString(CB_CTMemory, CB_CTVar, CB_CTQual, CB_CTFeel, Entity.HT_Name);
     }
@@ -331,7 +338,8 @@ public partial class MemoryAmie : Form
 
     private void Update255_MTB(object sender, EventArgs e)
     {
-        if (sender is not MaskedTextBox tb) return;
+        if (sender is not MaskedTextBox tb)
+            return;
         if (Util.ToInt32(tb.Text) > byte.MaxValue)
             tb.Text = "255";
     }

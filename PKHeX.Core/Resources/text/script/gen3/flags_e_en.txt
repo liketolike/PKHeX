@@ -206,9 +206,9 @@
 589	r	Heart Scale (hidden) on Route 105 found
 590	r	Heart Scale (hidden; under umbrella) on Route 109 found
 591	r	Heart Scale (hidden; near couple) on Route 109 found
-592	r	Hear Scale (hidden; near Cooltrainer) on Route 128 found
-593	r	Hear Scale (hidden; near rock wall) on Route 128 found
-594	r	Hear Scale (hidden; southwest) on Route 128 found
+592	r	Heart Scale (hidden; near Cooltrainer) on Route 128 found
+593	r	Heart Scale (hidden; near rock wall) on Route 128 found
+594	r	Heart Scale (hidden; southwest) on Route 128 found
 595	r	Rare Candy (hidden) in Petalburg City found
 596	r	Black Glasses (hidden) on Route 116 found
 597	r	Heart Scale (hidden) on Route 115 found
@@ -227,7 +227,7 @@
 610	r	Rare Candy (hidden) on Route 123 found
 611	r	Big Pearl (hidden) on Route 105 found
 
-700	r	Don't spawn Prof. Brich's bag on Route 101
+700	r	Don't spawn Prof. Birch's bag on Route 101
 701	r	Don't spawn apprentice in Battle Tower
 702	r	Don't spawn Mystery Gift guy in Pokémon Center 2F
 
@@ -619,7 +619,7 @@
 1107	r	Hyper Potion on Route 120 found
 1108	r	Nest Ball on Route 120 found
 1109	r	Elixir on Route 123 found
-1110	r	Thunderstone on New Mauville found
+1110	r	Thunder Stone on New Mauville found
 1111	r	Fire Stone in Fiery Path found
 1112	r	TM07 in Shoal Cave found
 1113	r	Never-Melt Ice in Shoal Cave found
@@ -653,7 +653,7 @@
 1144	r	Heal Powder on Route 115 found
 
 1146	r	Potion on Route 116 found
-1147	r	Elixier (near water) on Route 119 found
+1147	r	Elixir (near water) on Route 119 found
 1148	r	Revive on Route 120 found
 1149	r	Revive on Route 121 found
 1150	r	Zinc on Route 121 found

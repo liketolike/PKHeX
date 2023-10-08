@@ -1,22 +1,21 @@
 using System;
-using System.Collections.Generic;
+using System.Numerics;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
 
 /// <summary> Generation 6 <see cref="PKM"/> format. </summary>
-public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetCommon6, IRibbonSetMemory6,
-    IContestStats, IContestStatsMutable, IGeoTrack, ISuperTrain, IFormArgument, ITrainerMemories, IAffection, IGroundTile
+public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetCommon6, IRibbonSetMemory6, IRibbonSetRibbons,
+    IContestStats, IGeoTrack, ISuperTrain, IFormArgument, ITrainerMemories, IAffection, IGroundTile
 {
-    private static readonly ushort[] Unused =
+    public override ReadOnlySpan<ushort> ExtraBytes => new ushort[]
     {
         0x36, 0x37, // Unused Ribbons
         0x58, 0x59, 0x73, 0x90, 0x91, 0x9E, 0x9F, 0xA0, 0xA1, 0xA7, 0xAA, 0xAB, 0xAC, 0xAD, 0xC8, 0xC9, 0xD7, 0xE4, 0xE5, 0xE6, 0xE7,
     };
 
-    public override IReadOnlyList<ushort> ExtraBytes => Unused;
     public override EntityContext Context => EntityContext.Gen6;
-    public override PersonalInfo PersonalInfo => PersonalTable.AO.GetFormEntry(Species, Form);
+    public override PersonalInfo6AO PersonalInfo => PersonalTable.AO.GetFormEntry(Species, Form);
 
     public PK6() : base(PokeCrypto.SIZE_6PARTY) { }
     public PK6(byte[] data) : base(DecryptParty(data)) { }
@@ -28,7 +27,7 @@ public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
         return data;
     }
 
-    public override PKM Clone() => new PK6((byte[])Data.Clone());
+    public override PK6 Clone() => new((byte[])Data.Clone());
 
     // Structure
     #region Block A
@@ -62,16 +61,22 @@ public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
         set => WriteUInt16LittleEndian(Data.AsSpan(0x0A), (ushort)value);
     }
 
-    public override int TID
+    public override uint ID32
     {
-        get => ReadUInt16LittleEndian(Data.AsSpan(0x0C));
-        set => WriteUInt16LittleEndian(Data.AsSpan(0x0C), (ushort)value);
+        get => ReadUInt32LittleEndian(Data.AsSpan(0x0C));
+        set => WriteUInt32LittleEndian(Data.AsSpan(0x0C), value);
     }
 
-    public override int SID
+    public override ushort TID16
+    {
+        get => ReadUInt16LittleEndian(Data.AsSpan(0x0C));
+        set => WriteUInt16LittleEndian(Data.AsSpan(0x0C), value);
+    }
+
+    public override ushort SID16
     {
         get => ReadUInt16LittleEndian(Data.AsSpan(0x0E));
-        set => WriteUInt16LittleEndian(Data.AsSpan(0x0E), (ushort)value);
+        set => WriteUInt16LittleEndian(Data.AsSpan(0x0E), value);
     }
 
     public override uint EXP
@@ -215,12 +220,14 @@ public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public bool Dist8 { get => (DistByte & (1 << 7)) == 1 << 7; set => DistByte = (byte)((DistByte & ~(1 << 7)) | (value ? 1 << 7 : 0)); }
     public uint FormArgument { get => ReadUInt32LittleEndian(Data.AsSpan(0x3C)); set => WriteUInt32LittleEndian(Data.AsSpan(0x3C), value); }
     public byte FormArgumentMaximum { get => (byte)FormArgument; set => FormArgument = value & 0xFFu; }
+
+    public int RibbonCount => BitOperations.PopCount(ReadUInt64LittleEndian(Data.AsSpan(0x30)) & 0b00000000_00000000__00111111_11111111__11111111_11111111__11111111_11111111);
     #endregion
     #region Block B
     public override string Nickname
     {
         get => StringConverter6.GetString(Nickname_Trash);
-        set => StringConverter6.SetString(Nickname_Trash, value.AsSpan(), 12, StringConverterOption.None);
+        set => StringConverter6.SetString(Nickname_Trash, value, 12, StringConverterOption.None);
     }
 
     public override ushort Move1
@@ -283,7 +290,7 @@ public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public bool SecretSuperTrainingUnlocked { get => (Data[0x72] & 1) == 1; set => Data[0x72] = (byte)((Data[0x72] & ~1) | (value ? 1 : 0)); }
     public bool SecretSuperTrainingComplete { get => (Data[0x72] & 2) == 2; set => Data[0x72] = (byte)((Data[0x72] & ~2) | (value ? 2 : 0)); }
     // 0x73 Unused
-    private uint IV32 { get => ReadUInt32LittleEndian(Data.AsSpan(0x74)); set => WriteUInt32LittleEndian(Data.AsSpan(0x74), value); }
+    protected override uint IV32 { get => ReadUInt32LittleEndian(Data.AsSpan(0x74)); set => WriteUInt32LittleEndian(Data.AsSpan(0x74), value); }
     public override int IV_HP { get => (int)(IV32 >> 00) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 00)) | ((value > 31 ? 31u : (uint)value) << 00); }
     public override int IV_ATK { get => (int)(IV32 >> 05) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 05)) | ((value > 31 ? 31u : (uint)value) << 05); }
     public override int IV_DEF { get => (int)(IV32 >> 10) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 10)) | ((value > 31 ? 31u : (uint)value) << 10); }
@@ -297,7 +304,7 @@ public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public override string HT_Name
     {
         get => StringConverter6.GetString(HT_Trash);
-        set => StringConverter6.SetString(HT_Trash, value.AsSpan(), 12, StringConverterOption.None);
+        set => StringConverter6.SetString(HT_Trash, value, 12, StringConverterOption.None);
     }
     public override int HT_Gender { get => Data[0x92]; set => Data[0x92] = (byte)value; }
     public override int CurrentHandler { get => Data[0x93]; set => Data[0x93] = (byte)value; }
@@ -333,7 +340,7 @@ public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public override string OT_Name
     {
         get => StringConverter6.GetString(OT_Trash);
-        set => StringConverter6.SetString(OT_Trash, value.AsSpan(), 12, StringConverterOption.None);
+        set => StringConverter6.SetString(OT_Trash, value, 12, StringConverterOption.None);
     }
     public override int OT_Friendship { get => Data[0xCA]; set => Data[0xCA] = (byte)value; }
     public byte OT_Affection { get => Data[0xCB]; set => Data[0xCB] = value; }
@@ -374,23 +381,8 @@ public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public override int Stat_SPD { get => ReadUInt16LittleEndian(Data.AsSpan(0xFC)); set => WriteUInt16LittleEndian(Data.AsSpan(0xFC), (ushort)value); }
     #endregion
 
-    public int SuperTrainingMedalCount(int maxCount = 30)
-    {
-        uint value = SuperTrainBitFlags >> 2;
-#if NET6_0_OR_GREATER
-        return System.Numerics.BitOperations.PopCount(value);
-#else
-        int TrainCount = 0;
-        for (int i = 0; i < maxCount; i++)
-        {
-            if ((value & 1) != 0)
-                TrainCount++;
-            value >>= 1;
-        }
-
-        return TrainCount;
-#endif
-    }
+    private const int MedalCount = 30;
+    public int SuperTrainingMedalCount(int lowBitCount = MedalCount) => BitOperations.PopCount((SuperTrainBitFlags >> 2) & (uint.MaxValue >> (MedalCount - lowBitCount)));
 
     public bool IsUntradedEvent6 => Geo1_Country == 0 && Geo1_Region == 0 && Met_Location / 10000 == 4 && Gen6;
 
@@ -421,7 +413,7 @@ public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     protected override bool TradeOT(ITrainerInfo tr)
     {
         // Check to see if the OT matches the SAV's OT info.
-        if (!(tr.TID == TID && tr.SID == SID && tr.Gender == OT_Gender && tr.OT == OT_Name))
+        if (!(tr.ID32 == ID32 && tr.Gender == OT_Gender && tr.OT == OT_Name))
             return false;
 
         CurrentHandler = 0;
@@ -515,7 +507,7 @@ public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
         span[0xAA..0xB0].Clear(); /* Unused/Amie Fullness & Enjoyment. */
         span[0xE4..0xE8].Clear(); /* Unused. */
         pk7.Data[0x72] &= 0xFC; /* Clear lower two bits of Super training flags. */
-        pk7.Data[0xDE] = 0; /* Gen IV encounter type. */
+        pk7.Data[0xDE] = 0; /* Gen4 encounter type. */
 
         // Copy Form Argument data for Furfrou and Hoopa, since we're nice.
         pk7.FormArgumentRemain = FormArgumentRemain;

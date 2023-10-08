@@ -29,9 +29,11 @@ internal static class LearnVerifierEgg
         {
             VerifyMovesInitial(result, current, x);
         }
-        else
+        else if (enc.Version is not (GameVersion.Any or >= GameVersion.Unknown))
         {
-            ReadOnlySpan<ushort> initial = GameData.GetLearnset(enc.Version, enc.Species, enc.Form).GetBaseEggMoves(enc.LevelMin);
+            var ls = GameData.GetLearnSource(enc.Version);
+            var learn = ls.GetLearnset(enc.Species, enc.Form);
+            var initial = learn.GetBaseEggMoves(enc.LevelMin);
             VerifyMovesInitial(result, current, initial);
         }
     }

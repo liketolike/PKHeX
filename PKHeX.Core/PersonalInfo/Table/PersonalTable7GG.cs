@@ -9,8 +9,8 @@ public sealed class PersonalTable7GG : IPersonalTable, IPersonalTable<PersonalIn
 {
     private readonly PersonalInfo7GG[] Table;
     private const int SIZE = PersonalInfo7GG.SIZE;
-    private const int MaxSpecies = Legal.MaxSpeciesID_7b;
-    public int MaxSpeciesID => MaxSpecies;
+    private const ushort MaxSpecies = Legal.MaxSpeciesID_7b;
+    public ushort MaxSpeciesID => MaxSpecies;
 
     public PersonalTable7GG(ReadOnlySpan<byte> data)
     {
@@ -29,12 +29,12 @@ public sealed class PersonalTable7GG : IPersonalTable, IPersonalTable<PersonalIn
 
     public int GetFormIndex(ushort species, byte form)
     {
-        if ((uint)species <= MaxSpecies)
+        if (species <= MaxSpecies)
             return Table[species].FormIndex(species, form);
         return 0;
     }
 
-    public bool IsSpeciesInGame(ushort species) => (uint)species is <= Legal.MaxSpeciesID_1 or (int)Species.Meltan or (int)Species.Melmetal;
+    public bool IsSpeciesInGame(ushort species) => species is <= Legal.MaxSpeciesID_1 or (int)Species.Meltan or (int)Species.Melmetal;
     public bool IsPresentInGame(ushort species, byte form)
     {
         if (!IsSpeciesInGame(species))

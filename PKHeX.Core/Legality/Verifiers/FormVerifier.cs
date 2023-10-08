@@ -10,6 +10,7 @@ namespace PKHeX.Core;
 public sealed class FormVerifier : Verifier
 {
     protected override CheckIdentifier Identifier => CheckIdentifier.Form;
+    private static readonly FormArgumentVerifier FormArg = new();
 
     public override void Verify(LegalityAnalysis data)
     {
@@ -19,8 +20,7 @@ public sealed class FormVerifier : Verifier
         var result = VerifyForm(data);
         data.AddLine(result);
 
-        if (pk is IFormArgument f)
-            data.AddLine(VerifyFormArgument(data, f));
+        FormArg.Verify(data);
     }
 
     private CheckResult VALID => GetValid(LFormValid);
@@ -70,12 +70,16 @@ public sealed class FormVerifier : Verifier
                 return GetInvalid(string.Format(LFormInvalidExpect_0, EntityPID.GetUnownForm3(pk.EncryptionConstant)));
             case Dialga or Palkia or Giratina or Arceus when form > 0 && pk is PA8: // can change forms with key items
                 break;
-            case Giratina when form == 1 ^ pk.HeldItem == 112: // Giratina, Origin form only with Griseous Orb
+
+            case Dialga   when pk.Format >= 9 && ((form == 1) != (pk.HeldItem == 1777)): // Origin Forme Dialga with Adamant Crystal
+            case Palkia   when pk.Format >= 9 && ((form == 1) != (pk.HeldItem == 1778)): // Origin Forme Palkia with Lustrous Globe
+            case Giratina when pk.Format >= 9 && ((form == 1) != (pk.HeldItem == 1779)): // Origin Forme Giratina with Griseous Core
+            case Giratina when pk.Format <= 8 && ((form == 1) != (pk.HeldItem == 0112)): // Origin Forme Giratina with Griseous Orb
                 return GetInvalid(LFormItemInvalid);
 
             case Arceus:
             {
-                int arceus = GetArceusFormFromHeldItem(pk.HeldItem, pk.Format);
+                var arceus = GetArceusFormFromHeldItem(pk.HeldItem, pk.Format);
                 return arceus != form ? GetInvalid(LFormItemInvalid) : GetValid(LFormItem);
             }
             case Keldeo when enc.Generation != 5 || pk.Format >= 8:
@@ -89,7 +93,7 @@ public sealed class FormVerifier : Verifier
                 break;
             case Genesect:
             {
-                int genesect = GetGenesectFormFromHeldItem(pk.HeldItem);
+                var genesect = GetGenesectFormFromHeldItem(pk.HeldItem);
                 return genesect != form ? GetInvalid(LFormItemInvalid) : GetValid(LFormItem);
             }
             case Greninja:
@@ -99,6 +103,12 @@ public sealed class FormVerifier : Verifier
                     return GetInvalid(string.Format(LFormInvalidRange, 0, form));
                 break;
 
+            case Scatterbug or Spewpa or Vivillon when GameVersion.SV.Contains(enc.Version):
+                if (form > 18 && enc.Form != form) // Pokéball
+                    return GetInvalid(LFormVivillonEventPre);
+                if (form != 18 && enc is EncounterEgg) // Fancy
+                    return GetInvalid(LFormVivillonNonNative);
+                break;
             case Scatterbug or Spewpa:
                 if (form > Vivillon3DS.MaxWildFormID) // Fancy & Pokéball
                     return GetInvalid(LFormVivillonEventPre);
@@ -133,7 +143,7 @@ public sealed class FormVerifier : Verifier
 
             case Silvally:
             {
-                int silvally = GetSilvallyFormFromHeldItem(pk.HeldItem);
+                var silvally = GetSilvallyFormFromHeldItem(pk.HeldItem);
                 return silvally != form ? GetInvalid(LFormItemInvalid) : GetValid(LFormItem);
             }
 
@@ -150,6 +160,10 @@ public sealed class FormVerifier : Verifier
                     return GetInvalid(LFormInvalidNature);
                 break;
             }
+
+            // Ogerpon's form changes depending on its held mask
+            case Ogerpon when (form & 3) != GetOgerponFormFromHeldItem(pk.HeldItem):
+                return GetInvalid(LFormItemInvalid);
 
             // Impossible Egg forms
             case Rotom when pk.IsEgg && form != 0:
@@ -169,40 +183,11 @@ public sealed class FormVerifier : Verifier
         if (FormInfo.IsBattleOnlyForm(species, form, format))
             return GetInvalid(LFormBattle);
 
-        if (form == 0)
-            return VALID;
-
-        // everything below here is not Form 0, so it has a form.
-        if (format >= 7 && Info.Generation < 7)
-        {
-            if (species == 25 || Legal.AlolanOriginForms.Contains(species) || Legal.AlolanVariantEvolutions12.Contains(enc.Species))
-                return GetInvalid(LFormInvalidGame);
-        }
-        if (format >= 8 && Info.Generation < 8)
-        {
-            var orig = enc.Species;
-            if (Legal.GalarOriginForms.Contains(species) || Legal.GalarVariantFormEvolutions.Contains(orig))
-            {
-                if (species == (int)Meowth && enc.Form != 2)
-                {
-                    // We're okay here. There's also Alolan Meowth...
-                }
-                else if (((Species)orig is MrMime or MimeJr) && pk.CurrentLevel > enc.LevelMin && Info.Generation >= 4)
-                {
-                    // We're okay with a Mime Jr. that has evolved via level up.
-                }
-                else if (enc.Version != GameVersion.GO)
-                {
-                    return GetInvalid(LFormInvalidGame);
-                }
-            }
-        }
-
         return VALID;
     }
 
-    private static readonly ushort[] Arceus_PlateIDs = { 303, 306, 304, 305, 309, 308, 310, 313, 298, 299, 301, 300, 307, 302, 311, 312, 644 };
-    private static readonly ushort[] Arceus_ZCrystal = { 782, 785, 783, 784, 788, 787, 789, 792, 777, 778, 780, 779, 786, 781, 790, 791, 793 };
+    private static ReadOnlySpan<ushort> Arceus_PlateIDs => new ushort[] { 303, 306, 304, 305, 309, 308, 310, 313, 298, 299, 301, 300, 307, 302, 311, 312, 644 };
+    private static ReadOnlySpan<ushort> Arceus_ZCrystal => new ushort[] { 782, 785, 783, 784, 788, 787, 789, 792, 777, 778, 780, 779, 786, 781, 790, 791, 793 };
 
     public static byte GetArceusFormFromHeldItem(int item, int format) => item switch
     {
@@ -213,12 +198,12 @@ public sealed class FormVerifier : Verifier
 
     private static byte GetArceusFormFromZCrystal(int item)
     {
-        return (byte)(Array.IndexOf(Arceus_ZCrystal, (ushort)item) + 1);
+        return (byte)(Arceus_ZCrystal.IndexOf((ushort)item) + 1);
     }
 
     private static byte GetArceusFormFromPlate(int item, int format)
     {
-        byte form = (byte)(Array.IndexOf(Arceus_PlateIDs, (ushort)item) + 1);
+        byte form = (byte)(Arceus_PlateIDs.IndexOf((ushort)item) + 1);
         if (format != 4) // No need to consider Curse type
             return form;
         if (form < 9)
@@ -240,161 +225,11 @@ public sealed class FormVerifier : Verifier
         return 0;
     }
 
-    private CheckResult VerifyFormArgument(LegalityAnalysis data, IFormArgument f)
+    private static byte GetOgerponFormFromHeldItem(int item) => item switch
     {
-        var pk = data.Entity;
-        var enc = data.EncounterMatch;
-        var arg = f.FormArgument;
-
-        var unusedMask = pk.Format == 6 ? 0xFFFF_FF00 : 0xFF00_0000;
-        if ((arg & unusedMask) != 0)
-            return GetInvalid(LFormArgumentHigh);
-
-        return (Species)pk.Species switch
-        {
-            // Transfer Edge Cases -- Bank wipes the form but keeps old FormArgument value.
-            Furfrou when pk.Format == 7 && pk.Form == 0 &&
-                         ((enc.Generation == 6 && f.FormArgument <= byte.MaxValue) || IsFormArgumentDayCounterValid(f, 5, true))
-                => GetValid(LFormArgumentValid),
-
-            Furfrou when pk.Form != 0 => !IsFormArgumentDayCounterValid(f, 5, true) ? GetInvalid(LFormArgumentInvalid) :GetValid(LFormArgumentValid),
-            Hoopa when pk.Form == 1 => !IsFormArgumentDayCounterValid(f, 3) ? GetInvalid(LFormArgumentInvalid) : GetValid(LFormArgumentValid),
-            Yamask when pk.Form == 1 => arg switch
-            {
-                not 0 when pk.IsEgg => GetInvalid(LFormArgumentNotAllowed),
-                > 9_999 => GetInvalid(LFormArgumentHigh),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Runerigus when enc.Species == (int)Runerigus => arg switch
-            {
-                not 0 => GetInvalid(LFormArgumentNotAllowed),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Runerigus => arg switch // From Yamask-1
-            {
-                < 49 => GetInvalid(LFormArgumentLow),
-                > 9_999 => GetInvalid(LFormArgumentHigh),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Alcremie when enc.Species == (int)Alcremie => arg switch
-            {
-                not 0 => GetInvalid(LFormArgumentNotAllowed),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Alcremie => arg switch // From Milcery
-            {
-                > (uint) AlcremieDecoration.Ribbon => GetInvalid(LFormArgumentHigh),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Overqwil when enc.Species == (int)Overqwil => arg switch
-            {
-                not 0 => GetInvalid(LFormArgumentNotAllowed),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Wyrdeer when enc.Species == (int)Wyrdeer => arg switch
-            {
-                not 0 => GetInvalid(LFormArgumentNotAllowed),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Basculegion when enc.Species == (int)Basculegion => arg switch
-            {
-                not 0 => GetInvalid(LFormArgumentNotAllowed),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Basculin when pk.Form is 2 => arg switch
-            {
-                not 0 when pk.IsEgg => GetInvalid(LFormArgumentNotAllowed),
-                > 9_999 => GetInvalid(LFormArgumentHigh),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Qwilfish when pk.Form is 1 => arg switch
-            {
-                not 0 when pk.IsEgg => GetInvalid(LFormArgumentNotAllowed),
-                not 0 when pk.CurrentLevel < 25 => GetInvalid(LFormArgumentHigh),
-                > 9_999 => GetInvalid(LFormArgumentHigh),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Stantler when pk is PA8 || data.Info.EvoChainsAllGens.HasVisitedPLA => arg switch
-            {
-                not 0 when pk.IsEgg => GetInvalid(LFormArgumentNotAllowed),
-                not 0 when pk.CurrentLevel < 31 => GetInvalid(LFormArgumentHigh),
-                > 9_999 => GetInvalid(LFormArgumentHigh),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Wyrdeer => arg switch // From Stantler
-            {
-                < 20 => GetInvalid(LFormArgumentLow),
-                > 9_999 => GetInvalid(LFormArgumentHigh),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Overqwil => arg switch // From Qwilfish-1
-            {
-                < 20 => GetInvalid(LFormArgumentLow),
-                > 9_999 => GetInvalid(LFormArgumentHigh),
-                _ => GetValid(LFormArgumentValid),
-            },
-            Basculegion => arg switch // From Basculin-2
-            {
-                < 294 => GetInvalid(LFormArgumentLow),
-                > 9_999 => GetInvalid(LFormArgumentHigh),
-                _ => GetValid(LFormArgumentValid),
-            },
-            _ => VerifyFormArgumentNone(pk, f),
-        };
-    }
-
-    private CheckResult VerifyFormArgumentNone(PKM pk, IFormArgument f)
-    {
-        if (pk is not PK6 pk6)
-        {
-            if (f.FormArgument != 0)
-            {
-                if (pk.Species == (int)Furfrou && pk.Form == 0 && (f.FormArgument & ~0xFF_00_00u) == 0)
-                    return GetValid(LFormArgumentValid);
-                return GetInvalid(LFormArgumentNotAllowed);
-            }
-            return GetValid(LFormArgumentValid);
-        }
-
-        if (f.FormArgument != 0)
-        {
-            if (pk.Species == (int)Furfrou && pk.Form == 0 && (f.FormArgument & ~0xFFu) == 0)
-                return GetValid(LFormArgumentValid);
-            return GetInvalid(LFormArgumentNotAllowed);
-        }
-
-        // Stored separately from main form argument value
-        if (pk6.FormArgumentRemain != 0)
-            return GetInvalid(LFormArgumentNotAllowed);
-        if (pk6.FormArgumentElapsed != 0)
-            return GetInvalid(LFormArgumentNotAllowed);
-
-        return GetValid(LFormArgumentValid);
-    }
-
-    private static bool IsFormArgumentDayCounterValid(IFormArgument f, uint maxSeed, bool canRefresh = false)
-    {
-        var remain = f.FormArgumentRemain;
-        var elapsed = f.FormArgumentElapsed;
-        var maxElapsed = f.FormArgumentMaximum;
-        if (canRefresh)
-        {
-            if (maxElapsed < elapsed)
-                return false;
-
-            if (remain + elapsed < maxSeed)
-                return false;
-        }
-        else
-        {
-            if (maxElapsed != 0)
-                return false;
-
-            if (remain + elapsed != maxSeed)
-                return false;
-        }
-        if (remain > maxSeed)
-            return false;
-        return remain != 0;
-    }
+        2407 => 1, // Wellspring Mask
+        2408 => 2, // Hearthflame Mask
+        2406 => 3, // Cornerstone Mask
+        _ => 0, // Teal Mask
+    };
 }

@@ -78,6 +78,20 @@ public partial class SAV_Database : Form
             slot.ContextMenuStrip = mnu;
             if (Main.Settings.Hover.HoverSlotShowText)
                 slot.MouseEnter += (o, args) => ShowHoverTextForSlot(slot, args);
+            slot.Enter += (sender, e) =>
+            {
+                if (sender is not PictureBox pb)
+                    return;
+                var index = Array.IndexOf(PKXBOXES, sender);
+                if (index < 0)
+                    return;
+                index += (SCR_Box.Value * RES_MIN);
+                if (index >= Results.Count)
+                    return;
+
+                var pk = Results[index];
+                pb.AccessibleDescription = ShowdownParsing.GetLocalizedPreviewText(pk.Entity, Main.CurrentLanguage);
+            };
         }
 
         Counter = L_Count.Text;
@@ -263,6 +277,7 @@ public partial class SAV_Database : Form
 
         var versions = new List<ComboItem>(GameInfo.VersionDataSource);
         versions.Insert(0, comboAny);
+        versions.RemoveAt(versions.Count - 1); // None
         CB_GameOrigin.DataSource = versions;
 
         string[] hptypes = new string[GameInfo.Strings.types.Length - 2];
@@ -389,10 +404,13 @@ public partial class SAV_Database : Form
 
         if (Main.Settings.EntityDb.FilterUnavailableSpecies)
         {
+            static bool IsPresentInGameSV(ISpeciesForm pk) => pk is PK9 || PersonalTable.SV.IsPresentInGame(pk.Species, pk.Form);
             static bool IsPresentInGameSWSH(ISpeciesForm pk) => pk is PK8 || PersonalTable.SWSH.IsPresentInGame(pk.Species, pk.Form);
             static bool IsPresentInGameBDSP(ISpeciesForm pk) => pk is PB8 || PersonalTable.BDSP.IsPresentInGame(pk.Species, pk.Form);
-            static bool IsPresentInGamePLA (ISpeciesForm pk) => pk is PA8 || PersonalTable.LA  .IsPresentInGame(pk.Species, pk.Form);
-            if (sav is SAV8SWSH)
+            static bool IsPresentInGamePLA(ISpeciesForm pk) => pk is PA8 || PersonalTable.LA.IsPresentInGame(pk.Species, pk.Form);
+            if (sav is SAV9SV)
+                result.RemoveAll(z => !IsPresentInGameSV(z.Entity));
+            else if (sav is SAV8SWSH)
                 result.RemoveAll(z => !IsPresentInGameSWSH(z.Entity));
             else if (sav is SAV8BS)
                 result.RemoveAll(z => !IsPresentInGameBDSP(z.Entity));
@@ -415,11 +433,38 @@ public partial class SAV_Database : Form
         var sav = SaveUtil.GetVariantSAV(file);
         if (sav == null)
         {
-            Debug.WriteLine("Unable to load SaveFile: " + file);
+            if (FileUtil.TryGetMemoryCard(file, out var mc))
+                TryAddPKMsFromMemoryCard(dbTemp, mc, file);
+            else
+                Debug.WriteLine($"Unable to load SaveFile: {file}");
             return;
         }
 
         SlotInfoLoader.AddFromSaveFile(sav, dbTemp);
+    }
+
+    private static void TryAddPKMsFromMemoryCard(ConcurrentBag<SlotCache> dbTemp, SAV3GCMemoryCard mc, string file)
+    {
+        var state = mc.GetMemoryCardState();
+        if (state == GCMemoryCardState.Invalid)
+            return;
+
+        if (mc.HasCOLO)
+            TryAdd(dbTemp, mc, file, GameVersion.COLO);
+        if (mc.HasXD)
+            TryAdd(dbTemp, mc, file, GameVersion.XD);
+        if (mc.HasRSBOX)
+            TryAdd(dbTemp, mc, file, GameVersion.RSBOX);
+
+        static void TryAdd(ConcurrentBag<SlotCache> dbTemp, SAV3GCMemoryCard mc, string path, GameVersion game)
+        {
+            mc.SelectSaveGame(game);
+            var sav = SaveUtil.GetVariantSAV(mc);
+            if (sav is null)
+                return;
+            sav.Metadata.SetExtraInfo(path);
+            SlotInfoLoader.AddFromSaveFile(sav, dbTemp);
+        }
     }
 
     // IO Usage
@@ -498,7 +543,7 @@ public partial class SAV_Database : Form
             Nature = WinFormsUtil.GetIndex(CB_Nature),
             Item = WinFormsUtil.GetIndex(CB_HeldItem),
 
-            BatchInstructions = RTB_Instructions.Lines,
+            BatchInstructions = RTB_Instructions.Text,
 
             Level = int.TryParse(TB_Level.Text, out var lvl) ? lvl : null,
             SearchLevel = (SearchComparison)CB_Level.SelectedIndex,
@@ -601,7 +646,7 @@ public partial class SAV_Database : Form
             }
             return;
         }
-        int begin = start*RES_MIN;
+        int begin = start * RES_MIN;
         int end = Math.Min(RES_MAX, Results.Count - begin);
         for (int i = 0; i < end; i++)
             PKXBOXES[i].Image = Results[i + begin].Entity.Sprite(SAV, -1, -1, true);
@@ -732,9 +777,11 @@ public partial class SAV_Database : Form
         if (s.Length == 0)
         { WinFormsUtil.Alert(MsgBEPropertyInvalid); return; }
 
-        if (RTB_Instructions.Lines.Length != 0 && RTB_Instructions.Lines[^1].Length > 0)
-            s = Environment.NewLine + s;
-
-        RTB_Instructions.AppendText(s);
+        // If we already have text, add a new line (except if the last line is blank).
+        var tb = RTB_Instructions;
+        var batchText = tb.Text;
+        if (batchText.Length > 0 && !batchText.EndsWith('\n'))
+            tb.AppendText(Environment.NewLine);
+        tb.AppendText(s);
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using static PKHeX.Core.NatureAmpRequest;
 
 namespace PKHeX.Core;
@@ -25,7 +25,7 @@ public static class NatureAmp
         return GetNewNature(type, statIndex, up, dn);
     }
 
-    /// <inheritdoc cref="GetNewNature(PKHeX.Core.NatureAmpRequest,int,int)"/>
+    /// <inheritdoc cref="GetNewNature(NatureAmpRequest,int,int)"/>
     public static int GetNewNature(NatureAmpRequest type, int statIndex, int up, int dn)
     {
         // 
@@ -65,8 +65,8 @@ public static class NatureAmp
     /// </summary>
     public static (int up, int dn) GetNatureModification(int nature)
     {
-        var up = (nature / 5) + 1;
-        var dn = (nature % 5) + 1;
+        var up = (nature / 5);
+        var dn = (nature % 5);
         return (up, dn);
     }
 
@@ -99,8 +99,11 @@ public static class NatureAmp
         var (up, dn) = GetNatureModification(nature);
         if (IsNeutralOrInvalid(nature, up, dn))
             return;
-        stats[up] *= 11; stats[up] /= 10;
-        stats[dn] *= 9;  stats[dn] /= 10;
+
+        ref var upStat = ref stats[up + 1];
+        ref var dnStat = ref stats[dn + 1];
+        upStat = (ushort)((upStat * 11) / 10);
+        dnStat = (ushort)((dnStat * 9) / 10);
     }
 }
 

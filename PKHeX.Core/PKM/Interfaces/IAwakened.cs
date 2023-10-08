@@ -16,8 +16,13 @@ public interface IAwakened
     byte AV_SPD { get; set; }
 }
 
+/// <summary>
+/// Logic for interacting with LGP/E Awakening values.
+/// </summary>
 public static class AwakeningUtil
 {
+    public const byte AwakeningMax = 200;
+
     /// <summary>
     /// Sums all values.
     /// </summary>
@@ -34,7 +39,7 @@ public static class AwakeningUtil
     /// Sets all values to the maximum value.
     /// </summary>
     /// <param name="pk">Data to set values for</param>
-    public static void AwakeningMax(this IAwakened pk) => pk.AwakeningSetAllTo(Legal.AwakeningMax);
+    public static void AwakeningMaximize(this IAwakened pk) => pk.AwakeningSetAllTo(AwakeningMax);
 
     /// <summary>
     /// Sets all values to the specified value.
@@ -44,34 +49,48 @@ public static class AwakeningUtil
     public static void AwakeningSetAllTo(this IAwakened pk, byte value) => pk.AV_HP = pk.AV_ATK = pk.AV_DEF = pk.AV_SPE = pk.AV_SPA = pk.AV_SPD = value;
 
     /// <summary>
-    /// Sets all values to the specified value.
+    /// Sets all values to the bare minimum legal value.
     /// </summary>
     /// <param name="pk">Data to set values for</param>
-    /// <param name="min">Minimum value to set</param>
-    /// <param name="max">Maximum value to set</param>
-    public static void AwakeningSetRandom(this IAwakened pk, byte min = 0, int max = Legal.AwakeningMax)
+    public static void AwakeningMinimum(this IAwakened pk)
     {
         if (pk is not PB7 pb7)
             return;
 
         Span<byte> result = stackalloc byte[6];
-        GetExpectedMinimumAVs(result, pb7);
+        SetExpectedMinimumAVs(result, pb7);
+        AwakeningSetVisual(pb7, result);
+    }
+
+    /// <summary>
+    /// Sets all values to the specified value.
+    /// </summary>
+    /// <param name="pk">Data to set values for</param>
+    /// <param name="min">Minimum value to set</param>
+    /// <param name="max">Maximum value to set</param>
+    public static void AwakeningSetRandom(this IAwakened pk, byte min = 0, int max = AwakeningMax)
+    {
+        if (pk is not PB7 pb7)
+            return;
+
+        Span<byte> result = stackalloc byte[6];
+        SetExpectedMinimumAVs(result, pb7);
 
         var rnd = Util.Rand;
-        for (int i = 0; i < 6; i++)
+        foreach (ref var av in result)
         {
-            var realMin = Math.Max(min, result[i]);
-            var realMax = Math.Min(result[i], max);
-            result[i] = (byte)rnd.Next(realMin, realMax + 1);
+            var realMin = Math.Max(min, av);
+            var realMax = Math.Max(av, max);
+            av = (byte)rnd.Next(realMin, realMax + 1);
         }
         AwakeningSetVisual(pb7, result);
     }
 
     /// <summary>
-    /// Sets the awakening values according to their displayed order.
+    /// Gets the awakening values according to their displayed order.
     /// </summary>
     /// <param name="pk">Data to set values for</param>
-    /// <param name="value"></param>
+    /// <param name="value">Value storage result</param>
     public static void AwakeningGetVisual(IAwakened pk, Span<byte> value)
     {
         value[0] = pk.AV_HP;
@@ -86,7 +105,7 @@ public static class AwakeningUtil
     /// Sets the awakening values according to their displayed order.
     /// </summary>
     /// <param name="pk">Data to set values for</param>
-    /// <param name="value"></param>
+    /// <param name="value">Value storage to set from</param>
     public static void AwakeningSetVisual(IAwakened pk, ReadOnlySpan<byte> value)
     {
         pk.AV_HP = value[0];
@@ -103,17 +122,17 @@ public static class AwakeningUtil
     /// <param name="pk">Data to check</param>
     public static bool AwakeningAllValid(this IAwakened pk)
     {
-        if (pk.AV_HP > Legal.AwakeningMax)
+        if (pk.AV_HP > AwakeningMax)
             return false;
-        if (pk.AV_ATK > Legal.AwakeningMax)
+        if (pk.AV_ATK > AwakeningMax)
             return false;
-        if (pk.AV_DEF > Legal.AwakeningMax)
+        if (pk.AV_DEF > AwakeningMax)
             return false;
-        if (pk.AV_SPE > Legal.AwakeningMax)
+        if (pk.AV_SPE > AwakeningMax)
             return false;
-        if (pk.AV_SPA > Legal.AwakeningMax)
+        if (pk.AV_SPA > AwakeningMax)
             return false;
-        if (pk.AV_SPD > Legal.AwakeningMax)
+        if (pk.AV_SPD > AwakeningMax)
             return false;
         return true;
     }
@@ -174,13 +193,13 @@ public static class AwakeningUtil
     public static void SetSuggestedAwakenedValues(this IAwakened a, PKM pk)
     {
         Span<byte> result = stackalloc byte[6];
-        GetExpectedMinimumAVs(result, (PB7)a);
-        a.AV_HP  = Legal.AwakeningMax;
-        a.AV_ATK = pk.IV_ATK == 0 ? result[1] : Legal.AwakeningMax;
-        a.AV_DEF = Legal.AwakeningMax;
-        a.AV_SPA = Legal.AwakeningMax;
-        a.AV_SPD = Legal.AwakeningMax;
-        a.AV_SPE = pk.IV_SPE == 0 ? result[5] : Legal.AwakeningMax;
+        SetExpectedMinimumAVs(result, (PB7)a);
+        a.AV_HP  = AwakeningMax;
+        a.AV_ATK = pk.IV_ATK == 0 ? result[1] : AwakeningMax;
+        a.AV_DEF = AwakeningMax;
+        a.AV_SPA = AwakeningMax;
+        a.AV_SPD = AwakeningMax;
+        a.AV_SPE = pk.IV_SPE == 0 ? result[5] : AwakeningMax;
     }
 
     public static bool IsAwakeningBelow(this IAwakened current, IAwakened initial) => !current.IsAwakeningAboveOrEqual(initial);
@@ -210,14 +229,14 @@ public static class AwakeningUtil
     /// </summary>
     /// <param name="result">Stat results</param>
     /// <param name="pk">Entity to check</param>
-    public static void GetExpectedMinimumAVs(Span<byte> result, PB7 pk)
+    public static void SetExpectedMinimumAVs(Span<byte> result, PB7 pk)
     {
         // GO Park transfers start with 2 AVs for all stats.
         // Every other encounter is either all 0, or can legally start at 0 (trades).
         if (pk.Version == (int)GameVersion.GO)
-            result.Fill(2);
+            result.Fill(GP1.InitialAV);
 
-        // Leveling up in-game applies 1 AV to a "random" index.
+        // Leveling up in-game adds 1 AV to a "random" index.
         var start = pk.Met_Level;
         var end = pk.CurrentLevel;
         if (start == end)

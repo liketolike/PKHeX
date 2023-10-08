@@ -20,7 +20,12 @@ public static class MoveApplicator
         pk.Move4_PPUps = GetPPUpCount(moves[3]);
 
         pk.SetMaximumPPCurrent(moves);
-        static int GetPPUpCount(ushort moveID) => moveID != 0 ? 3 : 0;
+        static int GetPPUpCount(ushort moveID)
+        {
+            if (Legal.IsPPUpAvailable(moveID))
+                return 3;
+            return 0;
+        }
     }
 
     /// <summary>
@@ -59,8 +64,6 @@ public static class MoveApplicator
         pk.SetMoves(moves);
         if (maxPP && Legal.IsPPUpAvailable(pk))
             pk.SetMaximumPPUps(moves);
-        else
-            pk.SetMaximumPPCurrent(moves);
         pk.FixMoves();
     }
 

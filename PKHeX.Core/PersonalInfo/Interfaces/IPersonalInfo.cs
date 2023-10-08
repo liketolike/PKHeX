@@ -13,10 +13,10 @@ public interface IPersonalInfo : IBaseStat, IEffortValueYield, IGenderDetail, IP
     /// <summary>
     /// Gender Ratio value determining if the entry is a fixed gender or bi-gendered.
     /// </summary>
-    int Gender { get; set; }
+    byte Gender { get; set; }
 
     /// <summary>
     /// Experience-Level Growth Rate type
     /// </summary>
-    int EXPGrowth { get; set; }
+    byte EXPGrowth { get; set; }
 }

@@ -77,6 +77,9 @@ public static class GameUtil
         SW or SH => SWSH,
         BD or SP => BDSP,
         PLA => PLA,
+
+        // Gen9
+        SL or VL => SV,
         _ => Invalid,
     };
 
@@ -95,6 +98,7 @@ public static class GameUtil
         6 => AS,
         7 => UM,
         8 => SH,
+        9 => VL,
         _ => Invalid,
     };
 
@@ -114,6 +118,7 @@ public static class GameUtil
         if (Gen7.Contains(game)) return 7;
         if (Gen7b.Contains(game)) return 7;
         if (Gen8.Contains(game)) return 8;
+        if (Gen9.Contains(game)) return 9;
         return -1;
     }
 
@@ -142,6 +147,7 @@ public static class GameUtil
         if (PLA == game) return Legal.MaxSpeciesID_8a;
         if (BDSP.Contains(game)) return Legal.MaxSpeciesID_8b;
         if (Gen8.Contains(game)) return Legal.MaxSpeciesID_8;
+        if (Gen9.Contains(game)) return Legal.MaxSpeciesID_9;
         return 0;
     }
 
@@ -203,6 +209,9 @@ public static class GameUtil
             SWSH => g2 is SW or SH,
             BDSP => g2 is BD or SP,
             Gen8 => SWSH.Contains(g2) || BDSP.Contains(g2) || PLA == g2,
+
+            SV => g2 is SL or VL,
+            Gen9 => SV.Contains(g2),
             _ => false,
         };
     }
@@ -229,14 +238,19 @@ public static class GameUtil
         var max = obj.MaxGameID;
         if (max == Legal.MaxGameID_7b) // edge case
             return new[] {GO, GP, GE};
-        if (max == Legal.MaxGameID_8)
-            max = Legal.MaxGameID_8a;
         var versions = GameVersions
             .Where(version => (GameVersion)obj.MinGameID <= version && version <= (GameVersion)max);
         if (generation < 0)
             return versions;
         if (max == Legal.MaxGameID_7 && generation == 7)
             versions = versions.Where(version => version != GO);
+
+        // HOME allows up-reach to Gen9
+        if (generation >= 8)
+            generation = 9;
         return versions.Where(version => version.GetGeneration() <= generation);
     }
+
+    public static GameVersion[] GetVersionsWithinRange(this GameVersion lump, GameVersion[] source) =>
+        Array.FindAll(source, z => lump.Contains(z));
 }

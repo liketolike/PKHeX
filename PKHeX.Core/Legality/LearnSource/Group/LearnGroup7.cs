@@ -9,6 +9,7 @@ public sealed class LearnGroup7 : ILearnGroup
 {
     public static readonly LearnGroup7 Instance = new();
     private const int Generation = 7;
+    public ushort MaxMoveID => Legal.MaxMoveID_7_USUM;
 
     public ILearnGroup? GetPrevious(PKM pk, EvolutionHistory history, IEncounterTemplate enc, LearnOption option) => enc.Generation switch
     {
@@ -23,12 +24,12 @@ public sealed class LearnGroup7 : ILearnGroup
     public bool Check(Span<MoveResult> result, ReadOnlySpan<ushort> current, PKM pk, EvolutionHistory history, IEncounterTemplate enc,
         MoveSourceType types = MoveSourceType.All, LearnOption option = LearnOption.Current)
     {
-        var mode = GetCheckMode(pk);
+        var mode = GetCheckMode(enc, pk);
         var evos = history.Gen7;
         for (var i = 0; i < evos.Length; i++)
             Check(result, current, pk, evos[i], i, types, option, mode);
 
-        if (option is not LearnOption.Current && types.HasFlagFast(MoveSourceType.Encounter) && enc is EncounterEgg { Generation: Generation } egg)
+        if (option.IsPast() && types.HasFlag(MoveSourceType.Encounter) && enc is EncounterEgg { Generation: Generation } egg)
             CheckEncounterMoves(result, current, egg);
 
         return MoveResult.AllParsed(result);
@@ -36,23 +37,9 @@ public sealed class LearnGroup7 : ILearnGroup
 
     private static void CheckEncounterMoves(Span<MoveResult> result, ReadOnlySpan<ushort> current, EncounterEgg egg)
     {
-        ReadOnlySpan<ushort> eggMoves, levelMoves;
-        if (egg.Version > GameVersion.Y) // OR/AS
-        {
-            var inst = LearnSource7USUM.Instance;
-            eggMoves = inst.GetEggMoves(egg.Species, egg.Form);
-            levelMoves = egg.CanInheritMoves
-                ? inst.GetLearnset(egg.Species, egg.Form).Moves
-                : ReadOnlySpan<ushort>.Empty;
-        }
-        else
-        {
-            var inst = LearnSource7SM.Instance;
-            eggMoves = inst.GetEggMoves(egg.Species, egg.Form);
-            levelMoves = egg.CanInheritMoves
-                ? inst.GetLearnset(egg.Species, egg.Form).Moves
-                : ReadOnlySpan<ushort>.Empty;
-        }
+        ILearnSource inst = egg.Version > GameVersion.MN ? LearnSource7USUM.Instance : LearnSource7SM.Instance;
+        var eggMoves = inst.GetEggMoves(egg.Species, egg.Form);
+        var levelMoves = inst.GetInheritMoves(egg.Species, egg.Form);
 
         for (var i = result.Length - 1; i >= 0; i--)
         {
@@ -68,10 +55,10 @@ public sealed class LearnGroup7 : ILearnGroup
         }
     }
 
-    private static CheckMode GetCheckMode(PKM pk)
+    private static CheckMode GetCheckMode(IEncounterTemplate enc, PKM pk)
     {
         // We can check if it has visited specific sources. We won't check the games it hasn't visited.
-        if (!pk.IsUntraded)
+        if (enc.Context != EntityContext.Gen7 || !pk.IsUntraded)
             return CheckMode.Both;
         if (pk.USUM)
             return CheckMode.USUM;
@@ -144,7 +131,7 @@ public sealed class LearnGroup7 : ILearnGroup
         }
     }
 
-    private static void CheckSingle<T>(Span<MoveResult> result, ReadOnlySpan<ushort> current, PKM pk, EvoCriteria evo, int stage, T game, MoveSourceType types, LearnOption option) where T : ILearnSource
+    private static void CheckSingle(Span<MoveResult> result, ReadOnlySpan<ushort> current, PKM pk, EvoCriteria evo, int stage, ILearnSource<PersonalInfo7> game, MoveSourceType types, LearnOption option)
     {
         var species = evo.Species;
         if (!game.TryGetPersonal(species, evo.Form, out var pi))
@@ -164,10 +151,10 @@ public sealed class LearnGroup7 : ILearnGroup
 
     public void GetAllMoves(Span<bool> result, PKM pk, EvolutionHistory history, IEncounterTemplate enc, MoveSourceType types = MoveSourceType.All, LearnOption option = LearnOption.Current)
     {
-        if (types.HasFlagFast(MoveSourceType.Encounter) && enc.Generation == Generation)
+        if (types.HasFlag(MoveSourceType.Encounter) && enc.Generation == Generation)
             FlagEncounterMoves(enc, result);
 
-        var mode = GetCheckMode(pk);
+        var mode = GetCheckMode(enc, pk);
         foreach (var evo in history.Gen7)
             GetAllMoves(result, pk, evo, types, option, mode);
     }
@@ -181,7 +168,7 @@ public sealed class LearnGroup7 : ILearnGroup
         }
 
         // Check all forms
-        var inst = LearnSource6AO.Instance;
+        var inst = LearnSource7USUM.Instance;
         if (!inst.TryGetPersonal(evo.Species, evo.Form, out var pi))
             return;
 

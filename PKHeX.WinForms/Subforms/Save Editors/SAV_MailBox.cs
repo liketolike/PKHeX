@@ -70,7 +70,7 @@ public partial class SAV_MailBox : Form
                 for (int i = 0; i < m.Length; i++)
                     m[i] = sav3.GetMail(i);
 
-                MailItemID = new[] {121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132};
+                MailItemID = new[] { 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132 };
                 PartyBoxCount = 6;
                 break;
             case SAV4 sav4:
@@ -82,7 +82,7 @@ public partial class SAV_MailBox : Form
                 var l4 = (Mail4)m[^1];
                 ResetVer = l4.AuthorVersion;
                 ResetLang = l4.AuthorLanguage;
-                MailItemID = new[] {137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148};
+                MailItemID = new[] { 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148 };
                 PartyBoxCount = p.Count;
                 break;
             case SAV5 sav5:
@@ -94,7 +94,7 @@ public partial class SAV_MailBox : Form
                 var l5 = (Mail5)m[^1];
                 ResetVer = l5.AuthorVersion;
                 ResetLang = l5.AuthorLanguage;
-                MailItemID = new[] {137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148};
+                MailItemID = new[] { 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148 };
                 PartyBoxCount = p.Count;
                 break;
         }
@@ -288,7 +288,7 @@ public partial class SAV_MailBox : Form
         }
         if (Gen == 3)
         {
-            mail.AppearPKM = SpeciesConverter.GetG3Species(species);
+            mail.AppearPKM = SpeciesConverter.GetInternal3(species);
             return;
         }
 
@@ -332,7 +332,7 @@ public partial class SAV_MailBox : Form
         // E: mail is not empty, but no pk refer to the mail. it should be empty, or someone refer to the mail.
         if (Gen == 3)
         {
-            int[] heldMailIDs = new int[p.Count];
+            Span<int> heldMailIDs = stackalloc int[p.Count];
             for (int i = 0; i < p.Count; i++)
             {
                 int h = ((PK3)p[i]).HeldMailID;
@@ -351,10 +351,10 @@ public partial class SAV_MailBox : Form
             }
             for (int i = 0; i < 6; i++)
             {
-                var index = i;
-                if (heldMailIDs.Count(v => v == index) > 1) //D
+                var count = heldMailIDs.Count(i);
+                if (count > 1) //D
                     ret.Add($"MailID{i} duplicated");
-                if (m[i].IsEmpty == false && heldMailIDs.All(v => v != index)) //E
+                if (m[i].IsEmpty == false && count == 0) //E
                     ret.Add($"MailID{i} not referred");
             }
         }
@@ -470,7 +470,8 @@ public partial class SAV_MailBox : Form
 
     private void EntryControl(object sender, EventArgs e)
     {
-        if (editing) return;
+        if (editing)
+            return;
         editing = true;
         int partyIndex = LB_PartyHeld.SelectedIndex;
         int pcIndex = LB_PCBOX.SelectedIndex;
@@ -528,7 +529,7 @@ public partial class SAV_MailBox : Form
         }
         if (Gen == 3)
         {
-            AppearPKMs[0].SelectedValue = (int)SpeciesConverter.GetG4Species(species);
+            AppearPKMs[0].SelectedValue = (int)SpeciesConverter.GetNational3(species);
             editing = false;
             return;
         }
@@ -569,9 +570,11 @@ public partial class SAV_MailBox : Form
 
     private void NUD_MailIDn_ValueChanged(object sender, EventArgs e)
     {
-        if (editing || Gen != 3) return;
+        if (editing || Gen != 3)
+            return;
         int index = Array.IndexOf(PKMNUDs, (NumericUpDown)sender);
-        if (index < 0 || index >= p.Count) return;
+        if (index < 0 || index >= p.Count)
+            return;
         ((PK3)p[index]).HeldMailID = (sbyte)PKMNUDs[index].Value;
     }
 
@@ -580,26 +583,37 @@ public partial class SAV_MailBox : Form
     private void B_BoxUp_Click(object sender, EventArgs e) => SwapSlots(LB_PCBOX, false);
     private void B_BoxDown_Click(object sender, EventArgs e) => SwapSlots(LB_PCBOX, true);
 
-    private void SwapSlots(ListControl lb, bool down)
+    private void SwapSlots(ListBox lb, bool down)
     {
         int index = lb.SelectedIndex;
-        if (index <= 0)
+        var otherIndex = index + (down ? 1 : -1);
+        if ((uint)otherIndex >= lb.Items.Count)
         {
             System.Media.SystemSounds.Asterisk.Play();
             return;
         }
 
+        // Shift to actual indexes
         bool isBox = lb == LB_PCBOX;
         if (isBox)
+        {
             index += PartyBoxCount;
+            otherIndex += PartyBoxCount;
+        }
 
         editing = true;
-        var otherIndex = index + (down ? 1 : -1);
-        (m[otherIndex], m[index]) = (m[index], m[otherIndex]); // swap mail objects
+
+        // swap mail objects
+        (m[otherIndex], m[index]) = (m[index], m[otherIndex]);
         if ((entry >= PartyBoxCount) == isBox)
             entry = otherIndex;
         LoadList(); // reset labels
-        lb.SelectedIndex = otherIndex; // move selection to new spot
+
+        // move selection to new spot
+        if (isBox)
+            otherIndex -= PartyBoxCount;
+        lb.SelectedIndex = otherIndex;
+
         editing = false;
     }
 }

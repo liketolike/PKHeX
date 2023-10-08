@@ -17,9 +17,10 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
     public string SaveRevisionString => (Japanese ? "J" : !Korean ? "U" : "K") + (IsVirtualConsole ? "VC" : "GB");
     public bool Japanese { get; }
     public bool Korean { get; }
+    public override int Language => Japanese ? 1 : Korean ? (int)LanguageID.Korean : -1;
 
-    public override IPersonalTable Personal { get; }
-    public override IReadOnlyList<ushort> HeldItems => Legal.HeldItems_GSC;
+    public override PersonalTable2 Personal { get; }
+    public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_GSC;
 
     public override IReadOnlyList<string> PKMExtensions => Array.FindAll(PKM.Extensions, f =>
     {
@@ -74,7 +75,7 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
         for (int i = 0; i < BoxCount; i++)
         {
             int ofs = GetBoxRawDataOffset(i, splitAtIndex);
-            var box = GetData(ofs, stored);
+            var box = Data.AsSpan(ofs, stored).ToArray();
             var boxDest = baseDest + (i * SIZE_BOX);
             var boxPL = new PokeList2(box, capacity, Japanese);
             for (int j = 0; j < boxPL.Pokemon.Length; j++)
@@ -87,7 +88,7 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
             }
         }
 
-        var current = GetData(Offsets.CurrentBox, stored);
+        var current = Data.AsSpan(Offsets.CurrentBox, stored).ToArray();
         var curBoxPL = new PokeList2(current, capacity, Japanese);
         var curDest = baseDest + (CurrentBox * SIZE_BOX);
         for (int i = 0; i < curBoxPL.Pokemon.Length; i++)
@@ -99,7 +100,7 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
             pkDat.CopyTo(Data, dest);
         }
 
-        var party = GetData(Offsets.Party, SIZE_STOREDPARTY);
+        var party = Data.AsSpan(Offsets.Party, SIZE_STOREDPARTY).ToArray();
         var partyPL = new PokeList2(party, PokeListType.Party, Japanese);
         for (int i = 0; i < partyPL.Pokemon.Length; i++)
         {
@@ -155,8 +156,8 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
 
         var nick = span[..stringLength];
         var ot = span.Slice(stringLength, stringLength);
-        nick.CopyTo(pk.RawNickname);
-        ot.CopyTo(pk.RawOT);
+        nick.CopyTo(pk.Nickname_Trash);
+        ot.CopyTo(pk.OT_Trash);
 
         return pk;
     }
@@ -180,7 +181,9 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
             int slot = 0;
             for (int j = 0; j < boxPL.Pokemon.Length; j++)
             {
-                PK2 boxPK = (PK2) GetPKM(GetData(GetBoxOffset(i) + (j * SIZE_STORED), SIZE_STORED));
+                var ofs = GetBoxOffset(i) + (j * SIZE_STORED);
+                var data = Data.AsSpan(ofs, SIZE_STORED).ToArray();
+                PK2 boxPK = GetPKM(data);
                 if (boxPK.Species > 0)
                     boxPL[slot++] = boxPK;
             }
@@ -195,7 +198,9 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
         int pSlot = 0;
         for (int i = 0; i < 6; i++)
         {
-            PK2 partyPK = (PK2)GetPKM(GetData(GetPartyOffset(i), SIZE_STORED));
+            var ofs = GetPartyOffset(i);
+            var data = Data.AsSpan(ofs, SIZE_STORED).ToArray();
+            PK2 partyPK = GetPKM(data);
             if (partyPK.Species > 0)
                 partyPL[pSlot++] = partyPK;
         }
@@ -245,17 +250,15 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
                     break;
             }
         }
-        byte[] outData = new byte[Data.Length - SIZE_RESERVED];
-        Array.Copy(Data, outData, outData.Length);
-        return outData;
+        return Data[..^SIZE_RESERVED];
     }
 
     // Configuration
-    protected override SaveFile CloneInternal() => new SAV2(Write(), Version);
+    protected override SAV2 CloneInternal() => new(Write(), Version);
 
     protected override int SIZE_STORED => Japanese ? PokeCrypto.SIZE_2JLIST : PokeCrypto.SIZE_2ULIST;
     protected override int SIZE_PARTY => Japanese ? PokeCrypto.SIZE_2JLIST : PokeCrypto.SIZE_2ULIST;
-    public override PKM BlankPKM => new PK2(jp: Japanese);
+    public override PK2 BlankPKM => new(jp: Japanese);
     public override Type PKMType => typeof(PK2);
 
     private int SIZE_BOX => BoxSlotCount*SIZE_STORED;
@@ -277,13 +280,13 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
     public int EventFlagCount => 2000;
 
     public override int BoxCount => Japanese ? 9 : 14;
-    public override int MaxEV => 65535;
+    public override int MaxEV => EffortValues.Max12;
     public override int MaxIV => 15;
     public override int Generation => 2;
     public override EntityContext Context => EntityContext.Gen2;
     protected override int GiftCountMax => 0;
-    public override int OTLength => Japanese || Korean ? 5 : 7;
-    public override int NickLength => Japanese || Korean ? 5 : 10;
+    public override int MaxStringLengthOT => Japanese || Korean ? 5 : 7;
+    public override int MaxStringLengthNickname => Japanese || Korean ? 5 : 10;
     public override int BoxSlotCount => Japanese ? 30 : 20;
 
     public override bool HasParty => true;
@@ -306,25 +309,30 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
         WriteUInt16LittleEndian(Data.AsSpan(Offsets.OverallChecksumPosition2), accum);
     }
 
-    public override bool ChecksumsValid
+    public override bool ChecksumsValid => !ChecksumInfo.Contains("Invalid");
+
+    public override string ChecksumInfo
     {
         get
         {
             ushort accum = GetChecksum();
             ushort actual = ReadUInt16LittleEndian(Data.AsSpan(Offsets.OverallChecksumPosition));
-            return accum == actual;
+            ushort actual2 = ReadUInt16LittleEndian(Data.AsSpan(Offsets.OverallChecksumPosition2));
+
+            bool checksum1Valid = (accum == actual);
+            bool checksum2Valid = (accum == actual2);
+            static string valid(bool s) => s ? "Valid" : "Invalid";
+            return $"Checksum 1 {valid(checksum1Valid)}, Checksum 2 {valid(checksum2Valid)}.";
         }
     }
-
-    public override string ChecksumInfo => ChecksumsValid ? "Checksum valid." : "Checksum invalid";
 
     // Trainer Info
     public override GameVersion Version { get; protected set; }
 
     public override string OT
     {
-        get => GetString(Offsets.Trainer1 + 2, (Korean ? 2 : 1) * OTLength);
-        set => SetString(Data.AsSpan(Offsets.Trainer1 + 2, (Korean ? 2 : 1) * OTLength), value.AsSpan(), 8, StringConverterOption.Clear50);
+        get => GetString(Data.AsSpan(Offsets.Trainer1 + 2, (Korean ? 2 : 1) * MaxStringLengthOT));
+        set => SetString(Data.AsSpan(Offsets.Trainer1 + 2, (Korean ? 2 : 1) * MaxStringLengthOT), value, 8, StringConverterOption.Clear50);
     }
 
     public Span<byte> OT_Trash
@@ -335,8 +343,8 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
 
     public string Rival
     {
-        get => GetString(Offsets.Rival, (Korean ? 2 : 1) * OTLength);
-        set => SetString(Data.AsSpan(Offsets.Rival, (Korean ? 2 : 1) * OTLength), value.AsSpan(), 8, StringConverterOption.Clear50);
+        get => GetString(Data.AsSpan(Offsets.Rival, (Korean ? 2 : 1) * MaxStringLengthOT));
+        set => SetString(Data.AsSpan(Offsets.Rival, (Korean ? 2 : 1) * MaxStringLengthOT), value, 8, StringConverterOption.Clear50);
     }
 
     public Span<byte> Rival_Trash
@@ -357,13 +365,19 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
         }
     }
 
-    public override int TID
+    public override uint ID32
     {
-        get => ReadUInt16BigEndian(Data.AsSpan(Offsets.Trainer1));
-        set => WriteUInt16BigEndian(Data.AsSpan(Offsets.Trainer1), (ushort)value);
+        get => TID16;
+        set => TID16 = (ushort)value;
     }
 
-    public override int SID { get => 0; set { } }
+    public override ushort TID16
+    {
+        get => ReadUInt16BigEndian(Data.AsSpan(Offsets.Trainer1));
+        set => WriteUInt16BigEndian(Data.AsSpan(Offsets.Trainer1), value);
+    }
+
+    public override ushort SID16 { get => 0; set { } }
 
     public override int PlayedHours
     {
@@ -493,22 +507,18 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
         }
     }
 
-    private static ushort[] LegalItems => Legal.Pouch_Items_GSC;
-    private ushort[] LegalKeyItems => Version == GameVersion.C? Legal.Pouch_Key_C : Legal.Pouch_Key_GS;
-    private static ushort[] LegalBalls => Legal.Pouch_Ball_GSC;
-    private static ushort[] LegalTMHMs => Legal.Pouch_TMHM_GSC;
-
     public override IReadOnlyList<InventoryPouch> Inventory
     {
         get
         {
+            var info = Version == GameVersion.C ? ItemStorage2.InstanceC : ItemStorage2.InstanceGS;
             InventoryPouch[] pouch =
             {
-                new InventoryPouchGB(InventoryType.TMHMs, LegalTMHMs, 99, Offsets.PouchTMHM, 57),
-                new InventoryPouchGB(InventoryType.Items, LegalItems, 99, Offsets.PouchItem, 20),
-                new InventoryPouchGB(InventoryType.KeyItems, LegalKeyItems, 99, Offsets.PouchKey, 26),
-                new InventoryPouchGB(InventoryType.Balls, LegalBalls, 99, Offsets.PouchBall, 12),
-                new InventoryPouchGB(InventoryType.PCItems, ArrayUtil.ConcatAll(LegalItems, LegalKeyItems, LegalBalls, LegalTMHMs), 99, Offsets.PouchPC, 50),
+                new InventoryPouchGB(InventoryType.TMHMs, info, 99, Offsets.PouchTMHM, 57),
+                new InventoryPouchGB(InventoryType.Items, info, 99, Offsets.PouchItem, 20),
+                new InventoryPouchGB(InventoryType.KeyItems, info, 99, Offsets.PouchKey, 26),
+                new InventoryPouchGB(InventoryType.Balls, info, 99, Offsets.PouchBall, 12),
+                new InventoryPouchGB(InventoryType.PCItems, info, 99, Offsets.PouchPC, 50),
             };
             return pouch.LoadAll(Data);
         }
@@ -550,24 +560,25 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
         set => Data[Offsets.CurrentBoxIndex] = (byte)((Data[Offsets.CurrentBoxIndex] & 0x7F) | (byte)(value ? 0x80 : 0));
     }
 
-    public override string GetBoxName(int box)
+    public override string GetBoxName(int box) => GetString(GetBoxNameSpan(box));
+
+    private Span<byte> GetBoxNameSpan(int box)
     {
         int len = Korean ? 17 : 9;
-        return GetString(Offsets.BoxNames + (box * len), len);
+        return Data.AsSpan(Offsets.BoxNames + (box * len), len);
     }
 
-    public override void SetBoxName(int box, string value)
+    public override void SetBoxName(int box, ReadOnlySpan<char> value)
     {
-        int len = Korean ? 17 : 9;
-        var span = Data.AsSpan(Offsets.BoxNames + (box * len), len);
-        SetString(span, value.AsSpan(), 8, StringConverterOption.Clear50);
+        var span = GetBoxNameSpan(box);
+        SetString(span, value, 8, StringConverterOption.Clear50);
     }
 
-    protected override PKM GetPKM(byte[] data)
+    protected override PK2 GetPKM(byte[] data)
     {
         if (data.Length == SIZE_STORED)
             return new PokeList2(data, PokeListType.Single, Japanese)[0];
-        return new PK2(data);
+        return new(data);
     }
 
     protected override byte[] DecryptPKM(byte[] data)
@@ -709,16 +720,16 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
 
     private ushort GetResetKey()
     {
-        var value = (TID >> 8) + (TID & 0xFF) + ((Money >> 16) & 0xFF) + ((Money >> 8) & 0xFF) + (Money & 0xFF);
-        var ot = Data.AsSpan(Offsets.Trainer1 + 2, 5);
-        var sum = 0;
-        foreach (var b in ot)
-        {
-            if (b == StringConverter12.G1TerminatorCode)
-                break;
-            sum += b;
-        }
-        return (ushort)(value + sum);
+        ushort result = 0;
+        foreach (var b in Data.AsSpan(Offsets.Money, 3))
+            result += b;
+        var tr = Data.AsSpan(Offsets.Trainer1, 7);
+        var end = tr[2..].IndexOf(StringConverter12.G1TerminatorCode);
+        if (end >= 0)
+            tr = tr[..(end + 2)];
+        foreach (var b in tr)
+            result += b;
+        return result;
     }
 
     /// <summary>

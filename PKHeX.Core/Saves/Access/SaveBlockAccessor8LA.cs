@@ -1,10 +1,9 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace PKHeX.Core;
 
 // ReSharper disable UnusedMember.Local
-#pragma warning disable IDE0051 // Remove unused private members
-#pragma warning disable RCS1213 // Remove unused member declaration.
+#pragma warning disable IDE0051, RCS1213 // Remove unused private members
 public sealed class SaveBlockAccessor8LA : SCBlockAccessor, ISaveBlock8LA
 {
     public override IReadOnlyList<SCBlock> BlockInfo { get; }
@@ -14,7 +13,7 @@ public sealed class SaveBlockAccessor8LA : SCBlockAccessor, ISaveBlock8LA
     public PokedexSave8a PokedexSave { get; }
     public BoxLayout8a BoxLayout { get; }
     public MyItem8a Items { get; }
-    public AdventureStart8a AdventureStart { get; }
+    public Epoch1970Value AdventureStart { get; }
     public Coordinates8a Coordinates { get; }
     public LastSaved8a LastSaved { get; }
     public PlayerFashion8a FashionPlayer { get; }
@@ -29,7 +28,7 @@ public sealed class SaveBlockAccessor8LA : SCBlockAccessor, ISaveBlock8LA
         PartyInfo = new Party8a(sav, GetBlock(KParty));
         MyStatus = new MyStatus8a(sav, GetBlock(KMyStatus));
         Items = new MyItem8a(sav, GetBlock(KItemRegular));
-        AdventureStart = new AdventureStart8a(sav, GetBlock(KAdventureStart));
+        AdventureStart = new Epoch1970Value(GetBlock(KAdventureStart));
         LastSaved = new LastSaved8a(sav, GetBlock(KLastSaved));
         Played = new PlayTime8a(sav, GetBlock(KPlayTime));
         Coordinates = new Coordinates8a(sav, GetBlock(KCoordinates));
@@ -68,6 +67,7 @@ public sealed class SaveBlockAccessor8LA : SCBlockAccessor, ISaveBlock8LA
     public const uint KMassOutbreak = 0x1E0F1BA3;
     public const uint KMassiveMassOutbreak = 0x7799EB86;
     private const uint KCaptureRecords = 0x6506EE96; // 1000 entries, 0x1C each
+    private const uint KPlayRecords = 0x549B6033; // 0x18 per entry, first 8 bytes always 01, u64 fnv hash of entry, last 8 bytes value.
     private const uint KOtherPlayerLostSatchels = 0x05E7EBEB;
     private const uint KMyLostSatchels = 0xC5D7112B;
     private const uint KNobleRematchRecords = 0xB9252862; // Best times of Noble rematches
@@ -161,8 +161,8 @@ public sealed class SaveBlockAccessor8LA : SCBlockAccessor, ISaveBlock8LA
     private const uint KDefeatedLordArcanine = 0xA5981A37; // FSYS_NS_03_CLEARED
     private const uint KDefeatedLordElectrode = 0x6EF3C712; // FSYS_NS_04_CLEARED
     private const uint KDefeatedLordAvalugg = 0x424E9F0D; // FSYS_NS_05_CLEARED
-    private const uint KDefeatedOriginDialga = 0x5185ADC0; // FSYS_NS_D_CLEARED
-    private const uint KDefeatedOriginPalkia = 0x5E5BFD94; // FSYS_NS_P_CLEARED
+    private const uint KDefeatedOriginDialga = 0x5185ADC0; // FSYS_NS_D_CLEARED (Only applicable if Pearl Clan was chosen)
+    private const uint KDefeatedOriginPalkia = 0x5E5BFD94; // FSYS_NS_P_CLEARED (Only applicable if Diamond Clan was chosen)
     private const uint KDefeatedArceus = 0x2F91EFD3; // FSYS_SCENARIO_CLEARED_URA
     private const uint KCompletedPokedex = 0xD985E1C2; // FEVE_EV110100_END (Enables using Azure Flute to reach Arceus)
     private const uint KPerfectedPokedex = 0x98ED661E; //  FSYS_POKEDEX_COMPLETE_WITHOUT_EXCEPTION

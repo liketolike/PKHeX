@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PKHeX.Core;
 
@@ -16,11 +16,11 @@ public abstract class GBPKM : PKM
     public sealed override int MinGameID => (int)GameVersion.RD;
     public sealed override int MaxGameID => (int)GameVersion.C;
     public sealed override int MaxIV => 15;
-    public sealed override int MaxEV => ushort.MaxValue;
+    public sealed override int MaxEV => EffortValues.Max12;
 
-    public sealed override IReadOnlyList<ushort> ExtraBytes => Array.Empty<ushort>();
+    public sealed override ReadOnlySpan<ushort> ExtraBytes => ReadOnlySpan<ushort>.Empty;
 
-    protected GBPKM(int size) : base(size) { }
+    protected GBPKM([ConstantExpected] int size) : base(size) { }
     protected GBPKM(byte[] data) : base(data) { }
 
     public sealed override byte[] EncryptedPartyData => Encrypt();
@@ -31,13 +31,24 @@ public abstract class GBPKM : PKM
     public override bool Valid { get => true; set { } }
     public sealed override void RefreshChecksum() { }
 
-    protected abstract byte[] GetNonNickname(int language);
-
     private bool? _isnicknamed;
+    protected abstract void GetNonNickname(int language, Span<byte> data);
 
     public sealed override bool IsNicknamed
     {
-        get => _isnicknamed ??= !Nickname_Trash.SequenceEqual(GetNonNickname(GuessedLanguage()));
+        get
+        {
+            if (_isnicknamed is {} actual)
+                return actual;
+
+            var current = Nickname_Trash;
+            Span<byte> expect = stackalloc byte[current.Length];
+            var language = GuessedLanguage();
+            GetNonNickname(language, expect);
+            var result = !current.SequenceEqual(expect);
+            _isnicknamed = result;
+            return result;
+        }
         set
         {
             _isnicknamed = value;
@@ -106,15 +117,16 @@ public abstract class GBPKM : PKM
     public sealed override int Nature { get => 0; set { } }
     public sealed override bool ChecksumValid => true;
     public sealed override bool FatefulEncounter { get => false; set { } }
-    public sealed override int TSV => 0x0000;
-    public sealed override int PSV => 0xFFFF;
+    public sealed override uint TSV => 0x0000;
+    public sealed override uint PSV => 0xFFFF;
     public sealed override int Characteristic => -1;
     public sealed override int MarkValue { get => 0; set { } }
     public sealed override int Ability { get => -1; set { } }
     public sealed override int CurrentHandler { get => 0; set { } }
     public sealed override int Egg_Location { get => 0; set { } }
     public sealed override int Ball { get => 0; set { } }
-    public sealed override int SID { get => 0; set { } }
+    public sealed override uint ID32 { get => TID16; set => TID16 = (ushort)value; }
+    public sealed override ushort SID16 { get => 0; set { } }
     #endregion
 
     public sealed override bool IsShiny => IV_DEF == 10 && IV_SPE == 10 && IV_SPC == 10 && (IV_ATK & 2) == 2;
@@ -143,8 +155,11 @@ public abstract class GBPKM : PKM
         {
             if (Species != 201) // Unown
                 return;
-            while (Form != value)
-                SetRandomIVs(0);
+            if (Form == value)
+                return;
+            var rnd = Util.Rand;
+            do DV16 = (ushort)rnd.Next();
+            while (Form != value);
         }
     }
 
@@ -202,7 +217,7 @@ public abstract class GBPKM : PKM
 
     public override void LoadStats(IBaseStat p, Span<ushort> stats)
     {
-        var lv = Stat_Level;
+        var lv = CurrentLevel; // recalculate instead of checking Stat_Level
         stats[0] = (ushort)(GetStat(p.HP, IV_HP, EV_HP, lv) + (5 + lv)); // HP
         stats[1] = GetStat(p.ATK, IV_ATK, EV_ATK, lv);
         stats[2] = GetStat(p.DEF, IV_DEF, EV_DEF, lv);
@@ -213,7 +228,13 @@ public abstract class GBPKM : PKM
 
     protected static ushort GetStat(int baseStat, int iv, int effort, int level)
     {
-        effort = (ushort)Math.Min(255, Math.Sqrt(effort) + 1) >> 2;
+        // The games store a precomputed ushort[256] i*i table for all ushort->byte square root calcs.
+        // The game then iterates to find the lowest index with a value >= input (effort).
+        // With modern CPUs we can just call sqrt->ceil directly.
+        // ceil(sqrt(65535)) evals to 256, but we're clamped to byte only.
+        byte firstSquare = (byte)Math.Min(255, Math.Ceiling(Math.Sqrt(effort)));
+
+        effort = firstSquare >> 2;
         return (ushort)((((2 * (baseStat + iv)) + effort) * level / 100) + 5);
     }
 

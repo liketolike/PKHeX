@@ -71,6 +71,20 @@ public partial class SAV_MysteryGiftDB : Form
 
             slot.ContextMenuStrip = mnu;
             slot.MouseEnter += (o, args) => ShowHoverTextForSlot(slot, args);
+            slot.Enter += (sender, e) =>
+            {
+                if (sender is not PictureBox pb)
+                    return;
+                var index = Array.IndexOf(PKXBOXES, sender);
+                if (index < 0)
+                    return;
+                index += (SCR_Box.Value * RES_MIN);
+                if (index >= Results.Count)
+                    return;
+
+                var enc = Results[index];
+                pb.AccessibleDescription = string.Join(Environment.NewLine, enc.GetTextLines());
+            };
         }
 
         Counter = L_Count.Text;
@@ -149,7 +163,7 @@ public partial class SAV_MysteryGiftDB : Form
             WinFormsUtil.Alert(MsgExportWC3DataFail);
             return;
         }
-        WinFormsUtil.ExportMGDialog(g, SAV.Version);
+        WinFormsUtil.ExportMGDialog(g);
     }
 
     private int GetSenderIndex(object sender)
@@ -161,7 +175,7 @@ public partial class SAV_MysteryGiftDB : Form
             System.Media.SystemSounds.Exclamation.Play();
             return -1;
         }
-        index += SCR_Box.Value*RES_MIN;
+        index += SCR_Box.Value * RES_MIN;
         if (index >= Results.Count)
         {
             System.Media.SystemSounds.Exclamation.Play();
@@ -218,20 +232,20 @@ public partial class SAV_MysteryGiftDB : Form
             System.Media.SystemSounds.Asterisk.Play();
     }
 
+    private static Func<MysteryGift, bool> IsPresent<TTable>(TTable pt) where TTable : IPersonalTable => z => pt.IsPresentInGame(z.Species, z.Form);
+
     private void LoadDatabase()
     {
         var db = EncounterEvent.GetAllEvents();
 
         if (Main.Settings.MysteryDb.FilterUnavailableSpecies)
         {
-            static bool IsPresentInGameSWSH(ISpeciesForm pk) => PersonalTable.SWSH.IsPresentInGame(pk.Species, pk.Form);
-            static bool IsPresentInGameBDSP(ISpeciesForm pk) => PersonalTable.BDSP.IsPresentInGame(pk.Species, pk.Form);
-            static bool IsPresentInGameLA(ISpeciesForm pk) => PersonalTable.LA.IsPresentInGame(pk.Species, pk.Form);
             db = SAV switch
             {
-                SAV8SWSH => db.Where(IsPresentInGameSWSH),
-                SAV8BS => db.Where(IsPresentInGameBDSP),
-                SAV8LA => db.Where(IsPresentInGameLA),
+                SAV9SV s9 => db.Where(IsPresent(s9.Personal)),
+                SAV8SWSH s8 => db.Where(IsPresent(s8.Personal)),
+                SAV8BS b8 => db.Where(IsPresent(b8.Personal)),
+                SAV8LA a8 => db.Where(IsPresent(a8.Personal)),
                 SAV7b => db.Where(z => z is WB7),
                 SAV7 => db.Where(z => z.Generation < 7 || z is WC7),
                 _ => db.Where(z => z.Generation <= SAV.Generation),
@@ -327,9 +341,10 @@ public partial class SAV_MysteryGiftDB : Form
 
         slotSelected = -1; // reset the slot last viewed
 
-        if (RTB_Instructions.Lines.Any(line => line.Length > 0))
+        ReadOnlySpan<char> batchText = RTB_Instructions.Text;
+        if (batchText.Length > 0 && !StringInstructionSet.HasEmptyLine(batchText))
         {
-            var filters = StringInstruction.GetFilters(RTB_Instructions.Lines).ToArray();
+            var filters = StringInstruction.GetFilters(batchText);
             BatchEditing.ScreenStrings(filters);
             res = res.Where(pk => BatchEditing.IsFilterMatch(filters, pk)); // Compare across all filters
         }
@@ -448,9 +463,11 @@ public partial class SAV_MysteryGiftDB : Form
         if (s.Length == 0)
         { WinFormsUtil.Alert(MsgBEPropertyInvalid); return; }
 
-        if (RTB_Instructions.Lines.Length != 0 && RTB_Instructions.Lines[^1].Length > 0)
-            s = Environment.NewLine + s;
-
+        // If we already have text, add a new line (except if the last line is blank).
+        var tb = RTB_Instructions;
+        var batchText = tb.Text;
+        if (batchText.Length > 0 && !batchText.EndsWith('\n'))
+            tb.AppendText(Environment.NewLine);
         RTB_Instructions.AppendText(s);
     }
 }

@@ -7,10 +7,10 @@ namespace PKHeX.Core;
 /// </summary>
 public sealed class PersonalTable2 : IPersonalTable, IPersonalTable<PersonalInfo2>
 {
-    internal readonly PersonalInfo2[] Table; // internal to share with Gen1 tables
+    private readonly PersonalInfo2[] Table;
     private const int SIZE = PersonalInfo2.SIZE;
-    private const int MaxSpecies = Legal.MaxSpeciesID_2;
-    public int MaxSpeciesID => MaxSpecies;
+    private const ushort MaxSpecies = Legal.MaxSpeciesID_2;
+    public ushort MaxSpeciesID => MaxSpecies;
 
     public PersonalTable2(ReadOnlySpan<byte> data)
     {
@@ -28,7 +28,7 @@ public sealed class PersonalTable2 : IPersonalTable, IPersonalTable<PersonalInfo
     public PersonalInfo2 GetFormEntry(ushort species, byte form) => Table[GetFormIndex(species, form)];
 
     public int GetFormIndex(ushort species, byte form) => IsSpeciesInGame(species) ? species : 0;
-    public bool IsSpeciesInGame(ushort species) => (uint)species <= MaxSpecies;
+    public bool IsSpeciesInGame(ushort species) => species <= MaxSpecies;
     public bool IsPresentInGame(ushort species, byte form)
     {
         if (!IsSpeciesInGame(species))

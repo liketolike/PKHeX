@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
@@ -9,24 +10,24 @@ namespace PKHeX.Core;
 /// </summary>
 public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
 {
-    protected override PKM GetPKM(byte[] data) => new PK5(data);
+    protected override PK5 GetPKM(byte[] data) => new(data);
     protected override byte[] DecryptPKM(byte[] data) => PokeCrypto.DecryptArray45(data);
 
     protected internal override string ShortSummary => $"{OT} ({(GameVersion)Game}) - {PlayTimeString}";
     public override string Extension => ".sav";
 
-    public override IReadOnlyList<ushort> HeldItems => Legal.HeldItems_BW;
+    public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_BW;
     protected override int SIZE_STORED => PokeCrypto.SIZE_5STORED;
     protected override int SIZE_PARTY => PokeCrypto.SIZE_5PARTY;
-    public override PKM BlankPKM => new PK5();
+    public override PK5 BlankPKM => new();
     public override Type PKMType => typeof(PK5);
 
     public override int BoxCount => 24;
-    public override int MaxEV => 255;
+    public override int MaxEV => EffortValues.Max255;
     public override int Generation => 5;
     public override EntityContext Context => EntityContext.Gen5;
-    public override int OTLength => 7;
-    public override int NickLength => 10;
+    public override int MaxStringLengthOT => 7;
+    public override int MaxStringLengthNickname => 10;
     protected override int GiftCountMax => 12;
     public abstract int EventFlagCount { get; }
     public abstract int EventWorkCount { get; }
@@ -39,7 +40,7 @@ public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
     public override int MaxBallID => Legal.MaxBallID_5;
     public override int MaxGameID => Legal.MaxGameID_5; // B2
 
-    protected SAV5(int size) : base(size)
+    protected SAV5([ConstantExpected] int size) : base(size)
     {
         Initialize();
         ClearBoxes();
@@ -73,7 +74,6 @@ public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
     protected int EntreeForestOffset;
     private int AdventureInfo;
     public abstract int GTS { get; }
-    public abstract int Fused { get; }
     public int PGL => AllBlocks[35].Offset + 8; // Dream World Upload
 
     // Daycare
@@ -96,10 +96,11 @@ public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
     public override int GetPartyOffset(int slot) => Party + 8 + (SIZE_PARTY * slot);
 
     protected override int GetBoxWallpaperOffset(int box) => BoxLayout.GetBoxWallpaperOffset(box);
+    public override int BoxesUnlocked { get => BoxLayout.BoxesUnlocked; set => BoxLayout.BoxesUnlocked = (byte)value; }
     public override int GetBoxWallpaper(int box) => BoxLayout.GetBoxWallpaper(box);
     public override void SetBoxWallpaper(int box, int value) => BoxLayout.SetBoxWallpaper(box, value);
     public override string GetBoxName(int box) => BoxLayout[box];
-    public override void SetBoxName(int box, string value) => BoxLayout[box] = value;
+    public override void SetBoxName(int box, ReadOnlySpan<char> value) => BoxLayout.SetBoxName(box, value);
     public override int CurrentBox { get => BoxLayout.CurrentBox; set => BoxLayout.CurrentBox = value; }
 
     protected int BattleBoxOffset;
@@ -114,15 +115,18 @@ public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
     {
         var pk5 = (PK5)pk;
         // Apply to this Save File
-        DateTime Date = DateTime.Now;
-        if (pk5.Trade(OT, TID, SID, Gender, Date.Day, Date.Month, Date.Year))
+        var now = EncounterDate.GetDateNDS();
+        if (pk5.Trade(OT, ID32, Gender, now.Day, now.Month, now.Year))
             pk.RefreshChecksum();
     }
 
     // Player Data
     public override string OT { get => PlayerData.OT; set => PlayerData.OT = value; }
-    public override int TID { get => PlayerData.TID; set => PlayerData.TID = value; }
-    public override int SID { get => PlayerData.SID; set => PlayerData.SID = value; }
+    public override uint ID32 { get => PlayerData.ID32; set => PlayerData.ID32 = value; }
+    public override ushort TID16 { get => PlayerData.TID16; set => PlayerData.TID16 = value; }
+    public override ushort SID16 { get => PlayerData.SID16; set => PlayerData.SID16 = value; }
+    public int Country { get => PlayerData.Country; set => PlayerData.Country = value; }
+    public int Region { get => PlayerData.Region; set => PlayerData.Region = value; }
     public override int Language { get => PlayerData.Language; set => PlayerData.Language = value; }
     public override int Game { get => PlayerData.Game; set => PlayerData.Game = value; }
     public override int Gender { get => PlayerData.Gender; set => PlayerData.Gender = value; }
@@ -172,6 +176,8 @@ public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
         set => Data[CGearSkinInfoOffset + 2] = Data[PlayerData.Offset + (this is SAV5B2W2 ? 0x6C : 0x54)] = value ? (byte)1 : (byte)0;
     }
 
+    private static ReadOnlySpan<byte> DLCFooter => new byte[] { 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x14, 0x27, 0x00, 0x00, 0x27, 0x35, 0x05, 0x31, 0x00, 0x00 };
+
     public byte[] CGearSkinData
     {
         get
@@ -191,8 +197,7 @@ public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
             WriteUInt16LittleEndian(footer[2..], chk); // checksum
             WriteUInt16LittleEndian(footer[0x100..], chk);  // second checksum
 
-            Span<byte> dlcfooter = stackalloc byte[] { 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x14, 0x27, 0x00, 0x00, 0x27, 0x35, 0x05, 0x31, 0x00, 0x00 };
-            dlcfooter.CopyTo(footer[0x102..]);
+            DLCFooter.CopyTo(footer[0x102..]);
 
             ushort skinchkval = Checksums.CRC16_CCITT(footer[0x100..0x104]);
             WriteUInt16LittleEndian(footer[0x112..], skinchkval);
@@ -209,7 +214,7 @@ public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
 
     public EntreeForest EntreeData
     {
-        get => new(GetData(EntreeForestOffset, EntreeForest.SIZE));
+        get => new(Data.AsSpan(EntreeForestOffset, EntreeForest.SIZE).ToArray());
         set => SetData(value.Write(), EntreeForestOffset);
     }
 
@@ -225,9 +230,10 @@ public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
     public abstract Entralink5 Entralink { get; }
     public abstract Musical5 Musical { get; }
     public abstract Encount5 Encount { get; }
+    public abstract UnityTower5 UnityTower { get; }
 
     public static int GetMailOffset(int index) => (index * Mail5.SIZE) + 0x1DD00;
-    public byte[] GetMailData(int offset) => GetData(offset, Mail5.SIZE);
+    public byte[] GetMailData(int offset) => Data.AsSpan(offset, Mail5.SIZE).ToArray();
     public int GetBattleBoxSlot(int slot) => BattleBoxOffset + (slot * SIZE_STORED);
 
     public MailDetail GetMail(int mailIndex)

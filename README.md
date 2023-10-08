@@ -1,7 +1,7 @@
 PKHeX
 =====
 <div>
-  <span>English</span> / <a href=".github/README-es.md">Español</a> / <a href=".github/README-fr.md">Français</a> / <a href=".github/README-de.md">Deutsch</a> / <a href=".github/README-it.md">Italiano</a>
+  <span>English</span> / <a href=".github/README-es.md">Español</a> / <a href=".github/README-fr.md">Français</a> / <a href=".github/README-de.md">Deutsch</a> / <a href=".github/README-it.md">Italiano</a> / <a href=".github/README-zhHK.md">繁體中文</a> / <a href=".github/README-zh.md">简体中文</a>
 </div>
 
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
@@ -11,7 +11,7 @@ Pokémon core series save editor, programmed in [C#](https://en.wikipedia.org/wi
 Supports the following files:
 * Save files ("main", \*.sav, \*.dsv, \*.dat, \*.gci, \*.bin)
 * GameCube Memory Card files (\*.raw, \*.bin) containing GC Pokémon savegames.
-* Individual Pokémon entity files (.pk\*, \*.ck3, \*.xk3, \*.pb7, \*.sk2, \*.bk4)
+* Individual Pokémon entity files (.pk\*, \*.ck3, \*.xk3, \*.pb7, \*.sk2, \*.bk4, \*.rk4)
 * Mystery Gift files (\*.pgt, \*.pcd, \*.pgf, .wc\*) including conversion to .pk\*
 * Importing GO Park entities (\*.gp1) including conversion to .pb7
 * Importing teams from Decrypted 3DS Battle Videos
@@ -28,13 +28,13 @@ PKHeX expects save files that are not encrypted with console-specific keys. Use 
 
 ## Screenshots
 
-![Main Window](https://i.imgur.com/RBcUanJ.png)
+![Main Window](https://i.imgur.com/xofMmf8.png)
 
 ## Building
 
-PKHeX is a Windows Forms application which requires [.NET Framework v4.6](https://www.microsoft.com/en-us/download/details.aspx?id=48137), with experimental support for [.NET 6.0](https://dotnet.microsoft.com/download/dotnet/6.0).
+PKHeX is a Windows Forms application which requires [.NET 7.0](https://dotnet.microsoft.com/download/dotnet/7.0).
 
-The executable can be built with any compiler that supports C# 10.
+The executable can be built with any compiler that supports C# 11.
 
 ### Build Configurations
 
@@ -51,7 +51,3 @@ PKHeX's Pokémon Legends: Arceus sprite collection is taken from the [National P
 ### IDE
 
 PKHeX can be opened with IDEs such as [Visual Studio](https://visualstudio.microsoft.com/downloads/) by opening the .sln or .csproj file.
-
-### GNU/Linux
-
-GNU/Linux is not the main Operating System of developers of this program so there may be bugs; some may come from non GNU/Linux specific code of Mono/Wine, so other users may not be able to reproduce the error you are experiencing.

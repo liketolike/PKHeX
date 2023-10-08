@@ -7,7 +7,7 @@ namespace PKHeX.Core;
 /// <summary>
 /// Generation 8 Mystery Gift Template File
 /// </summary>
-public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDynamaxLevel, IRibbonIndex, IMemoryOT, ILangNicknamedTemplate, IEncounterServerDate,
+public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDynamaxLevel, IRibbonIndex, IMemoryOT, ILangNicknamedTemplate, IEncounterServerDate, IRestrictVersion,
     IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetCommon6, IRibbonSetCommon7, IRibbonSetCommon8, IRibbonSetMark8
 {
     public const int Size = 0x2D0;
@@ -15,6 +15,7 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
 
     public override int Generation => 8;
     public override EntityContext Context => EntityContext.Gen8;
+    public override bool FatefulEncounter => true;
 
     public enum GiftType : byte
     {
@@ -90,7 +91,7 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
 
     public override Shiny Shiny => PIDType switch
     {
-        ShinyType8.FixedValue => FixedShinyType(DateTime.UtcNow),
+        ShinyType8.FixedValue => FixedShinyType(),
         ShinyType8.Random => Shiny.Random,
         ShinyType8.Never => Shiny.Never,
         ShinyType8.AlwaysStar => Shiny.AlwaysStar,
@@ -98,34 +99,39 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         _ => throw new ArgumentOutOfRangeException(),
     };
 
-    private Shiny FixedShinyType(DateTime date) => IsHOMEGift && IsHOMEShinyPossible(date) ? Shiny.Random : GetShinyXor() switch
+    private Shiny FixedShinyType() => IsHOMEGift && IsHOMEShinyPossible() ? Shiny.Random : GetShinyXor() switch
     {
         0 => Shiny.AlwaysSquare,
         <= 15 => Shiny.AlwaysStar,
         _ => Shiny.Never,
     };
 
-    private int GetShinyXor()
+    private uint GetShinyXor()
     {
         // Player owned anti-shiny fixed PID
-        if (TID == 0 && SID == 0)
-            return int.MaxValue;
+        if (ID32 == 0)
+            return uint.MaxValue;
 
-        var pid = PID;
-        var psv = (int)((pid >> 16) ^ (pid & 0xFFFF));
-        var tsv = (TID ^ SID);
-        return psv ^ tsv;
+        var xor = PID ^ ID32;
+        return (xor >> 16) ^ (xor & 0xFFFF);
     }
 
-    public override int TID
+    public override uint ID32
+    {
+        get => ReadUInt32LittleEndian(Data.AsSpan(CardStart + 0x20));
+        set => WriteUInt32LittleEndian(Data.AsSpan(CardStart + 0x20), value);
+    }
+
+    public override ushort TID16
     {
         get => ReadUInt16LittleEndian(Data.AsSpan(CardStart + 0x20));
-        set => WriteUInt16LittleEndian(Data.AsSpan(CardStart + 0x20), (ushort)value);
+        set => WriteUInt16LittleEndian(Data.AsSpan(CardStart + 0x20), value);
     }
 
-    public override int SID {
+    public override ushort SID16
+    {
         get => ReadUInt16LittleEndian(Data.AsSpan(CardStart + 0x22));
-        set => WriteUInt16LittleEndian(Data.AsSpan(CardStart + 0x22), (ushort)value);
+        set => WriteUInt16LittleEndian(Data.AsSpan(CardStart + 0x22), value);
     }
 
     public int OriginGame
@@ -190,17 +196,21 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
     private const int RibbonBytesCount = 0x20;
     private const int RibbonByteNone = 0xFF; // signed -1
 
-    public bool HasMark()
+    public bool HasMarkEncounter8
     {
-        for (int i = 0; i < RibbonBytesCount; i++)
+        get
         {
-            var value = Data[RibbonBytesOffset + i];
-            if (value == RibbonByteNone)
-                return false;
-            if ((RibbonIndex)value is >= MarkLunchtime and <= MarkSlump)
-                return true;
+            for (int i = 0; i < RibbonBytesCount; i++)
+            {
+                var value = Data[RibbonBytesOffset + i];
+                if (value == RibbonByteNone)
+                    return false;
+                if ((RibbonIndex)value is >= MarkLunchtime and <= MarkSlump)
+                    return true;
+            }
+
+            return false;
         }
-        return false;
     }
 
     public byte GetRibbonAtIndex(int byteIndex)
@@ -237,6 +247,8 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
     public byte OT_Memory { get => Data[CardStart + 0x27A]; set => Data[CardStart + 0x27A] = value; }
     public byte OT_Feeling { get => Data[CardStart + 0x27B]; set => Data[CardStart + 0x27B] = value; }
     public ushort OT_TextVar { get => ReadUInt16LittleEndian(Data.AsSpan(CardStart + 0x27C)); set => WriteUInt16LittleEndian(Data.AsSpan(CardStart + 0x27C), value); }
+
+    public ushort Checksum => ReadUInt16LittleEndian(Data.AsSpan(0x2CC));
 
     // Meta Accessible Properties
     public override int[] IVs
@@ -358,11 +370,13 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
     public bool IsNicknamed => false;
     public int Language => 2;
 
-    public string GetNickname(int language) => StringConverter8.GetString(Data.AsSpan(GetNicknameOffset(language), 0x1A));
-    public void SetNickname(int language, string value) => StringConverter8.SetString(Data.AsSpan(GetNicknameOffset(language), 0x1A), value.AsSpan(), 12, StringConverterOption.ClearZero);
+    private Span<byte> GetNicknameSpan(int language) => Data.AsSpan(GetNicknameOffset(language), 0x1A);
+    public string GetNickname(int language) => StringConverter8.GetString(GetNicknameSpan(language));
+    public void SetNickname(int language, ReadOnlySpan<char> value) => StringConverter8.SetString(GetNicknameSpan(language), value, 12, StringConverterOption.ClearZero);
 
-    public string GetOT(int language) => StringConverter8.GetString(Data.AsSpan(GetOTOffset(language), 0x1A));
-    public void SetOT(int language, string value) => StringConverter8.SetString(Data.AsSpan(GetOTOffset(language), 0x1A), value.AsSpan(), 12, StringConverterOption.ClearZero);
+    private Span<byte> GetOTSpan(int language) => Data.AsSpan(GetOTOffset(language), 0x1A);
+    public string GetOT(int language) => StringConverter8.GetString(GetOTSpan(language));
+    public void SetOT(int language, ReadOnlySpan<char> value) => StringConverter8.SetString(GetOTSpan(language), value, 12, StringConverterOption.ClearZero);
 
     private static int GetNicknameOffset(int language)
     {
@@ -386,7 +400,7 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         set { }
     }
 
-    public override PKM ConvertToPKM(ITrainerInfo tr, EncounterCriteria criteria)
+    public override PK8 ConvertToPKM(ITrainerInfo tr, EncounterCriteria criteria)
     {
         if (!IsEntity)
             throw new ArgumentException(nameof(IsEntity));
@@ -400,9 +414,9 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
 
         var pk = new PK8
         {
-            EncryptionConstant = EncryptionConstant != 0 || IsHOMEGift ? EncryptionConstant : Util.Rand32(),
-            TID = TID,
-            SID = SID,
+            EncryptionConstant = EncryptionConstant != 0 ? EncryptionConstant : Util.Rand32(),
+            TID16 = TID16,
+            SID16 = SID16,
             Species = Species,
             Form = Form,
             CurrentLevel = currentLevel,
@@ -462,24 +476,27 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
 
         if (OTGender >= 2)
         {
-            pk.TID = tr.TID;
-            pk.SID = tr.SID;
+            pk.TID16 = tr.TID16;
+            pk.SID16 = tr.SID16;
 
+            // Initial updates of HOME did not assign a TSV of 0.
+            // After enough server updates, HOME can now assign a TSV of 0.
+            // They will XOR the PID to ensure the shiny state of gifts is matched.
+            // Don't set a Secret ID.
             if (IsHOMEGift)
-            {
-                pk.TrainerSID7 = 0;
-                while (pk.TSV == 0)
-                {
-                    pk.TrainerID7 = Util.Rand.Next(16, 999_999 + 1);
-                }
-            }
+                pk.ID32 %= 1_000_000;
         }
 
         // Official code explicitly corrects for Meowstic
         if (pk.Species == (int)Core.Species.Meowstic)
             pk.Form = (byte)(pk.Gender & 1);
 
-        pk.MetDate = IsDateRestricted && EncounterServerDate.WC8Gifts.TryGetValue(CardID, out var dt) ? dt : DateTime.Now;
+        var date = GetSuggestedDate();
+        pk.MetDate = date;
+
+        // Prior to 3.0.0, HOME would set the Encryption Constant exactly and not give a random value if it was 0.
+        if (IsHOMEGiftOld(date))
+            pk.EncryptionConstant = EncryptionConstant;
 
         var nickname_language = GetLanguage(language);
         pk.Language = nickname_language != 0 ? nickname_language : tr.Language;
@@ -499,7 +516,7 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
             SetEggMetData(pk);
         pk.CurrentFriendship = pk.IsEgg ? pi.HatchCycles : pi.BaseFriendship;
 
-        if (!IsHOMEGift)
+        if (!IsHOMEGiftOld(date))
         {
             pk.HeightScalar = PokeSizeUtil.GetRandomScalar();
             pk.WeightScalar = PokeSizeUtil.GetRandomScalar();
@@ -510,23 +527,40 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         return pk;
     }
 
-    private void SetEggMetData(PKM pk)
+    private bool IsHOMEGiftOld(DateOnly date)
+    {
+        // 2023/05/30 -- every date prior [*,29th] is an old gift.
+        const int DayNumberHOME300 = 738669;
+        return IsHOMEGift && date.DayNumber < DayNumberHOME300;
+    }
+
+    private DateOnly GetSuggestedDate()
+    {
+        if (!IsDateRestricted)
+            return EncounterDate.GetDateSwitch();
+        if (EncounterServerDate.WC8GiftsChk.TryGetValue(Checksum, out var range))
+            return range.Start;
+        if (EncounterServerDate.WC8Gifts.TryGetValue(CardID, out range))
+            return range.Start;
+        return EncounterDate.GetDateSwitch();
+    }
+
+    private void SetEggMetData(PK8 pk)
     {
         pk.IsEgg = true;
-        pk.EggMetDate = DateTime.Now;
+        pk.EggMetDate = EncounterDate.GetDateSwitch();
         pk.Nickname = SpeciesName.GetEggName(pk.Language, Generation);
         pk.IsNicknamed = true;
     }
 
-    private void SetPINGA(PKM pk, EncounterCriteria criteria)
+    private void SetPINGA(PK8 pk, EncounterCriteria criteria)
     {
-        var pi = PersonalTable.SWSH.GetFormEntry(Species, Form);
-        pk.Nature = (int)criteria.GetNature(Nature == -1 ? Core.Nature.Random : (Nature)Nature);
-        pk.StatNature = pk.Nature;
+        var pi = pk.PersonalInfo;
+        pk.Nature = pk.StatNature = (int)criteria.GetNature(Nature == -1 ? Core.Nature.Random : (Nature)Nature);
         pk.Gender = criteria.GetGender(Gender, pi);
         var av = GetAbilityIndex(criteria);
         pk.RefreshAbility(av);
-        SetPID(pk, pk.MetDate ?? DateTime.UtcNow);
+        SetPID(pk);
         SetIVs(pk);
     }
 
@@ -546,46 +580,42 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         _ => AbilityPermission.Any12H,
     };
 
-    private uint GetPID(ITrainerID tr, ShinyType8 type, DateTime date) => type switch
+    private uint GetPID(PKM tr, ShinyType8 type) => type switch
     {
         ShinyType8.Never        => GetAntishiny(tr), // Random, Never Shiny
         ShinyType8.Random       => Util.Rand32(), // Random, Any
-        ShinyType8.AlwaysStar   => (uint) (((tr.TID ^ tr.SID ^ (PID & 0xFFFF) ^ 1) << 16) | (PID & 0xFFFF)), // Fixed, Force Star
-        ShinyType8.AlwaysSquare => (uint) (((tr.TID ^ tr.SID ^ (PID & 0xFFFF) ^ 0) << 16) | (PID & 0xFFFF)), // Fixed, Force Square
-        ShinyType8.FixedValue   => GetFixedPID(tr, date),
+        ShinyType8.AlwaysStar   => (1u ^ (PID & 0xFFFF) ^ tr.TID16 ^ tr.SID16) << 16 | (PID & 0xFFFF), // Fixed, Force Star
+        ShinyType8.AlwaysSquare => (0u ^ (PID & 0xFFFF) ^ tr.TID16 ^ tr.SID16) << 16 | (PID & 0xFFFF), // Fixed, Force Square
+        ShinyType8.FixedValue   => GetFixedPID(tr),
         _ => throw new ArgumentOutOfRangeException(nameof(type)),
     };
 
-    private uint GetFixedPID(ITrainerID tr, DateTime date)
+    private uint GetFixedPID(PKM tr)
     {
         var pid = PID;
-        if (pid != 0 && !(TID == 0 && SID == 0))
+        if (pid != 0 && ID32 != 0)
             return pid;
 
         if (!tr.IsShiny(pid, 8))
             return pid;
-        if (IsHOMEGift && !IsHOMEShinyPossible(date))
-            return GetAntishinyFixedHOME(tr);
+        if (IsHOMEGift && !IsHOMEShinyPossible())
+            return ForceAntiShiny(pid);
         return pid;
     }
 
-    private static uint GetAntishinyFixedHOME(ITrainerID tr)
-    {
-        var fid = (uint)(tr.SID << 16) | (uint)tr.TID;
-        return fid ^ 0x10u;
-    }
+    private static uint ForceAntiShiny(uint pid) => pid ^ 0x1000_0000;
 
-    private static uint GetAntishiny(ITrainerID tr)
+    private static uint GetAntishiny(ITrainerID32 tr)
     {
         var pid = Util.Rand32();
         if (tr.IsShiny(pid, 8))
-            return pid ^ 0x1000_0000;
+            return ForceAntiShiny(pid);
         return pid;
     }
 
-    private void SetPID(PKM pk, DateTime date)
+    private void SetPID(PK8 pk)
     {
-        pk.PID = GetPID(pk, PIDType, date);
+        pk.PID = GetPID(pk, PIDType);
     }
 
     private void SetIVs(PKM pk)
@@ -622,8 +652,8 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         {
             if (OTGender < 2)
             {
-                if (SID != pk.SID) return false;
-                if (TID != pk.TID) return false;
+                if (SID16 != pk.SID16) return false;
+                if (TID16 != pk.TID16) return false;
                 if (OTGender != pk.OT_Gender) return false;
             }
 
@@ -638,15 +668,15 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
                 if (EncryptionConstant != pk.EncryptionConstant)
                     return false;
             }
-            else if (IsHOMEGift)// 0
+            else if (IsHOMEGift)
             {
-                // HOME gifts -- PID and EC are zeroes...
-                if (EncryptionConstant != pk.EncryptionConstant)
-                    return false;
-
-                if (pk.TSV == 0) // HOME doesn't assign TSV=0 to accounts.
-                    return false;
-
+                // Prior to 3.0.0, HOME would set the Encryption Constant exactly and not give a random value if it was 0.
+                if (pk.MetDate is { } x && IsHOMEGiftOld(x))
+                {
+                    // HOME gifts -- PID and EC are zeroes...
+                    if (EncryptionConstant != pk.EncryptionConstant)
+                        return false;
+                }
                 if (IsShiny)
                 {
                     if (!pk.IsShiny)
@@ -654,25 +684,25 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
                 }
                 else // Never or Random (HOME ID specific)
                 {
-                    if (pk.IsShiny && !IsHOMEShinyPossible(pk.MetDate ?? DateTime.UtcNow))
+                    if (pk.IsShiny && !IsHOMEShinyPossible())
                         return false;
                 }
             }
         }
 
-        if (Form != evo.Form && !FormInfo.IsFormChangeable(Species, Form, pk.Form, pk.Format))
+        if (Form != evo.Form && !FormInfo.IsFormChangeable(Species, Form, pk.Form, Context, pk.Context))
             return false;
 
         var shinyType = Shiny;
         if (PIDType == ShinyType8.FixedValue)
-            shinyType = FixedShinyType(pk.MetDate ?? DateTime.UtcNow);
+            shinyType = FixedShinyType();
         if (IsEgg)
         {
             if (EggLocation != pk.Egg_Location) // traded
             {
                 if (pk.Egg_Location != Locations.LinkTrade6)
                     return false;
-                if (PIDType == ShinyType8.Random && pk.IsShiny && pk.ShinyXor > 1)
+                if (PIDType == ShinyType8.Random && pk is { IsShiny: true, ShinyXor: > 1 })
                     return false; // shiny traded egg will always have xor0/1.
             }
             if (!shinyType.IsValid(pk))
@@ -680,7 +710,7 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
                 return false; // can't be traded away for unshiny
             }
 
-            if (pk.IsEgg && !pk.IsNative)
+            if (pk is { IsEgg: true, IsNative: false })
                 return false;
         }
         else
@@ -702,12 +732,26 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         if (pk is PK8 pk8 && pk8.DynamaxLevel < DynamaxLevel)
             return false;
 
-        if (IsHOMEGift && pk is IScaledSize s)
+        if (IsHOMEGift)
         {
-            if (s.HeightScalar != 0)
-                return false;
-            if (s.WeightScalar != 0)
-                return false;
+            // Prior to 3.0.0, HOME would set the Height and Weight exactly and not give a random value if it was 0.
+            // However, entering HOME will re-randomize the Height and Weight.
+            if (pk.MetDate is { } x && IsHOMEGiftOld(x))
+            {
+                // Need to defer and not mismatch date ranges.
+                if (!EncounterServerDate.IsValidDateWC8(this, x))
+                    return false;
+
+                if (pk.Context is not (EntityContext.Gen8 or EntityContext.Gen8b))
+                {
+                    // Only these 3 can transfer to PLA and get 0 scale prior to 3.0.0
+                    if (Species is not ((ushort)Core.Species.Pikachu or (ushort)Core.Species.Eevee or (ushort)Core.Species.Rotom or (ushort)Core.Species.Pichu))
+                    {
+                        if (pk is IScaledSize { HeightScalar: 0, WeightScalar: 0 })
+                            return false;
+                    }
+                }
+            }
         }
 
         // Duplicate card; one with Nickname specified and another without.
@@ -720,18 +764,22 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         var type = PIDType;
         if (type is ShinyType8.Never or ShinyType8.Random)
             return true;
-        return pk.PID == GetPID(pk, type, pk.MetDate ?? DateTime.UtcNow);
+        if (pk.PID == GetPID(pk, type))
+            return true;
+
+        return false;
     }
 
-    private bool IsHOMEShinyPossible(DateTime date)
+    private bool IsHOMEShinyPossible()
     {
-        // no defined TID/SID and having a fixed PID can cause the player's TID/SID to match the PID's shiny calc.
-        return TID == 0 && SID == 0 && PID != 0 && (CardID < 9015 && date < new DateTime(2022, 5, 18));
+        // no defined TID16/SID16 and having a fixed PID can cause the player's TID16/SID16 to match the PID's shiny calc.
+        // All PIDs are fixed for HOME gifts.
+        return ID32 == 0 && PID != 0;
     }
 
     public bool IsDateRestricted => IsHOMEGift;
 
-    protected override bool IsMatchDeferred(PKM pk) => Species != pk.Species;
+    protected override bool IsMatchDeferred(PKM pk) => false;
     protected override bool IsMatchPartial(PKM pk) => false; // no version compatibility checks yet.
 
     #region Lazy Ribbon Implementation
@@ -833,7 +881,7 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
     public bool RibbonMarkVigor { get => this.GetRibbonIndex(MarkVigor); set => this.SetRibbonIndex(MarkVigor, value); }
     public bool RibbonMarkSlump { get => this.GetRibbonIndex(MarkSlump); set => this.SetRibbonIndex(MarkSlump, value); }
     public bool RibbonTwinklingStar { get => this.GetRibbonIndex(TwinklingStar); set => this.SetRibbonIndex(TwinklingStar, value); }
-    public bool RibbonPioneer { get => this.GetRibbonIndex(Pioneer); set => this.SetRibbonIndex(Pioneer, value); }
+    public bool RibbonHisui { get => this.GetRibbonIndex(Hisui); set => this.SetRibbonIndex(Hisui, value); }
 
     public int GetRibbonByte(int index) => Array.IndexOf(Data, (byte)index, RibbonBytesOffset, RibbonBytesCount);
     public bool GetRibbon(int index) => GetRibbonByte(index) >= 0;

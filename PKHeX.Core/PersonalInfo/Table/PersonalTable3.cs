@@ -7,10 +7,10 @@ namespace PKHeX.Core;
 /// </summary>
 public sealed class PersonalTable3 : IPersonalTable, IPersonalTable<PersonalInfo3>
 {
-    internal readonly PersonalInfo3[] Table; // internal to share with Gen1 tables
+    private readonly PersonalInfo3[] Table;
     private const int SIZE = PersonalInfo3.SIZE;
-    private const int MaxSpecies = Legal.MaxSpeciesID_3;
-    public int MaxSpeciesID => MaxSpecies;
+    private const ushort MaxSpecies = Legal.MaxSpeciesID_3;
+    public ushort MaxSpeciesID => MaxSpecies;
 
     public PersonalTable3(ReadOnlySpan<byte> data)
     {
@@ -28,7 +28,7 @@ public sealed class PersonalTable3 : IPersonalTable, IPersonalTable<PersonalInfo
     public PersonalInfo3 GetFormEntry(ushort species, byte form) => Table[GetFormIndex(species, form)];
 
     public int GetFormIndex(ushort species, byte form) => IsSpeciesInGame(species) ? species : 0;
-    public bool IsSpeciesInGame(ushort species) => (uint)species <= MaxSpecies;
+    public bool IsSpeciesInGame(ushort species) => species <= MaxSpecies;
     public bool IsPresentInGame(ushort species, byte form)
     {
         if (!IsSpeciesInGame(species))
@@ -45,4 +45,24 @@ public sealed class PersonalTable3 : IPersonalTable, IPersonalTable<PersonalInfo
     PersonalInfo IPersonalTable.this[int index] => this[index];
     PersonalInfo IPersonalTable.this[ushort species, byte form] => this[species, form];
     PersonalInfo IPersonalTable.GetFormEntry(ushort species, byte form) => GetFormEntry(species, form);
+
+    internal void LoadTables(BinLinkerAccessor machine, BinLinkerAccessor tutors)
+    {
+        var table = Table;
+        for (int i = Legal.MaxSpeciesID_3; i >= 1; i--)
+        {
+            var entry = table[i];
+            entry.AddTMHM(machine[i]);
+            entry.AddTypeTutors(tutors[i]);
+        }
+    }
+
+    internal void CopyTables(PersonalTable3 pt)
+    {
+        // Copy to other tables
+        var other = pt.Table;
+        var table = Table;
+        for (int i = Legal.MaxSpeciesID_3; i >= 1; i--)
+            table[i].CopyFrom(other[i]);
+    }
 }

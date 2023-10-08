@@ -51,7 +51,7 @@ public static class CommonEdits
     /// Sets the <see cref="PKM.Ability"/> value by sanity checking the provided <see cref="PKM.Ability"/> against the possible pool of abilities.
     /// </summary>
     /// <param name="pk">Pokémon to modify.</param>
-    /// <param name="abil">Desired <see cref="PKM.Ability"/> to set.</param>
+    /// <param name="abil">Desired <see cref="Ability"/> value to set.</param>
     public static void SetAbility(this PKM pk, int abil)
     {
         if (abil < 0)
@@ -88,14 +88,7 @@ public static class CommonEdits
             pk.EncryptionConstant = pk.PID;
             return;
         }
-
-        int wIndex = WurmpleUtil.GetWurmpleEvoGroup(pk.Species);
-        if (wIndex != -1)
-        {
-            pk.EncryptionConstant = WurmpleUtil.GetWurmpleEncryptionConstant(wIndex);
-            return;
-        }
-        pk.EncryptionConstant = Util.Rand32();
+        pk.EncryptionConstant = GetComplicatedEC(pk);
     }
 
     /// <summary>
@@ -149,7 +142,7 @@ public static class CommonEdits
     /// <param name="nature">Desired <see cref="PKM.Nature"/> value to set.</param>
     public static void SetNature(this PKM pk, int nature)
     {
-        var value = Math.Min((int)Nature.Quirky, Math.Max((int)Nature.Hardy, nature));
+        var value = Math.Clamp(nature, (int)Nature.Hardy, (int)Nature.Quirky);
         var format = pk.Format;
         if (format >= 8)
             pk.StatNature = value;
@@ -181,13 +174,13 @@ public static class CommonEdits
             // Under this scenario, just force the Hidden Power type.
             if (Array.IndexOf(Set.Moves, (ushort)Move.HiddenPower) != -1 && pk.HPType != Set.HiddenPowerType)
             {
-                if (Array.Exists(Set.IVs, static iv => iv >= 30))
+                if (Set.IVs.AsSpan().IndexOfAny(30, 31) >= 0)
                     pk.SetHiddenPower(Set.HiddenPowerType);
             }
 
             // In Generation 1/2 Format sets, when EVs are not specified at all, it implies maximum EVs instead!
             // Under this scenario, just apply maximum EVs (65535).
-            if (Array.TrueForAll(Set.EVs, static ev => ev == 0))
+            if (Set.EVs.AsSpan().IndexOfAnyExcept(0) == -1)
                 gb.MaxEVs();
             else
                 pk.SetEVs(Set.EVs);
@@ -199,7 +192,7 @@ public static class CommonEdits
 
         // IVs have no side effects such as hidden power type in gen 8
         // therefore all specified IVs are deliberate and should not be Hyper Trained for pokemon met in gen 8
-        if (!pk.Gen8)
+        if (pk.Generation < 8)
             pk.SetSuggestedHyperTrainingData(Set.IVs);
 
         if (ShowdownSetIVMarkings)
@@ -237,12 +230,12 @@ public static class CommonEdits
             c.CanGigantamax = Set.CanGigantamax;
         if (pk is IDynamaxLevel d)
             d.DynamaxLevel = d.GetSuggestedDynamaxLevel(pk, requested: Set.DynamaxLevel);
-
-        if (pk is ITechRecord8 t)
+        if (pk is ITeraType tera)
         {
-            t.ClearRecordFlags();
-            t.SetRecordFlags(Set.Moves);
+            var type = Set.TeraType == MoveType.Any ? (MoveType)pk.PersonalInfo.Type1 : Set.TeraType;
+            tera.SetTeraType(type);
         }
+
         if (pk is IMoveShop8Mastery s)
             s.SetMoveShopFlags(Set.Moves, pk);
 
@@ -250,8 +243,13 @@ public static class CommonEdits
             pk.Nature = pk.StatNature;
 
         var legal = new LegalityAnalysis(pk);
+        if (pk is ITechRecord t)
+        {
+            t.ClearRecordFlags();
+            t.SetRecordFlags(Set.Moves, legal.Info.EvoChainsAllGens.Get(pk.Context));
+        }
         if (legal.Parsed && !MoveResult.AllValid(legal.Info.Relearn))
-            pk.SetRelearnMoves(legal.GetSuggestedRelearnMoves());
+            pk.SetRelearnMoves(legal);
         pk.ResetPartyStats();
         pk.RefreshChecksum();
     }
@@ -311,11 +309,11 @@ public static class CommonEdits
     public static int GetMaximumEV(this PKM pk, int index)
     {
         if (pk.Format < 3)
-            return ushort.MaxValue;
+            return EffortValues.Max12;
 
         var sum = pk.EVTotal - pk.GetEV(index);
-        int remaining = 510 - sum;
-        return Math.Min(Math.Max(remaining, 0), 252);
+        int remaining = EffortValues.Max510 - sum;
+        return Math.Clamp(remaining, 0, EffortValues.Max252);
     }
 
     /// <summary>
@@ -336,8 +334,9 @@ public static class CommonEdits
     /// Force hatches a PKM by applying the current species name and a valid Met Location from the origin game.
     /// </summary>
     /// <param name="pk">PKM to apply hatch details to</param>
+    /// <param name="tr">Trainer to force hatch with if Version is not currently set.</param>
     /// <param name="reHatch">Re-hatch already hatched <see cref="PKM"/> inputs</param>
-    public static void ForceHatchPKM(this PKM pk, bool reHatch = false)
+    public static void ForceHatchPKM(this PKM pk, ITrainerInfo? tr = null, bool reHatch = false)
     {
         if (!pk.IsEgg && !reHatch)
             return;
@@ -346,10 +345,12 @@ public static class CommonEdits
         pk.CurrentFriendship = pk.PersonalInfo.BaseFriendship;
         if (pk.IsTradedEgg)
             pk.Egg_Location = pk.Met_Location;
+        if (pk.Version == 0)
+            pk.Version = (int)EggStateLegality.GetEggHatchVersion(pk, (GameVersion)(tr?.Game ?? RecentTrainerCache.Game));
         var loc = EncounterSuggestion.GetSuggestedEggMetLocation(pk);
         if (loc >= 0)
             pk.Met_Location = loc;
-        pk.MetDate = DateTime.Today;
+        pk.MetDate = DateOnly.FromDateTime(DateTime.Today);
         if (pk.Gen6)
             pk.SetHatchMemory6();
     }
@@ -363,7 +364,7 @@ public static class CommonEdits
     public static void SetEggMetData(this PKM pk, GameVersion origin, GameVersion dest)
     {
         bool traded = origin != dest;
-        var today = pk.MetDate = DateTime.Today;
+        var today = pk.MetDate = DateOnly.FromDateTime(DateTime.Today);
         pk.Egg_Location = EncounterSuggestion.GetSuggestedEncounterEggLocationEgg(pk.Generation, origin, traded);
         pk.EggMetDate = today;
     }
@@ -402,7 +403,7 @@ public static class CommonEdits
     /// <param name="la">Precomputed optional</param>
     public static void SetDefaultNickname(this PKM pk, LegalityAnalysis la)
     {
-        if (la.Parsed && la.EncounterOriginal is EncounterTrade {HasNickname: true} t)
+        if (la is { Parsed: true, EncounterOriginal: IFixedNickname {IsFixedNickname: true} t })
             pk.SetNickname(t.GetNickname(pk.Language));
         else
             pk.ClearNickname();
@@ -414,8 +415,21 @@ public static class CommonEdits
     /// <param name="pk">Pokémon to modify.</param>
     public static void SetDefaultNickname(this PKM pk) => pk.SetDefaultNickname(new LegalityAnalysis(pk));
 
-    private static readonly string[] PotentialUnicode = { "★☆☆☆", "★★☆☆", "★★★☆", "★★★★" };
-    private static readonly string[] PotentialNoUnicode = { "+", "++", "+++", "++++" };
+    private static string GetPotentialUnicode(int rating) => rating switch
+    {
+        0 => "★☆☆☆",
+        1 => "★★☆☆",
+        2 => "★★★☆",
+        _ => "★★★★",
+    };
+
+    private static string GetPotentialASCII(int rating) => rating switch
+    {
+        0 => "+",
+        1 => "++",
+        2 => "+++",
+        _ => "++++",
+    };
 
     /// <summary>
     /// Gets the Potential evaluation of the input <see cref="pk"/>.
@@ -425,8 +439,10 @@ public static class CommonEdits
     /// <returns>Potential string</returns>
     public static string GetPotentialString(this PKM pk, bool unicode = true)
     {
-        var arr = unicode ? PotentialUnicode : PotentialNoUnicode;
-        return arr[pk.PotentialRating];
+        var rating = pk.PotentialRating;
+        if (unicode)
+            return GetPotentialUnicode(rating);
+        return GetPotentialASCII(rating);
     }
 
     // Extensions
@@ -443,5 +459,38 @@ public static class CommonEdits
 
         int location = eggmet ? pk.Egg_Location : pk.Met_Location;
         return GameInfo.GetLocationName(eggmet, location, pk.Format, pk.Generation, (GameVersion)pk.Version);
+    }
+
+    /// <summary>
+    /// Gets a <see cref="PKM.EncryptionConstant"/> to match the requested option.
+    /// </summary>
+    public static uint GetComplicatedEC(ISpeciesForm pk, char option = ' ')
+    {
+        var rng = Util.Rand;
+        uint rand = rng.Rand32();
+        uint mod = 1, noise = 0;
+        if (pk.Species is >= (int)Species.Wurmple and <= (int)Species.Dustox)
+        {
+            mod = 10;
+            bool lower = option is '0' or 'B' or 'S' || WurmpleUtil.GetWurmpleEvoGroup(pk.Species) == 0;
+            noise = (lower ? 0u : 5u) + (uint)rng.Next(0, 5);
+        }
+        else if (pk.Species is (int)Species.Dunsparce or (int)Species.Dudunsparce or (int)Species.Tandemaus or (int)Species.Maushold)
+        {
+            mod = 100;
+            noise = option switch
+            {
+                '0' or '3' => 0u,
+                _ when pk.Species is (int)Species.Dudunsparce && pk.Form == 1 => 0, // 3 Segment
+                _ when pk.Species is (int)Species.Maushold && pk.Form == 0 => 0, // Family of 3
+                _ => (uint)rng.Next(1, 100),
+            };
+        }
+        else if (option is >= '0' and <= '5')
+        {
+            mod = 6;
+            noise = (uint)(option - '0');
+        }
+        return unchecked(rand - (rand % mod) + noise);
     }
 }

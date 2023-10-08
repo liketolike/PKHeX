@@ -43,7 +43,8 @@ public partial class SAV_Pokedex5 : Form
 
     private void ChangeCBSpecies(object sender, EventArgs e)
     {
-        if (editing) return;
+        if (editing)
+            return;
         SetEntry();
 
         editing = true;
@@ -56,7 +57,8 @@ public partial class SAV_Pokedex5 : Form
 
     private void ChangeLBSpecies(object sender, EventArgs e)
     {
-        if (editing) return;
+        if (editing)
+            return;
         SetEntry();
 
         editing = true;
@@ -68,7 +70,7 @@ public partial class SAV_Pokedex5 : Form
 
     private void ChangeDisplayed(object sender, EventArgs e)
     {
-        if (!((CheckBox) sender).Checked)
+        if (!((CheckBox)sender).Checked)
             return;
 
         CHK_P6.Checked = sender == CHK_P6;
@@ -136,7 +138,7 @@ public partial class SAV_Pokedex5 : Form
         CLB_FormsSeen.Items.Clear();
         CLB_FormDisplayed.Items.Clear();
 
-        int fc = pi.FormCount;
+        var fc = pi.FormCount;
         int f = SAV is SAV5B2W2 ? DexFormUtil.GetDexFormIndexB2W2(species, fc) : DexFormUtil.GetDexFormIndexBW(species, fc);
         if (f < 0)
             return;
@@ -174,21 +176,21 @@ public partial class SAV_Pokedex5 : Form
                 Dex.SetLanguageFlag(species - 1, i, CL[i].Checked);
         }
 
-        int fc = SAV.Personal[species].FormCount;
+        var fc = SAV.Personal[species].FormCount;
         int f = SAV is SAV5B2W2 ? DexFormUtil.GetDexFormIndexB2W2(species, fc) : DexFormUtil.GetDexFormIndexBW(species, fc);
         if (f < 0)
             return;
 
-        for (int i = 0; i < CLB_FormsSeen.Items.Count/2; i++) // Seen
+        for (int i = 0; i < CLB_FormsSeen.Items.Count / 2; i++) // Seen
             Dex.SetFormFlag(f + i, 0, CLB_FormsSeen.GetItemChecked(i));
-        for (int i = 0; i < CLB_FormsSeen.Items.Count/2; i++)  // Seen Shiny
-            Dex.SetFormFlag(f + i, 1, CLB_FormsSeen.GetItemChecked(i + (CLB_FormsSeen.Items.Count/2)));
+        for (int i = 0; i < CLB_FormsSeen.Items.Count / 2; i++)  // Seen Shiny
+            Dex.SetFormFlag(f + i, 1, CLB_FormsSeen.GetItemChecked(i + (CLB_FormsSeen.Items.Count / 2)));
 
         editing = true;
-        for (int i = 0; i < CLB_FormDisplayed.Items.Count/2; i++) // Displayed
+        for (int i = 0; i < CLB_FormDisplayed.Items.Count / 2; i++) // Displayed
             Dex.SetFormFlag(f + i, 2, CLB_FormDisplayed.GetItemChecked(i));
-        for (int i = 0; i < CLB_FormDisplayed.Items.Count/2; i++)  // Displayed Shiny
-            Dex.SetFormFlag(f + i, 3, CLB_FormDisplayed.GetItemChecked(i + (CLB_FormDisplayed.Items.Count/2)));
+        for (int i = 0; i < CLB_FormDisplayed.Items.Count / 2; i++)  // Displayed Shiny
+            Dex.SetFormFlag(f + i, 3, CLB_FormDisplayed.GetItemChecked(i + (CLB_FormDisplayed.Items.Count / 2)));
         editing = false;
     }
 
@@ -220,8 +222,8 @@ public partial class SAV_Pokedex5 : Form
         {
             CHK_P1.Checked = ModifierKeys != Keys.Control;
         }
-        int index = LB_Species.SelectedIndex+1;
-        int gt = SAV.Personal[index].Gender;
+        int index = LB_Species.SelectedIndex + 1;
+        byte gt = SAV.Personal[index].Gender;
 
         bool canBeMale = gt != PersonalInfo.RatioMagicFemale;
         bool canBeFemale = gt is not (PersonalInfo.RatioMagicMale or PersonalInfo.RatioMagicGenderless);
@@ -255,7 +257,7 @@ public partial class SAV_Pokedex5 : Form
         {
             for (int i = 0; i < LB_Species.Items.Count; i++)
             {
-                int gt = SAV.Personal[i + 1].Gender;
+                byte gt = SAV.Personal[i + 1].Gender;
                 LB_Species.SelectedIndex = i;
                 foreach (CheckBox t in new[] { CHK_P2, CHK_P3, CHK_P4, CHK_P5 })
                     t.Checked = mnuSeenNone != sender && t.Enabled;
@@ -284,7 +286,7 @@ public partial class SAV_Pokedex5 : Form
         {
             for (int i = 0; i < CB_Species.Items.Count; i++)
             {
-                int gt = SAV.Personal[i + 1].Gender;
+                byte gt = SAV.Personal[i + 1].Gender;
                 LB_Species.SelectedIndex = i;
                 foreach (CheckBox t in new[] { CHK_P1 })
                     t.Checked = mnuCaughtNone != sender;
@@ -335,7 +337,9 @@ public partial class SAV_Pokedex5 : Form
             return;
 
         // Only allow one form to be displayed if the user sets a new display value
-        if (e.NewValue != CheckState.Checked) return;
+        if (e.NewValue != CheckState.Checked)
+            return;
+
         for (int i = 0; i < CLB_FormDisplayed.Items.Count; i++)
         {
             if (i != e.Index)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace PKHeX.Core;
 
@@ -15,12 +15,12 @@ public sealed class MysteryBlock7 : SaveBlock<SAV7>
     // Mystery Gift
     public bool[] MysteryGiftReceivedFlags
     {
-        get => ArrayUtil.GitBitFlagArray(Data.AsSpan(Offset + FlagStart), MaxReceivedFlag);
+        get => FlagUtil.GitBitFlagArray(Data.AsSpan(Offset + FlagStart), MaxReceivedFlag);
         set
         {
             if (value.Length != MaxReceivedFlag)
                 return;
-            ArrayUtil.SetBitFlagArray(Data.AsSpan(Offset + FlagStart), value);
+            FlagUtil.SetBitFlagArray(Data.AsSpan(Offset + FlagStart), value);
             SAV.State.Edited = true;
         }
     }
@@ -50,7 +50,7 @@ public sealed class MysteryBlock7 : SaveBlock<SAV7>
             throw new ArgumentOutOfRangeException(nameof(index));
 
         var offset = GetGiftOffset(index);
-        var data = SAV.GetData(offset, WC7.Size);
+        var data = SAV.Data.AsSpan(offset, WC7.Size).ToArray();
         return new WC7(data);
     }
 

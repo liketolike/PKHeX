@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using static PKHeX.Core.LanguageID;
 
 namespace PKHeX.Core;
@@ -8,14 +8,15 @@ namespace PKHeX.Core;
 /// </summary>
 public static class Language
 {
-    private static readonly byte[] Languages =
+    private static ReadOnlySpan<byte> Languages => new[]
     {
         (byte)Japanese,
         (byte)English,
         (byte)French,
-        (byte)German,
-        (byte)Spanish,
         (byte)Italian,
+        (byte)German,
+
+        (byte)Spanish,
 
         (byte)Korean, // GS
 
@@ -24,10 +25,15 @@ public static class Language
     };
 
     // check Korean for the VC case, never possible to match string outside of this case
-    private static readonly byte[] Languages_GB = Languages.AsSpan(0, 7).ToArray(); // [..KOR]
-    private static readonly byte[] Languages_3  = Languages.AsSpan(0, 6).ToArray(); // [..KOR)
+    private static ReadOnlySpan<byte> Languages_GB => Languages[..7]; // [..KOR]
+    private static ReadOnlySpan<byte> Languages_3  => Languages[..6]; // [..KOR)
     private const LanguageID SafeLanguage = English;
 
+    /// <summary>
+    /// Returns the available languages for the given generation.
+    /// </summary>
+    /// <param name="generation">Generation to check.</param>
+    /// <returns>Available languages for the given generation.</returns>
     public static ReadOnlySpan<byte> GetAvailableGameLanguages(int generation = PKX.Generation) => generation switch
     {
         1           => Languages_3, // No KOR
@@ -37,12 +43,15 @@ public static class Language
         _           => Languages,
     };
 
-    private static bool HasLanguage(byte[] permitted, byte language)
-    {
-        int index = Array.IndexOf(permitted, language);
-        return index != -1;
-    }
+    private static bool HasLanguage(ReadOnlySpan<byte> permitted, byte language) => permitted.Contains(language);
 
+    /// <summary>
+    /// Returns the language that is safe to use for the given generation.
+    /// </summary>
+    /// <param name="generation">Generation to check.</param>
+    /// <param name="prefer">Preferred language.</param>
+    /// <param name="game">Game version to check.</param>
+    /// <returns>Language that is safe to use for the given generation.</returns>
     public static LanguageID GetSafeLanguage(int generation, LanguageID prefer, GameVersion game = GameVersion.Any) => generation switch
     {
         1 when game == GameVersion.BU => Japanese,
@@ -53,6 +62,11 @@ public static class Language
         _           => HasLanguage(Languages,    (byte)prefer) ? prefer : SafeLanguage,
     };
 
+    /// <summary>
+    /// Gets the 2-character language name for the given <see cref="LanguageID"/>.
+    /// </summary>
+    /// <param name="language">Language ID to get the 2-character name for.</param>
+    /// <returns>2-character language name.</returns>
     public static string GetLanguage2CharName(this LanguageID language) => language switch
     {
         Japanese => "ja",

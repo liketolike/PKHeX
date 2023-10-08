@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 
 namespace PKHeX.Core;
 
@@ -13,8 +14,10 @@ public static class RibbonStrings
     /// Resets the Ribbon Dictionary to use the supplied set of Ribbon (Property) Names.
     /// </summary>
     /// <param name="lines">Array of strings that are tab separated with Property Name, \t, and Display Name.</param>
-    public static void ResetDictionary(IEnumerable<string> lines)
+    public static void ResetDictionary(ReadOnlySpan<string> lines)
     {
+        RibbonNames.EnsureCapacity(lines.Length);
+
         // Don't clear existing keys on reset; only update.
         // A language will have the same keys (hopefully), only with differing values.
         foreach (var line in lines)
@@ -22,8 +25,8 @@ public static class RibbonStrings
             var index = line.IndexOf('\t');
             if (index < 0)
                 continue;
-            var name = line[..index];
             var text = line[(index + 1)..];
+            var name = line[..index];
             RibbonNames[name] = text;
         }
     }
@@ -37,7 +40,7 @@ public static class RibbonStrings
     {
         // Throw an exception with the requested property name as the message, rather than an ambiguous "key not present" message.
         // We should ALWAYS have the key present as the input arguments are not user-defined, rather, they are from PKM property names.
-        if (!RibbonNames.TryGetValue(propertyName, out string value))
+        if (!RibbonNames.TryGetValue(propertyName, out var value))
             throw new KeyNotFoundException(propertyName);
         return value;
     }

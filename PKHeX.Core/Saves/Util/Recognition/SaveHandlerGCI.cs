@@ -20,7 +20,7 @@ public sealed class SaveHandlerGCI : ISaveHandler
     {
         foreach (var header in headers)
         {
-            if (IsGameMatchHeader(data, header.AsSpan()))
+            if (IsGameMatchHeader(data, header))
                 return true;
         }
         return false;
@@ -38,7 +38,7 @@ public sealed class SaveHandlerGCI : ISaveHandler
         return true;
     }
 
-    public bool IsRecognized(int size) => size is SIZE_G3BOXGCI or SIZE_G3COLOGCI or SIZE_G3XDGCI;
+    public bool IsRecognized(long size) => size is SIZE_G3BOXGCI or SIZE_G3COLOGCI or SIZE_G3XDGCI;
 
     public SaveHandlerSplitResult? TrySplit(ReadOnlySpan<byte> input)
     {

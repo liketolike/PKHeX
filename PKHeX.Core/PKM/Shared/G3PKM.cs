@@ -1,14 +1,17 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PKHeX.Core;
 
 /// <summary>
 /// Generation 3 Base <see cref="PKM"/> Class
 /// </summary>
-public abstract class G3PKM : PKM, IRibbonSetEvent3, IRibbonSetCommon3, IRibbonSetUnique3, IRibbonSetOnly3, IContestStats, IContestStatsMutable
+public abstract class G3PKM : PKM, IRibbonSetEvent3, IRibbonSetCommon3, IRibbonSetUnique3, IRibbonSetOnly3, IRibbonSetRibbons, IContestStats
 {
     protected G3PKM(byte[] data) : base(data) { }
-    protected G3PKM(int size) : base(size) { }
+    protected G3PKM([ConstantExpected] int size) : base(size) { }
+
+    public abstract override PersonalInfo3 PersonalInfo { get; }
 
     // Maximums
     public sealed override ushort MaxMoveID => Legal.MaxMoveID_3;
@@ -18,16 +21,16 @@ public abstract class G3PKM : PKM, IRibbonSetEvent3, IRibbonSetCommon3, IRibbonS
     public sealed override int MaxBallID => Legal.MaxBallID_3;
     public sealed override int MaxGameID => Legal.MaxGameID_3;
     public sealed override int MaxIV => 31;
-    public sealed override int MaxEV => 255;
-    public sealed override int OTLength => 7;
-    public sealed override int NickLength => 10;
+    public sealed override int MaxEV => EffortValues.Max255;
+    public sealed override int MaxStringLengthOT => 7;
+    public sealed override int MaxStringLengthNickname => 10;
 
     // Generated Attributes
-    public sealed override int PSV => (int)(((PID >> 16) ^ (PID & 0xFFFF)) >> 3);
-    public sealed override int TSV => (TID ^ SID) >> 3;
+    public sealed override uint PSV => ((PID >> 16) ^ (PID & 0xFFFF)) >> 3;
+    public sealed override uint TSV => (uint)(TID16 ^ SID16) >> 3;
     public sealed override bool Japanese => Language == (int)LanguageID.Japanese;
 
-    public sealed override int Ability { get => ((PersonalInfo3)PersonalInfo).GetAbility(AbilityBit); set { } }
+    public sealed override int Ability { get => PersonalInfo.GetAbility(AbilityBit); set { } }
     public sealed override uint EncryptionConstant { get => PID; set { } }
     public sealed override int Nature { get => (int)(PID % 25); set { } }
     public sealed override bool IsNicknamed { get => SpeciesName.IsNicknamed(Species, Nickname, Language, 3); set { } }
@@ -52,7 +55,7 @@ public abstract class G3PKM : PKM, IRibbonSetEvent3, IRibbonSetCommon3, IRibbonS
         MarkValue = (MarkValue & ~(1 << index)) | ((value & 1) << index);
     }
 
-    public abstract ushort SpeciesID3 { get; set; } // raw access
+    public abstract ushort SpeciesInternal { get; set; } // raw access
 
     public sealed override byte Form
     {
@@ -74,7 +77,7 @@ public abstract class G3PKM : PKM, IRibbonSetEvent3, IRibbonSetCommon3, IRibbonS
     {
         if (Species is (int)Core.Species.Granbull or (int)Core.Species.Vibrava or (int)Core.Species.Flygon)
             return;
-        AbilityBit = n == 1 && ((PersonalInfo3)PersonalInfo).HasSecondAbility;
+        AbilityBit = n == 1 && PersonalInfo.HasSecondAbility;
     }
 
     public override bool Valid { get => true; set { } }
@@ -102,6 +105,7 @@ public abstract class G3PKM : PKM, IRibbonSetEvent3, IRibbonSetCommon3, IRibbonS
     public abstract bool Unused2 { get; set; }
     public abstract bool Unused3 { get; set; }
     public abstract bool Unused4 { get; set; }
+    public abstract int RibbonCount { get; }
 
     public abstract byte CNT_Cool   { get; set; }
     public abstract byte CNT_Beauty { get; set; }
@@ -137,11 +141,11 @@ public abstract class G3PKM : PKM, IRibbonSetEvent3, IRibbonSetCommon3, IRibbonS
     /// <returns>New object with transferred properties.</returns>
     protected T ConvertTo<T>() where T : G3PKM, new() => new()
     {
-        SpeciesID3 = SpeciesID3,
+        SpeciesInternal = SpeciesInternal,
         Language = Language,
         PID = PID,
-        TID = TID,
-        SID = SID,
+        TID16 = TID16,
+        SID16 = SID16,
         EXP = EXP,
         HeldItem = HeldItem,
         AbilityBit = AbilityBit,

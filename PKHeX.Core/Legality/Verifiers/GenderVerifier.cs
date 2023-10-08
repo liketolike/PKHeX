@@ -16,7 +16,7 @@ public sealed class GenderVerifier : Verifier
         if (pi.Genderless != (pk.Gender == 2))
         {
             // DP/HGSS shedinja glitch -- only generation 4 spawns
-            bool ignore = pk.Format == 4 && pk.Species == (int)Species.Shedinja && pk.Met_Level != pk.CurrentLevel;
+            bool ignore = pk is { Format: 4, Species: (int)Species.Shedinja } && pk.Met_Level != pk.CurrentLevel;
             if (!ignore)
                 data.AddLine(GetInvalid(LGenderInvalidNone));
             return;
@@ -43,11 +43,13 @@ public sealed class GenderVerifier : Verifier
     private static void VerifyNaturePID(LegalityAnalysis data)
     {
         var pk = data.Entity;
-        var result = pk.EncryptionConstant % 25 == pk.Nature
+        var result = GetExpectedNature(pk) == pk.Nature
             ? GetValid(LPIDNatureMatch, CheckIdentifier.Nature)
             : GetInvalid(LPIDNatureMismatch, CheckIdentifier.Nature);
         data.AddLine(result);
     }
+
+    private static uint GetExpectedNature(PKM pk) => pk.EncryptionConstant % 25;
 
     private static bool IsValidGenderPID(LegalityAnalysis data)
     {
@@ -57,9 +59,8 @@ public sealed class GenderVerifier : Verifier
             return IsValidGenderMismatch(pk);
 
         // check for mixed->fixed gender incompatibility by checking the gender of the original species
-        var original = data.EncounterMatch.Species;
-        if (Legal.FixedGenderFromBiGender.Contains(original))
-            return IsValidFixedGenderFromBiGender(pk, original);
+        if (SpeciesCategory.IsFixedGenderFromDual(pk.Species))
+            return IsValidFixedGenderFromBiGender(pk, data.EncounterMatch.Species);
 
         return true;
     }

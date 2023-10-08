@@ -6,14 +6,14 @@ namespace PKHeX.Core;
 /// <summary> Generation 2 <see cref="PKM"/> format. </summary>
 public sealed class PK2 : GBPKML, ICaughtData2
 {
-    public override PersonalInfo PersonalInfo => PersonalTable.C[Species];
+    public override PersonalInfo2 PersonalInfo => PersonalTable.C[Species];
 
     internal const byte EggSpeciesValue = 0xFD;
     public override bool Valid => Species is <= Legal.MaxSpeciesID_2 or EggSpeciesValue; // egg
 
     public override int SIZE_PARTY => PokeCrypto.SIZE_2PARTY;
     public override int SIZE_STORED => PokeCrypto.SIZE_2STORED;
-    public override bool Korean => !Japanese && RawOT[0] <= 0xB;
+    public override bool Korean => !Japanese && OT_Trash[0] <= 0xB;
 
     public override EntityContext Context => EntityContext.Gen2;
 
@@ -27,9 +27,9 @@ public sealed class PK2 : GBPKML, ICaughtData2
         return data;
     }
 
-    public override PKM Clone()
+    public override PK2 Clone()
     {
-        var clone = new PK2((byte[])Data.Clone(), Japanese) { IsEgg = IsEgg };
+        PK2 clone = new((byte[])Data.Clone(), Japanese) { IsEgg = IsEgg };
         OT_Trash.CopyTo(clone.OT_Trash);
         Nickname_Trash.CopyTo(clone.Nickname_Trash);
         return clone;
@@ -45,7 +45,7 @@ public sealed class PK2 : GBPKML, ICaughtData2
     public override ushort Move2 { get => Data[3]; set => Data[3] = (byte)value; }
     public override ushort Move3 { get => Data[4]; set => Data[4] = (byte)value; }
     public override ushort Move4 { get => Data[5]; set => Data[5] = (byte)value; }
-    public override int TID { get => ReadUInt16BigEndian(Data.AsSpan(6)); set => WriteUInt16BigEndian(Data.AsSpan(6), (ushort)value); }
+    public override ushort TID16 { get => ReadUInt16BigEndian(Data.AsSpan(6)); set => WriteUInt16BigEndian(Data.AsSpan(6), value); }
     public override uint EXP { get => ReadUInt32BigEndian(Data.AsSpan(0x08)) >> 8; set => WriteUInt32BigEndian(Data.AsSpan(8), (value << 8) | Data[0xB]); }
     public override int EV_HP  { get => ReadUInt16BigEndian(Data.AsSpan(0x0B)); set => WriteUInt16BigEndian(Data.AsSpan(0xB), (ushort)value); }
     public override int EV_ATK { get => ReadUInt16BigEndian(Data.AsSpan(0x0D)); set => WriteUInt16BigEndian(Data.AsSpan(0xD), (ushort)value); }
@@ -132,18 +132,21 @@ public sealed class PK2 : GBPKML, ICaughtData2
     public PK7 ConvertToPK7()
     {
         var rnd = Util.Rand;
+        var lang = TransferLanguage(RecentTrainerCache.Language);
+        var pi = PersonalTable.SM[Species];
+        int abil = TransporterLogic.IsHiddenDisallowedVC2(Species) ? 0 : 2; // Hidden
         var pk7 = new PK7
         {
             EncryptionConstant = rnd.Rand32(),
             Species = Species,
-            TID = TID,
+            TID16 = TID16,
             CurrentLevel = CurrentLevel,
             EXP = EXP,
             Met_Level = CurrentLevel,
             Nature = Experience.GetNatureVC(EXP),
             PID = rnd.Rand32(),
             Ball = 4,
-            MetDate = DateTime.Now,
+            MetDate = EncounterDate.GetDate3DS(),
             Version = HasOriginalMetLocation ? (int)GameVersion.C : (int)GameVersion.SI,
             Move1 = Move1,
             Move2 = Move2,
@@ -161,37 +164,23 @@ public sealed class PK2 : GBPKML, ICaughtData2
             CurrentHandler = 1,
             HT_Name = RecentTrainerCache.OT_Name,
             HT_Gender = RecentTrainerCache.OT_Gender,
+
+            Language = lang,
+            Nickname = SpeciesName.GetSpeciesNameGeneration(Species, lang, 7),
+            OT_Name = GetTransferTrainerName(lang),
+            OT_Gender = OT_Gender, // Crystal
+            OT_Friendship = pi.BaseFriendship,
+            HT_Friendship = pi.BaseFriendship,
+
+            Ability = pi.GetAbilityAtIndex(abil),
+            AbilityNumber = 1 << abil,
         };
-        RecentTrainerCache.SetConsoleRegionData3DS(pk7);
-        RecentTrainerCache.SetFirstCountryRegion(pk7);
-        pk7.HealPP();
-        var lang = TransferLanguage(RecentTrainerCache.Language);
-        pk7.Language = lang;
-        pk7.Nickname = SpeciesName.GetSpeciesNameGeneration(pk7.Species, lang, pk7.Format);
 
-        // IVs
         var special = Species is 151 or 251;
-        Span<int> finalIVs = stackalloc int[6];
         int flawless = special ? 5 : 3;
-        for (var i = 0; i < finalIVs.Length; i++)
-            finalIVs[i] = rnd.Next(32);
-        for (var i = 0; i < flawless; i++)
-            finalIVs[i] = 31;
-        Util.Shuffle(finalIVs);
-        pk7.SetIVs(finalIVs);
-
-        switch (IsShiny ? Shiny.Always : Shiny.Never)
-        {
-            case Shiny.Always when !pk7.IsShiny: // Force Square
-                pk7.PID = (uint)(((pk7.TID ^ 0 ^ (pk7.PID & 0xFFFF) ^ 0) << 16) | (pk7.PID & 0xFFFF));
-                break;
-            case Shiny.Never when pk7.IsShiny: // Force Not Shiny
-                pk7.PID ^= 0x1000_0000;
-                break;
-        }
-
-        int abil = Legal.TransferSpeciesDefaultAbilityGen2(Species) ? 0 : 2; // Hidden
-        pk7.RefreshAbility(abil); // 0/1/2 (not 1/2/4)
+        pk7.SetTransferIVs(flawless, rnd);
+        pk7.SetTransferPID(IsShiny);
+        pk7.SetTransferLocale(lang);
 
         if (special)
         {
@@ -200,29 +189,29 @@ public sealed class PK2 : GBPKML, ICaughtData2
         else if (IsNicknamedBank)
         {
             pk7.IsNicknamed = true;
-            pk7.Nickname = Korean ? Nickname : StringConverter12Transporter.GetString(RawNickname, Japanese);
+            pk7.Nickname = Korean ? Nickname : StringConverter12Transporter.GetString(Nickname_Trash, Japanese);
         }
-        if (RawOT[0] == StringConverter12.G1TradeOTCode) // In-game Trade
-            pk7.OT_Name = StringConverter12.G1TradeOTName[lang];
-        else
-            pk7.OT_Name = Korean ? OT_Name : StringConverter12Transporter.GetString(RawOT, Japanese);
-        pk7.OT_Gender = OT_Gender; // Crystal
-        pk7.OT_Friendship = pk7.HT_Friendship = PersonalTable.SM[Species].BaseFriendship;
-
-        pk7.SetTradeMemoryHT6(bank: true); // oh no, memories on gen7 pk
 
         // Dizzy Punch cannot be transferred
+        var dizzy = pk7.GetMoveIndex(146); // Dizzy Punch
+        if (dizzy != -1)
         {
-            var index = pk7.GetMoveIndex(146); // Dizzy Punch
-            if (index != -1)
-            {
-                pk7.SetMove(index, 0);
-                pk7.FixMoves();
-            }
+            pk7.SetMove(dizzy, 0);
+            pk7.FixMoves();
         }
 
+        pk7.HealPP();
         pk7.RefreshChecksum();
         return pk7;
+    }
+
+    private string GetTransferTrainerName(int lang)
+    {
+        if (OT_Trash[0] == StringConverter12.G1TradeOTCode) // In-game Trade
+            return StringConverter12.G1TradeOTName[lang];
+        if (Korean)
+            return OT_Name;
+        return StringConverter12Transporter.GetString(OT_Trash, Japanese);
     }
 
     public SK2 ConvertToSK2() => new(Japanese)
@@ -233,7 +222,7 @@ public sealed class PK2 : GBPKML, ICaughtData2
         Move2 = Move2,
         Move3 = Move3,
         Move4 = Move4,
-        TID = TID,
+        TID16 = TID16,
         EXP = EXP,
         EV_HP = EV_HP,
         EV_ATK = EV_ATK,

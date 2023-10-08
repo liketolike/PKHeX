@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using static System.Buffers.Binary.BinaryPrimitives;
 
@@ -47,7 +48,7 @@ public sealed class SAV3GCMemoryCard
         0x4000000, // 128MB
     };
 
-    public static bool IsMemoryCardSize(long Size) => ValidMemoryCardSizes.Contains((int)Size);
+    public static bool IsMemoryCardSize(long size) => ValidMemoryCardSizes.Contains((int)size);
 
     public static bool IsMemoryCardSize(ReadOnlySpan<byte> Data)
     {
@@ -74,7 +75,7 @@ public sealed class SAV3GCMemoryCard
     public SAV3GCMemoryCard(byte[] data) => Data = data;
 
     // Checksums
-    private (ushort Checksum, ushort Inverse) GetChecksum(int block, int offset, int length)
+    private (ushort Checksum, ushort Inverse) GetChecksum(int block, int offset, [ConstantExpected(Min = 0)] int length)
     {
         ushort csum = 0;
         ushort inv_csum = 0;
@@ -223,6 +224,7 @@ public sealed class SAV3GCMemoryCard
             : Directory_Block;
 
         // Search for pokemon savegames in the directory
+        SaveGameCount = 0;
         for (int i = 0; i < NumEntries_Directory; i++)
         {
             int offset = (DirectoryBlock_Used * BLOCK_SIZE) + (i * DENTRY_SIZE);
@@ -240,7 +242,6 @@ public sealed class SAV3GCMemoryCard
             if (dataEnd > Data.Length)
                 continue;
 
-            SaveGameCount = 0;
             var header = Data.AsSpan(offset, 4);
             var ver = SaveHandlerGCI.GetGameCode(header);
             if (ver == GameVersion.COLO)
@@ -250,14 +251,14 @@ public sealed class SAV3GCMemoryCard
                 EntryCOLO = i;
                 SaveGameCount++;
             }
-            if (ver == GameVersion.XD)
+            else if (ver == GameVersion.XD)
             {
                 if (HasXD) // another entry already exists
                     return GCMemoryCardState.DuplicateXD;
                 EntryXD = i;
                 SaveGameCount++;
             }
-            if (ver == GameVersion.RSBOX)
+            else if (ver == GameVersion.RSBOX)
             {
                 if (HasRSBOX) // another entry already exists
                     return GCMemoryCardState.DuplicateRSBOX;
@@ -325,7 +326,7 @@ public sealed class SAV3GCMemoryCard
         return $"{Makercode}-{GameCode}-{Util.TrimFromZero(FileName)}.gci";
     }
 
-    public byte[] ReadSaveGameData()
+    public ReadOnlyMemory<byte> ReadSaveGameData()
     {
         var entry = EntrySelected;
         if (entry < 0)
@@ -333,14 +334,14 @@ public sealed class SAV3GCMemoryCard
         return ReadSaveGameData(entry);
     }
 
-    private byte[] ReadSaveGameData(int entry)
+    private ReadOnlyMemory<byte> ReadSaveGameData(int entry)
     {
         int offset = (DirectoryBlock_Used * BLOCK_SIZE) + (entry * DENTRY_SIZE);
         var span = Data.AsSpan(offset);
         int blockFirst = ReadUInt16BigEndian(span[0x36..]);
         int blockCount = ReadUInt16BigEndian(span[0x38..]);
 
-        return Data.AsSpan(blockFirst * BLOCK_SIZE, blockCount * BLOCK_SIZE).ToArray();
+        return Data.AsMemory(blockFirst * BLOCK_SIZE, blockCount * BLOCK_SIZE);
     }
 
     public void WriteSaveGameData(ReadOnlySpan<byte> data)

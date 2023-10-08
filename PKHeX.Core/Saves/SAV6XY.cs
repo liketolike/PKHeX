@@ -23,10 +23,10 @@ public sealed class SAV6XY : SAV6, ISaveBlock6XY, IMultiplayerSprite
         ClearBoxes();
     }
 
-    public override IPersonalTable Personal => PersonalTable.XY;
-    public override IReadOnlyList<ushort> HeldItems => Legal.HeldItem_XY;
+    public override PersonalTable6XY Personal => PersonalTable.XY;
+    public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_XY;
     public SaveBlockAccessor6XY Blocks { get; }
-    protected override SaveFile CloneInternal() => new SAV6XY((byte[])Data.Clone());
+    protected override SAV6XY CloneInternal() => new((byte[])Data.Clone());
     public override ushort MaxMoveID => Legal.MaxMoveID_6_XY;
     public override int MaxItemID => Legal.MaxItemID_6_XY;
     public override int MaxAbilityID => Legal.MaxAbilityID_6_XY;
@@ -112,7 +112,7 @@ public sealed class SAV6XY : SAV6, ISaveBlock6XY, IMultiplayerSprite
     }
 
     public override string JPEGTitle => !HasJPPEGData ? string.Empty : StringConverter6.GetString(Data.AsSpan(JPEG, 0x1A));
-    public override byte[] GetJPEGData() => !HasJPPEGData ? Array.Empty<byte>() : GetData(JPEG + 0x54, 0xE004);
+    public override byte[] GetJPEGData() => !HasJPPEGData ? Array.Empty<byte>() : Data.AsSpan(JPEG + 0x54, 0xE004).ToArray();
     private bool HasJPPEGData => Data[JPEG + 0x54] == 0xFF;
 
     public void UnlockAllFriendSafariSlots()

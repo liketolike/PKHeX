@@ -15,7 +15,7 @@ public partial class SAV_SecretBase : Form
     private int CurrentPKMIndex;
     private SecretBase6PKM? CurrentPKM;
 
-    private int CurrentPlacementIndex ;
+    private int CurrentPlacementIndex;
     private SecretBase6GoodPlacement? CurrentPlacement;
 
     private bool loading = true;
@@ -80,7 +80,7 @@ public partial class SAV_SecretBase : Form
             string name = other.TrainerName;
             if (string.IsNullOrWhiteSpace(name))
                 name = "Empty";
-            LB_Bases.Items.Add($"{i+1:00} {name}");
+            LB_Bases.Items.Add($"{i + 1:00} {name}");
         }
 
         if (index >= 0)
@@ -150,10 +150,10 @@ public partial class SAV_SecretBase : Form
         if (p is null || index < 0)
             return;
 
-        p.Good = (ushort) NUD_FObjType.Value;
-        p.X = (ushort) NUD_FX.Value;
-        p.Y = (ushort) NUD_FY.Value;
-        p.Rotation = (byte) NUD_FRot.Value;
+        p.Good = (ushort)NUD_FObjType.Value;
+        p.X = (ushort)NUD_FX.Value;
+        p.Y = (ushort)NUD_FY.Value;
+        p.Rotation = (byte)NUD_FRot.Value;
 
         bdata.SetPlacement(index, p);
     }
@@ -192,12 +192,12 @@ public partial class SAV_SecretBase : Form
         pk.Nature = WinFormsUtil.GetIndex(CB_Nature);
         pk.Gender = EntityGender.GetFromString(Label_Gender.Text);
         pk.Form = (byte)CB_Form.SelectedIndex;
-        pk.EV_HP = Math.Min(Convert.ToInt32(TB_HPEV.Text), 252);
-        pk.EV_ATK = Math.Min(Convert.ToInt32(TB_ATKEV.Text), 252);
-        pk.EV_DEF = Math.Min(Convert.ToInt32(TB_DEFEV.Text), 252);
-        pk.EV_SPA = Math.Min(Convert.ToInt32(TB_SPAEV.Text), 252);
-        pk.EV_SPD = Math.Min(Convert.ToInt32(TB_SPDEV.Text), 252);
-        pk.EV_SPE = Math.Min(Convert.ToInt32(TB_SPEEV.Text), 252);
+        pk.EV_HP  = Math.Clamp(Convert.ToInt32(TB_HPEV.Text) , 0, EffortValues.Max252);
+        pk.EV_ATK = Math.Clamp(Convert.ToInt32(TB_ATKEV.Text), 0, EffortValues.Max252);
+        pk.EV_DEF = Math.Clamp(Convert.ToInt32(TB_DEFEV.Text), 0, EffortValues.Max252);
+        pk.EV_SPA = Math.Clamp(Convert.ToInt32(TB_SPAEV.Text), 0, EffortValues.Max252);
+        pk.EV_SPD = Math.Clamp(Convert.ToInt32(TB_SPDEV.Text), 0, EffortValues.Max252);
+        pk.EV_SPE = Math.Clamp(Convert.ToInt32(TB_SPEEV.Text), 0, EffortValues.Max252);
         pk.Move1 = (ushort)WinFormsUtil.GetIndex(CB_Move1);
         pk.Move2 = (ushort)WinFormsUtil.GetIndex(CB_Move2);
         pk.Move3 = (ushort)WinFormsUtil.GetIndex(CB_Move3);
@@ -206,7 +206,7 @@ public partial class SAV_SecretBase : Form
         pk.Move2_PPUps = CB_PPu2.SelectedIndex;
         pk.Move3_PPUps = CB_PPu3.SelectedIndex;
         pk.Move4_PPUps = CB_PPu4.SelectedIndex;
-        pk.IV_HP = Convert.ToByte(TB_HPIV.Text) & 0x1F;
+        pk.IV_HP  = Convert.ToByte(TB_HPIV.Text)  & 0x1F;
         pk.IV_ATK = Convert.ToByte(TB_ATKIV.Text) & 0x1F;
         pk.IV_DEF = Convert.ToByte(TB_DEFIV.Text) & 0x1F;
         pk.IV_SPA = Convert.ToByte(TB_SPAIV.Text) & 0x1F;
@@ -304,7 +304,7 @@ public partial class SAV_SecretBase : Form
         SavePKM(pk);
         o.SetParticipant(CurrentPKMIndex, pk);
 
-        var index = CurrentPKMIndex = (int) NUD_FPKM.Value;
+        var index = CurrentPKMIndex = (int)NUD_FPKM.Value;
         pk = o.GetParticipant(index);
         LoadPKM(pk);
     }
@@ -322,7 +322,7 @@ public partial class SAV_SecretBase : Form
     private void SetAbilityList(ushort species, byte form, int abilityIndex)
     {
         var abilities = PersonalTable.AO.GetFormEntry(species, form);
-        var list = GameInfo.FilteredSources.GetAbilityList(abilities, 6);
+        var list = GameInfo.FilteredSources.GetAbilityList(abilities);
         CB_Ability.DataSource = new BindingSource(list, null);
         CB_Ability.SelectedIndex = abilityIndex < 3 ? abilityIndex : 0;
     }
@@ -377,7 +377,7 @@ public partial class SAV_SecretBase : Form
     private void SetGenderLabel(int gender)
     {
         var symbols = Main.GenderSymbols;
-        if ((uint) gender >= symbols.Count)
+        if ((uint)gender >= symbols.Count)
             gender = 0;
         Label_Gender.Text = symbols[gender];
     }
@@ -396,12 +396,11 @@ public partial class SAV_SecretBase : Form
 
         var data = File.ReadAllBytes(path);
         var obj = SecretBase6.Read(data);
-        if (obj is null) // shouldn't happen, we already size-check above.
-            throw new NullReferenceException();
+        // shouldn't happen, we already size-check above.
+        ArgumentNullException.ThrowIfNull(obj);
 
         var sb = CurrentBase;
-        if (sb is null)
-            throw new NullReferenceException();
+        ArgumentNullException.ThrowIfNull(sb);
 
         ResetLoadNew();
         sb.Load(obj);
@@ -413,14 +412,13 @@ public partial class SAV_SecretBase : Form
     private void B_Export_Click(object sender, EventArgs e)
     {
         var sb = CurrentBase;
-        if (sb is null)
-            throw new NullReferenceException();
+        ArgumentNullException.ThrowIfNull(sb);
 
         SaveCurrent(sb);
         var tr = sb.TrainerName;
         if (string.IsNullOrWhiteSpace(tr))
             tr = "Trainer";
-        using var sfd = new SaveFileDialog {Filter = "Secret Base Data|*.sb6", FileName = $"{sb.BaseLocation:D2} - {Util.CleanFileName(tr)}.sb6"};
+        using var sfd = new SaveFileDialog { Filter = "Secret Base Data|*.sb6", FileName = $"{sb.BaseLocation:D2} - {Util.CleanFileName(tr)}.sb6" };
         if (sfd.ShowDialog() != DialogResult.OK)
             return;
 
@@ -441,8 +439,7 @@ public partial class SAV_SecretBase : Form
 
         int index = LB_Bases.SelectedIndex - 1;
         var bdata = CurrentBase;
-        if (bdata is null)
-            throw new NullReferenceException();
+        ArgumentNullException.ThrowIfNull(bdata);
 
         string BaseTrainer = bdata.TrainerName;
         if (string.IsNullOrEmpty(BaseTrainer))

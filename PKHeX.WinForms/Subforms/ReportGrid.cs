@@ -15,7 +15,6 @@ public partial class ReportGrid : Form
     public ReportGrid()
     {
         InitializeComponent();
-        dgData.DoubleBuffered(true);
         CenterToParent();
         GetContextMenu();
     }
@@ -59,7 +58,7 @@ public partial class ReportGrid : Form
         foreach (var entry in Data)
         {
             var pk = entry.Entity;
-            if ((uint)(pk.Species - 1) >= pk.MaxSpeciesID)
+            if (pk.Species - 1u >= pk.MaxSpeciesID)
             {
                 continue;
             }
@@ -118,8 +117,8 @@ public partial class ReportGrid : Form
 
     private async Task Export_CSV(string path)
     {
-        using var fs = new FileStream(path, FileMode.Create);
-        using var s = new StreamWriter(fs, System.Text.Encoding.Unicode);
+        await using var fs = new FileStream(path, FileMode.Create);
+        await using var s = new StreamWriter(fs, System.Text.Encoding.Unicode);
 
         var headers = dgData.Columns.Cast<DataGridViewColumn>();
         await s.WriteLineAsync(string.Join(",", headers.Skip(1).Select(column => $"\"{column.HeaderText}\""))).ConfigureAwait(false);

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using static PKHeX.Core.Species;
 
@@ -30,6 +31,7 @@ public static class FormInfo
             case (int)Necrozma when form < 3: // Only mark Ultra Necrozma as Battle Only
                 return false;
             case (int)Minior: return form < 7; // Minior Shields-Down
+            case (int)Ogerpon: return form >= 4; // Embody Aspect
 
             default:
                 return form != 0;
@@ -49,7 +51,24 @@ public static class FormInfo
         (int)Darmanitan => (byte)(form & 2),
         (int)Zygarde when format > 6 => 3,
         (int)Minior => (byte)(form + 7),
+        (int)Ogerpon => (byte)(form & 3),
         _ => 0,
+    };
+
+    /// <summary>
+    /// Indicates if the entity should be prevented from being traded away.
+    /// </summary>
+    /// <param name="species">Entity species</param>
+    /// <param name="form">Entity form</param>
+    /// <param name="formArg">Entity form argument</param>
+    /// <param name="format">Current generation format</param>
+    /// <returns>True if it trading should be disallowed.</returns>
+    public static bool IsUntradable(ushort species, byte form, uint formArg, int format) => species switch
+    {
+        (int)Koraidon or (int)Miraidon when formArg == 1 => true, // Ride-able Box Legend
+        (int)Pikachu when form == 8 && format == 7 => true, // Let's Go Pikachu Starter
+        (int)Eevee when form == 1 && format == 7 => true, // Let's Go Eevee Starter
+        _ => IsFusedForm(species, form, format),
     };
 
     /// <summary>
@@ -71,8 +90,9 @@ public static class FormInfo
     /// <param name="species">Original species</param>
     /// <param name="oldForm">Original form</param>
     /// <param name="newForm">Current form</param>
-    /// <param name="format">Current format</param>
-    public static bool IsFormChangeable(ushort species, byte oldForm, byte newForm, int format)
+    /// <param name="origin">Encounter context</param>
+    /// <param name="current">Current context</param>
+    public static bool IsFormChangeable(ushort species, byte oldForm, byte newForm, EntityContext origin, EntityContext current)
     {
         if (FormChange.Contains(species))
             return true;
@@ -83,15 +103,31 @@ public static class FormInfo
         // Gen8: Form changing improved; can pick any Form & Ability combination.
         if (species == (int)Zygarde)
         {
-            return format switch
+            return current switch
             {
-                6 => false,
-                7 => newForm >= 2 || (oldForm == 1 && newForm == 0),
+                EntityContext.Gen6 => false,
+                EntityContext.Gen7 => newForm >= 2 || (oldForm == 1 && newForm == 0),
                 _ => true,
             };
         }
+        if (species is (int)Deerling or (int)Sawsbuck)
+        {
+            if (origin == EntityContext.Gen5)
+                return true; // B/W
+            if (current.Generation() >= 8)
+                return true; // Via S/V
+        }
         return false;
     }
+
+    public static bool IsFormChangeEgg(ushort species) => FormChangeEgg.Contains(species);
+
+    private static ReadOnlySpan<ushort> FormChangeEgg => new ushort[]
+    {
+        (int)Burmy,
+        (int)Furfrou,
+        (int)Oricorio,
+    };
 
     /// <summary>
     /// Species that can change between their forms, regardless of origin.
@@ -99,11 +135,12 @@ public static class FormInfo
     /// <remarks>Excludes Zygarde as it has special conditions. Check separately.</remarks>
     private static readonly HashSet<ushort> FormChange = new()
     {
-        // Sometimes considered for wild encounters
         (int)Burmy,
-        (int)Rotom,
         (int)Furfrou,
         (int)Oricorio,
+
+        // Sometimes considered for wild encounters
+        (int)Rotom,
 
         (int)Deoxys,
         (int)Dialga,
@@ -122,6 +159,7 @@ public static class FormInfo
         (int)Necrozma,
         (int)Calyrex,
         (int)Enamorus,
+        (int)Ogerpon,
     };
 
     /// <summary>
@@ -148,6 +186,9 @@ public static class FormInfo
         (int)Zacian,
         (int)Zamazenta,
         (int)Eternatus,
+
+        (int)Palafin,
+        (int)Ogerpon,
     };
 
     /// <summary>
@@ -199,28 +240,50 @@ public static class FormInfo
     }
 
     /// <summary>
-    /// Checks if the <see cref="form"/> for the <see cref="species"/> is a Totem form.
+    /// Species has a Totem form in Gen7 (S/M &amp; US/UM) that can be captured and owned.
     /// </summary>
-    /// <param name="species">Entity species</param>
-    /// <param name="form">Entity form</param>
-    /// <param name="format">Current generation format</param>
-    public static bool IsTotemForm(ushort species, byte form, int format) => format == 7 && IsTotemForm(species, form);
+    /// <param name="species"></param>
+    /// <returns>True if the species exists as a Totem.</returns>
+    /// <remarks>Excludes <see cref="Wishiwashi"/> because it cannot be captured.</remarks>
+    public static bool HasTotemForm(ushort species) => species switch
+    {
+        (ushort)Raticate => true,
+        (ushort)Marowak => true,
+        (ushort)Gumshoos => true,
+        (ushort)Vikavolt => true,
+        (ushort)Ribombee => true,
+        (ushort)Araquanid => true,
+        (ushort)Lurantis => true,
+        (ushort)Salazzle => true,
+        (ushort)Mimikyu => true,
+        (ushort)Kommoo => true,
+        (ushort)Togedemaru => true,
+        _ => false,
+    };
 
     /// <summary>
     /// Checks if the <see cref="form"/> for the <see cref="species"/> is a Totem form.
     /// </summary>
-    /// <remarks>Use <see cref="IsTotemForm(ushort,byte,int)"/> if you aren't 100% sure the format is 7.</remarks>
+    /// <param name="species">Entity species</param>
+    /// <param name="form">Entity form</param>
+    /// <param name="context">Current generation format</param>
+    public static bool IsTotemForm(ushort species, byte form, EntityContext context) => context == EntityContext.Gen7 && IsTotemForm(species, form);
+
+    /// <summary>
+    /// Checks if the <see cref="form"/> for the <see cref="species"/> is a Totem form.
+    /// </summary>
+    /// <remarks>Use <see cref="IsTotemForm(ushort,byte,EntityContext)"/> if you aren't 100% sure the format is 7.</remarks>
     /// <param name="species">Entity species</param>
     /// <param name="form">Entity form</param>
     public static bool IsTotemForm(ushort species, byte form)
     {
         if (form == 0)
             return false;
-        if (!Legal.Totem_USUM.Contains(species))
+        if (!HasTotemForm(species))
             return false;
         if (species == (int)Mimikyu)
             return form is 2 or 3;
-        if (Legal.Totem_Alolan.Contains(species))
+        if (species is (int)Raticate or (int)Marowak)
             return form == 2;
         return form == 1;
     }
@@ -237,9 +300,9 @@ public static class FormInfo
         return --form;
     }
 
-    public static bool IsLordForm(ushort species, byte form, int generation)
+    public static bool IsLordForm(ushort species, byte form, EntityContext context)
     {
-        if (generation != 8)
+        if (context != EntityContext.Gen8a)
             return false;
         return IsLordForm(species, form);
     }
@@ -284,7 +347,7 @@ public static class FormInfo
         if (format <= 3 && species != (int)Unown)
             return false;
 
-        if (HasFormValuesNotIndicatedByPersonal.Contains(species))
+        if (HasFormValuesNotIndicatedByPersonal(species))
             return true;
 
         int count = pi.FormCount;
@@ -294,10 +357,11 @@ public static class FormInfo
     /// <summary>
     /// <seealso cref="IsValidOutOfBoundsForm"/>
     /// </summary>
-    private static readonly HashSet<ushort> HasFormValuesNotIndicatedByPersonal = new()
+    private static bool HasFormValuesNotIndicatedByPersonal(ushort species) => species switch
     {
-        (int)Unown,
-        (int)Mothim, // (Burmy form is not cleared on evolution)
-        (int)Scatterbug, (int)Spewpa, // Vivillon pre-evos
+        (int)Unown => true,
+        (int)Mothim => true, // (Burmy form is not cleared on evolution)
+        (int)Scatterbug or (int)Spewpa => true, // Vivillon pre-evos
+        _ => false,
     };
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -27,7 +27,7 @@ public static class FileUtil
                 return null;
 
             var data = File.ReadAllBytes(path);
-            var ext = Path.GetExtension(path);
+            var ext = Path.GetExtension(path.AsSpan());
             return GetSupportedFile(data, ext, reference);
         }
         // User input data can be fuzzed; if anything blows up, just fail safely.
@@ -46,7 +46,7 @@ public static class FileUtil
     /// <param name="ext">File extension used as a hint.</param>
     /// <param name="reference">Reference savefile used for PC Binary compatibility checks.</param>
     /// <returns>Supported file object reference, null if none found.</returns>
-    public static object? GetSupportedFile(byte[] data, string ext, SaveFile? reference = null)
+    public static object? GetSupportedFile(byte[] data, ReadOnlySpan<char> ext, SaveFile? reference = null)
     {
         if (TryGetSAV(data, out var sav))
             return sav;
@@ -73,16 +73,41 @@ public static class FileUtil
         catch { return true; }
     }
 
-    public static int GetFileSize(string path)
+    public static long GetFileSize(string path)
     {
         try
         {
-            var size = new FileInfo(path).Length;
+            var fi = new FileInfo(path);
+            var size = fi.Length;
             if (size > int.MaxValue)
                 return -1;
-            return (int)size;
+            return size;
         }
         catch { return -1; } // Bad File / Locked
+    }
+
+    public static IEnumerable<T> IterateSafe<T>(this IEnumerable<T> source, int failOut = 10, Action<Exception>? log = null)
+    {
+        using var enumerator = source.GetEnumerator();
+        int ctr = 0;
+        while (true)
+        {
+            try
+            {
+                var next = enumerator.MoveNext();
+                if (!next)
+                    yield break;
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke(ex);
+                if (++ctr >= failOut)
+                    yield break;
+                continue;
+            }
+            ctr = 0;
+            yield return enumerator.Current;
+        }
     }
 
     private static bool TryGetGP1(byte[] data, [NotNullWhen(true)] out GP1? gp1)
@@ -100,6 +125,16 @@ public static class FileUtil
         if (RentalTeam8.IsRentalTeam(data))
         {
             result = new RentalTeam8(data);
+            return true;
+        }
+        if (RentalTeam9.IsRentalTeam(data))
+        {
+            result = new RentalTeam9(data);
+            return true;
+        }
+        if (RentalTeamSet9.IsRentalTeamSet(data))
+        {
+            result = new RentalTeamSet9(data);
             return true;
         }
         return false;
@@ -157,6 +192,18 @@ public static class FileUtil
         return true;
     }
 
+    /// <inheritdoc cref="TryGetMemoryCard(byte[], out SAV3GCMemoryCard?)"/>
+    public static bool TryGetMemoryCard(string file, [NotNullWhen(true)] out SAV3GCMemoryCard? memcard)
+    {
+        if (!File.Exists(file))
+        {
+            memcard = null;
+            return false;
+        }
+        var data = File.ReadAllBytes(file);
+        return TryGetMemoryCard(data, out memcard);
+    }
+
     /// <summary>
     /// Tries to get an <see cref="PKM"/> object from the input parameters.
     /// </summary>
@@ -165,7 +212,7 @@ public static class FileUtil
     /// <param name="ext">Format hint</param>
     /// <param name="sav">Reference savefile used for PC Binary compatibility checks.</param>
     /// <returns>True if file object reference is valid, false if none found.</returns>
-    public static bool TryGetPKM(byte[] data, [NotNullWhen(true)] out PKM? pk, string ext, ITrainerInfo? sav = null)
+    public static bool TryGetPKM(byte[] data, [NotNullWhen(true)] out PKM? pk, ReadOnlySpan<char> ext, ITrainerInfo? sav = null)
     {
         if (ext == ".pgt") // size collision with pk6
         {
@@ -220,7 +267,7 @@ public static class FileUtil
     /// <param name="mg">Output result</param>
     /// <param name="ext">Format hint</param>
     /// <returns>True if file object reference is valid, false if none found.</returns>
-    public static bool TryGetMysteryGift(byte[] data, [NotNullWhen(true)] out MysteryGift? mg, string ext)
+    public static bool TryGetMysteryGift(byte[] data, [NotNullWhen(true)] out MysteryGift? mg, ReadOnlySpan<char> ext)
     {
         mg = MysteryGift.GetMysteryGift(data, ext);
         return mg != null;
@@ -252,7 +299,7 @@ public static class FileUtil
         if (!fi.Exists)
             return null;
         if (fi.Length == GP1.SIZE && TryGetGP1(File.ReadAllBytes(file), out var gp1))
-            return gp1.ConvertToPB7(sav);
+            return gp1.ConvertToPKM(sav);
         if (!EntityDetection.IsSizePlausible(fi.Length) && !MysteryGift.IsMysteryGift(fi.Length))
             return null;
         var data = File.ReadAllBytes(file);

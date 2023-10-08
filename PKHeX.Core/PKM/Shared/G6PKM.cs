@@ -1,5 +1,5 @@
 using System;
-using static System.Buffers.Binary.BinaryPrimitives;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PKHeX.Core;
 
@@ -9,7 +9,7 @@ public abstract class G6PKM : PKM, ISanityChecksum
     public override int SIZE_PARTY => PokeCrypto.SIZE_6PARTY;
     public override int SIZE_STORED => PokeCrypto.SIZE_6STORED;
     protected G6PKM(byte[] data) : base(data) { }
-    protected G6PKM(int size) : base(size) { }
+    protected G6PKM([ConstantExpected] int size) : base(size) { }
 
     // Trash Bytes
     public sealed override Span<byte> Nickname_Trash => Data.AsSpan(0x40, 26);
@@ -22,13 +22,7 @@ public abstract class G6PKM : PKM, ISanityChecksum
     public sealed override bool ChecksumValid => CalculateChecksum() == Checksum;
     public sealed override bool Valid { get => Sanity == 0 && ChecksumValid; set { if (!value) return; Sanity = 0; RefreshChecksum(); } }
 
-    private ushort CalculateChecksum()
-    {
-        ushort chk = 0;
-        for (int i = 8; i < PokeCrypto.SIZE_6STORED; i += 2) // don't use SIZE_STORED property; pb7 overrides stored size
-            chk += ReadUInt16LittleEndian(Data.AsSpan(i));
-        return chk;
-    }
+    private ushort CalculateChecksum() => Checksums.Add16(Data.AsSpan()[8..PokeCrypto.SIZE_6STORED]);
 
     // Simple Generated Attributes
     public sealed override int CurrentFriendship
@@ -43,27 +37,13 @@ public abstract class G6PKM : PKM, ISanityChecksum
         set { if (CurrentHandler == 1) OT_Friendship = value; else HT_Friendship = value; }
     }
 
-    public sealed override int PSV => (int)(((PID >> 16) ^ (PID & 0xFFFF)) >> 4);
-    public sealed override int TSV => (TID ^ SID) >> 4;
+    public sealed override uint PSV => ((PID >> 16) ^ (PID & 0xFFFF)) >> 4;
+    public sealed override uint TSV => (uint)(TID16 ^ SID16) >> 4;
     public sealed override bool IsUntraded => Data[0x78] == 0 && Data[0x78 + 1] == 0 && Format == Generation; // immediately terminated HT_Name data (\0)
 
     // Complex Generated Attributes
-    public sealed override int Characteristic
-    {
-        get
-        {
-            int pm6 = (int)(EncryptionConstant % 6);
-            int maxIV = MaximumIV;
-            int pm6stat = 0;
-            for (int i = 0; i < 6; i++)
-            {
-                pm6stat = (pm6 + i) % 6;
-                if (GetIV(pm6stat) == maxIV)
-                    break;
-            }
-            return (pm6stat * 5) + (maxIV % 5);
-        }
-    }
+    protected abstract uint IV32 { get; set; }
+    public override int Characteristic => EntityCharacteristic.GetCharacteristic(EncryptionConstant, IV32);
 
     // Methods
     protected sealed override byte[] Encrypt()
@@ -105,7 +85,7 @@ public abstract class G6PKM : PKM, ISanityChecksum
         {
             // Eggs do not have any modifications done if they are traded
             // Apply link trade data, only if it left the OT (ignore if dumped & imported, or cloned, etc)
-            if ((tr.TID != TID) || (tr.SID != SID) || (tr.Gender != OT_Gender) || (tr.OT != OT_Name))
+            if ((tr.TID16 != TID16) || (tr.SID16 != SID16) || (tr.Gender != OT_Gender) || (tr.OT != OT_Name))
                 SetLinkTradeEgg(Day, Month, Year, Locations.LinkTrade6);
             return;
         }
@@ -120,9 +100,9 @@ public abstract class G6PKM : PKM, ISanityChecksum
 
     // Maximums
     public sealed override int MaxIV => 31;
-    public sealed override int MaxEV => 252;
-    public sealed override int OTLength => 12;
-    public sealed override int NickLength => 12;
+    public sealed override int MaxEV => EffortValues.Max252;
+    public sealed override int MaxStringLengthOT => 12;
+    public sealed override int MaxStringLengthNickname => 12;
 }
 
 public interface ISuperTrain
@@ -130,5 +110,5 @@ public interface ISuperTrain
     uint SuperTrainBitFlags { get; set; }
     bool SecretSuperTrainingUnlocked { get; set; }
     bool SecretSuperTrainingComplete { get; set; }
-    int SuperTrainingMedalCount(int maxCount = 30);
+    int SuperTrainingMedalCount(int lowBitCount = 30);
 }

@@ -15,7 +15,7 @@ public static class LearnsetReader
     /// </summary>
     /// <param name="input">Raw ROM data containing the contiguous moves</param>
     /// <param name="maxSpecies">Highest species ID for the input game.</param>
-    public static Learnset[] GetArray(ReadOnlySpan<byte> input, int maxSpecies)
+    public static Learnset[] GetArray(ReadOnlySpan<byte> input, ushort maxSpecies)
     {
         int offset = 0;
         var result = new Learnset[maxSpecies + 1];
@@ -68,7 +68,7 @@ public static class LearnsetReader
     /// <remarks>Count of moves, followed by Moves and Levels which are 16-bit</remarks>
     private static Learnset ReadLearnset16(ReadOnlySpan<byte> data)
     {
-        if (data.Length == 0)
+        if (data.Length <= 4)
             return EMPTY;
         var count = (data.Length / 4) - 1;
         var moves = new ushort[count];

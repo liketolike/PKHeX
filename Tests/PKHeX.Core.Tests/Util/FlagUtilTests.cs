@@ -1,10 +1,9 @@
-﻿using System;
+using System;
 using FluentAssertions;
-using PKHeX.Core;
 using Xunit;
 using static System.Buffers.Binary.BinaryPrimitives;
 
-namespace PKHeX.Tests.Util;
+namespace PKHeX.Core.Tests.Util;
 
 public class FlagUtilTests
 {
@@ -36,7 +35,7 @@ public class FlagUtilTests
         // does nothing on empty
         Span<byte> copy = stackalloc byte[data.Length];
         FlagUtil.SetFlag(copy, byteIndex, bitIndex, false);
-        copy.Count((byte)0).Should().Be(copy.Length);
+        copy.IndexOfAnyExcept<byte>(0).Should().Be(-1);
 
         // doesn't clear any other flag
         data.CopyTo(copy);

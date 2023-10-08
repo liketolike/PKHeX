@@ -65,29 +65,56 @@ public static partial class Extensions
     {
         if (pk is not IHyperTrain t)
             return;
-        if (!pk.IsHyperTrainingAvailable(h))
-        {
-            t.HyperTrainFlags = 0;
-            return;
-        }
 
+        if (!pk.IsHyperTrainingAvailable(h))
+            t.HyperTrainFlags = 0;
+        else
+            t.SetSuggestedHyperTrainingData(pk, IVs);
+    }
+
+    /// <inheritdoc cref="SetSuggestedHyperTrainingData(PKM,EvolutionHistory,ReadOnlySpan{int})"/>
+    public static void SetSuggestedHyperTrainingData(this PKM pk, EntityContext c, ReadOnlySpan<int> IVs)
+    {
+        if (pk is not IHyperTrain t)
+            return;
+
+        if (!c.IsHyperTrainingAvailable(pk.CurrentLevel))
+            t.HyperTrainFlags = 0;
+        else
+            t.SetSuggestedHyperTrainingData(pk, IVs);
+    }
+
+    private static void SetSuggestedHyperTrainingData(this IHyperTrain t, PKM pk, ReadOnlySpan<int> IVs)
+    {
         t.HT_HP = IVs[0] != 31;
         t.HT_ATK = IVs[1] != 31 && IVs[1] > 2;
         t.HT_DEF = IVs[2] != 31;
         t.HT_SPA = IVs[4] != 31;
         t.HT_SPD = IVs[5] != 31;
-
-        // sometimes unusual speed IVs are desirable for competitive reasons
-        // if nothing else was HT'd and the IV isn't too high, it was probably intentional
-        t.HT_SPE = IVs[3] != 31 && IVs[3] > 2 &&
-                   (IVs[3] > 17 || t.HT_HP || t.HT_ATK || t.HT_DEF || t.HT_SPA || t.HT_SPD);
+        t.HT_SPE = IsSpeedHyperTrainSuggested(t, IVs);
 
         if (pk is ICombatPower pb)
             pb.ResetCP();
     }
 
+    private static bool IsSpeedHyperTrainSuggested(IHyperTrain t, ReadOnlySpan<int> IVs)
+    {
+        // sometimes unusual speed IVs are desirable for competitive reasons
+        var speed = IVs[3];
+        if (speed is 31 or <= 2)
+            return false;
+
+        // if IV isn't too high and nothing else was HT'd, it was probably intentional to stay low.
+        if (speed > 17)
+            return true;
+        return t.HT_HP || t.HT_ATK || t.HT_DEF || t.HT_SPA || t.HT_SPD;
+    }
+
     /// <inheritdoc cref="SetSuggestedHyperTrainingData(PKM,EvolutionHistory,ReadOnlySpan{int})"/>
-    public static void SetSuggestedHyperTrainingData(this PKM pk, ReadOnlySpan<int> IVs) => pk.SetSuggestedHyperTrainingData(EvolutionHistory.Empty, IVs);
+    public static void SetSuggestedHyperTrainingData(this PKM pk, ReadOnlySpan<int> IVs)
+    {
+        pk.SetSuggestedHyperTrainingData(pk.Context, IVs);
+    }
 
     /// <inheritdoc cref="SetSuggestedHyperTrainingData(PKM,EvolutionHistory,ReadOnlySpan{int})"/>
     public static void SetSuggestedHyperTrainingData(this PKM pk)
@@ -98,7 +125,7 @@ public static partial class Extensions
     }
 
     /// <summary>
-    /// Indicates if Hyper Training is available for toggling.
+    /// Indicates if Hyper Training is available to be set.
     /// </summary>
     /// <param name="t">Entity to train</param>
     /// <param name="h">History of evolutions present as</param>
@@ -106,9 +133,43 @@ public static partial class Extensions
     public static bool IsHyperTrainingAvailable(this IHyperTrain t, EvolutionHistory h) => t switch
     {
         // Check for game formats where training is unavailable:
-        PA8 => h.HasVisitedGen7 || h.HasVisitedSWSH || h.HasVisitedBDSP,
+        PA8 => h.HasVisitedGen7 || h.HasVisitedSWSH || h.HasVisitedBDSP || h.HasVisitedGen9,
         _ => true,
     };
+
+    /// <inheritdoc cref="IsHyperTrainingAvailable(IHyperTrain,EvolutionHistory)"/>
+    public static bool IsHyperTrainingAvailable(this EntityContext c, int currentLevel)
+    {
+        var min = GetHyperTrainMinLevel(c);
+        return currentLevel <= min;
+    }
+
+    /// <inheritdoc cref="GetHyperTrainMinLevel(IHyperTrain,EvolutionHistory, EntityContext)"/>
+    public static int GetHyperTrainMinLevel(this EntityContext c) => c switch
+    {
+        EntityContext.Gen7 or EntityContext.Gen8 or EntityContext.Gen8b => 100,
+        EntityContext.Gen9 => 50,
+        _ => 101,
+    };
+
+    /// <summary>
+    /// Gets the minimum level required for Hyper Training an IV.
+    /// </summary>
+    /// <param name="_">Entity to train</param>
+    /// <param name="h">History of evolutions present as</param>
+    /// <param name="current">Current context</param>
+    /// <returns>True if available, otherwise false.</returns>
+    public static int GetHyperTrainMinLevel(this IHyperTrain _, EvolutionHistory h, EntityContext current)
+    {
+        // HOME 3.0.0+ disallows inbound transfers of Hyper Trained Pokémon below level 100.
+        // PokeDupeChecker in BD/SP will DprIllegal if < 100, even if it was legitimately trained in S/V+.
+        if (current == EntityContext.Gen8b)
+            return 100;
+
+        if (h.HasVisitedGen9)
+            return 50;
+        return 100;
+    }
 
     /// <inheritdoc cref="IsHyperTrainingAvailable(IHyperTrain, EvolutionHistory)"/>
     /// <param name="pk">Entity data</param>
@@ -120,7 +181,8 @@ public static partial class Extensions
         if (!t.IsHyperTrainingAvailable(h))
             return false;
 
-        // Gated behind level 100.
-        return pk.CurrentLevel == 100;
+        // Gated behind level.
+        var min = t.GetHyperTrainMinLevel(h, pk.Context);
+        return pk.CurrentLevel >= min;
     }
 }

@@ -45,7 +45,8 @@ public static class EncounterFinder
 
             // Looks like we might have a good enough match. Check if this is really a good match.
             info.EncounterMatch = enc;
-            info.Parse.Add(e);
+            if (e.Comment.Length > 0)
+                info.Parse.Add(e);
             if (!VerifySecondaryChecks(pk, info, encounter))
                 continue;
 
@@ -54,7 +55,7 @@ public static class EncounterFinder
                 break;
 
             var match = mx.GetMatchRating(pk);
-            if (match != EncounterMatchRating.PartialMatch)
+            if (match < EncounterMatchRating.PartialMatch)
                 break;
 
             // Reaching here implies the encounter wasn't valid. Try stepping to the next encounter.
@@ -62,14 +63,14 @@ public static class EncounterFinder
                 continue;
 
             // We ran out of possible encounters without finding a suitable match; add a message indicating that the encounter is not a complete match.
-            info.Parse.Add(new CheckResult(Severity.Invalid, LEncInvalid, CheckIdentifier.Encounter));
+            info.Parse.Add(new CheckResult(Severity.Invalid, CheckIdentifier.Encounter, LEncInvalid));
             break;
         }
 
-        if (!info.FrameMatches && info.EncounterMatch is EncounterSlot {Version: not GameVersion.CXD}) // if false, all valid RNG frame matches have already been consumed
-            info.Parse.Add(new CheckResult(ParseSettings.RNGFrameNotFound, LEncConditionBadRNGFrame, CheckIdentifier.PID)); // todo for further confirmation
+        if (info is { FrameMatches: false }) // if false, all valid RNG frame matches have already been consumed
+            info.Parse.Add(new CheckResult(ParseSettings.RNGFrameNotFound, CheckIdentifier.PID, LEncConditionBadRNGFrame)); // todo for further confirmation
         if (!info.PIDIVMatches) // if false, all valid PIDIV matches have already been consumed
-            info.Parse.Add(new CheckResult(Severity.Invalid, LPIDTypeMismatch, CheckIdentifier.PID));
+            info.Parse.Add(new CheckResult(Severity.Invalid, CheckIdentifier.PID, LPIDTypeMismatch));
     }
 
     /// <summary>
@@ -117,20 +118,26 @@ public static class EncounterFinder
             if (m is IMemoryOT o && MemoryPermissions.IsMemoryOfKnownMove(o.OT_Memory))
             {
                 var mem = MemoryVariableSet.Read(m, 0);
-                if (!MemoryPermissions.CanKnowMove(pk, mem, info.EncounterMatch.Context, info))
+                bool valid = MemoryPermissions.CanKnowMove(pk, mem, info.EncounterMatch.Context, info);
+                if (!valid && iterator.PeekIsNext())
                     return false;
             }
             if (m is IMemoryHT h && MemoryPermissions.IsMemoryOfKnownMove(h.HT_Memory) && !pk.HasMove(h.HT_TextVar))
             {
                 var mem = MemoryVariableSet.Read(m, 1);
-                var context = Memories.GetContextHandler(pk.Context);
-                if (!MemoryPermissions.CanKnowMove(pk, mem, context, info))
+
+                var sources = MemoryRules.GetPossibleSources(info.EvoChainsAllGens);
+                sources = MemoryRules.ReviseSourcesHandler(pk, sources, info.EncounterOriginal);
+
+                bool valid = (sources.HasFlag(MemorySource.Gen6) && MemoryPermissions.CanKnowMove(pk, mem, EntityContext.Gen6, info))
+                          || (sources.HasFlag(MemorySource.Gen8) && MemoryPermissions.CanKnowMove(pk, mem, EntityContext.Gen8, info));
+                if (!valid && iterator.PeekIsNext())
                     return false;
             }
         }
         else if (pk is PK1 pk1)
         {
-            var hasGen2 = Array.Exists(info.Moves, z => z.Generation is 2);
+            var hasGen2 = MoveInfo.IsAnyFromGeneration(2, info.Moves);
             if (hasGen2)
             {
                 if (!ParseSettings.AllowGen1Tradeback)
@@ -155,35 +162,35 @@ public static class EncounterFinder
         info.EncounterMatch = new EncounterInvalid(pk);
         string hint = GetHintWhyNotFound(pk, info.EncounterMatch.Generation);
 
-        info.Parse.Add(new CheckResult(Severity.Invalid, hint, CheckIdentifier.Encounter));
+        info.Parse.Add(new CheckResult(Severity.Invalid, CheckIdentifier.Encounter, hint));
         LearnVerifierRelearn.Verify(info.Relearn, info.EncounterOriginal, pk);
         LearnVerifier.Verify(info.Moves, pk, info.EncounterMatch, info.EvoChainsAllGens);
     }
 
-    private static string GetHintWhyNotFound(PKM pk, int gen)
+    private static string GetHintWhyNotFound(PKM pk, int generation)
     {
-        if (WasGiftEgg(pk, gen, (ushort)pk.Egg_Location))
+        if (WasGiftEgg(pk, generation, (ushort)pk.Egg_Location))
             return LEncGift;
-        if (WasEventEgg(pk, gen))
+        if (WasEventEgg(pk, generation))
             return LEncGiftEggEvent;
-        if (WasEvent(pk, gen))
+        if (WasEvent(pk, generation))
             return LEncGiftNotFound;
         return LEncInvalid;
     }
 
-    private static bool WasGiftEgg(PKM pk, int gen, ushort loc) => !pk.FatefulEncounter && gen switch
+    private static bool WasGiftEgg(PKM pk, int generation, ushort eggLocation) => !pk.FatefulEncounter && generation switch
     {
         3 => pk.IsEgg && (byte)pk.Met_Location == 253, // Gift Egg, indistinguishable from normal eggs after hatch
-        4 => Legal.GiftEggLocation4.Contains(loc) || (pk.Format != 4 && (loc == Locations.Faraway4 && pk.HGSS)),
-        5 => loc is Locations.Breeder5,
-        _ => loc is Locations.Breeder6,
+        4 => eggLocation - 2009u <= (2014 - 2009) || (pk.Format != 4 && (eggLocation == Locations.Faraway4 && pk.HGSS)),
+        5 => eggLocation is Locations.Breeder5,
+        _ => eggLocation is Locations.Breeder6,
     };
 
     private static bool WasEventEgg(PKM pk, int gen) => gen switch
     {
         // Event Egg, indistinguishable from normal eggs after hatch
         // can't tell after transfer
-        3 => pk.Format == 3 && pk.IsEgg && Locations.IsEventLocation3(pk.Met_Location),
+        3 => pk is { Context: EntityContext.Gen3, IsEgg: true } && Locations.IsEventLocation3(pk.Met_Location),
 
         // Manaphy was the only generation 4 released event egg
         _ => pk.FatefulEncounter && pk.Egg_Day != 0,

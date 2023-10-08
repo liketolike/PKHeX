@@ -1,10 +1,13 @@
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace PKHeX.Core;
 
 /// <summary>
 /// Generic Message Strings used for messages shown to the user.
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]
 public static class MessageStrings
 {
     #region Generic Program Messages
@@ -65,6 +68,7 @@ public static class MessageStrings
     public static string MsgFileGameCubeNoGames { get; set; } = "GC Memory Card without any Pokémon save file. Aborting.";
 
     public static string MsgFileSize { get; set; } = "File Size: {0} bytes";
+    public static string MsgFileSizeIncorrect { get; set; } = "Input file size ({0} bytes) does not match expected size ({1} bytes).";
     public static string MsgFileSizeLarge { get; set; } = "Input file is too large.";
     public static string MsgFileSizeSmall { get; set; } = "Input file is too small.";
     public static string MsgFileWriteFail { get; set; } = "Unable to save file.";
@@ -315,7 +319,6 @@ public static class MessageStrings
     #endregion
 
     #region Misc
-
     public static string MsgSaveDifferentTypes { get; set; } = "Save File types are different.";
     public static string MsgSaveDifferentVersions { get; set; } = "Save File versions are not the same.";
     public static string MsgSaveNumberInvalid { get; set; } = "Save File {0} is not valid.";

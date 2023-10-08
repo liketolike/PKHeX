@@ -1,10 +1,13 @@
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace PKHeX.Core;
 
 /// <summary>
 /// Legality Check Message Strings to indicate why certain <see cref="PKM"/> <see cref="LegalInfo"/> values are flagged.
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]
 public static class LegalityCheckStrings
 {
     // Message String Name format: L/F[Category][Summary]
@@ -59,9 +62,11 @@ public static class LegalityCheckStrings
     public static string L_XEnigmaBerry_0 { get; set; } = "{0} Berry";
     public static string L_XMatches0_1 { get; set; } = "Matches: {0} {1}";
     public static string L_XWurmpleEvo_0 { get; set; } = "Wurmple Evolution: {0}";
+    public static string L_XRareFormEvo_0_1 { get; set; } = "Evolves into form: {0} (rare: {1})";
 
     public static string LAbilityCapsuleUsed { get; set; } = "Ability available with Ability Capsule.";
     public static string LAbilityPatchUsed { get; set; } = "Ability available with Ability Patch.";
+    public static string LAbilityPatchRevertUsed { get; set; } = "Ability available with Ability Patch Revert.";
     public static string LAbilityFlag { get; set; } = "Ability matches ability number.";
     public static string LAbilityHiddenFail { get; set; } = "Hidden Ability mismatch for encounter type.";
     public static string LAbilityHiddenUnavailable { get; set; } = "Hidden Ability not available.";
@@ -247,7 +252,7 @@ public static class LegalityCheckStrings
     public static string LG3EReader { get; set; } = "Non Japanese Shadow E-reader Pokémon. Unreleased encounter.";
     public static string LG3OTGender { get; set; } = "OT from Colosseum/XD cannot be female.";
     public static string LG4InvalidTileR45Surf { get; set; } = "Johto Route 45 surfing encounter. Unreachable Water tiles.";
-    public static string LG5ID_N { get; set; } = "The Name/TID/SID of N is incorrect.";
+    public static string LG5ID_N { get; set; } = "The Name/TID16/SID16 of N is incorrect.";
     public static string LG5IVAll30 { get; set; } = "All IVs of N's Pokémon should be 30.";
     public static string LG5OTGenderN { get; set; } = "N's Pokémon must have a male OT gender.";
     public static string LG5PIDShinyGrotto { get; set; } = "Hidden Grotto captures cannot be shiny.";
@@ -266,7 +271,7 @@ public static class LegalityCheckStrings
     public static string LGeoNoCountryHT { get; set; } = "GeoLocation Memory: HT Name present but has no previous Country.";
     public static string LGeoNoRegion { get; set; } = "GeoLocation Memory: Region without Country.";
 
-    public static string LHyperBelow100 { get; set; } = "Can't Hyper Train a Pokémon that isn't level 100.";
+    public static string LHyperTooLow_0 { get; set; } = "Can't Hyper Train a Pokémon that isn't level {0}.";
     public static string LHyperPerfectAll { get; set; } = "Can't Hyper Train a Pokémon with perfect IVs.";
     public static string LHyperPerfectOne { get; set; } = "Can't Hyper Train a perfect IV.";
     public static string LHyperPerfectUnavailable { get; set; } = "Can't Hyper Train any IV(s).";
@@ -414,12 +419,12 @@ public static class LegalityCheckStrings
     public static string LOTShort { get; set; } = "OT Name too short.";
     public static string LOTSuspicious { get; set; } = "Suspicious Original Trainer details.";
 
-    public static string LOT_IDEqual { get; set; } = "TID and SID are equal.";
-    public static string LOT_IDs0 { get; set; } = "TID and SID are 0.";
-    public static string LOT_SID0 { get; set; } = "SID is zero.";
-    public static string LOT_SID0Invalid { get; set; } = "SID should be 0.";
-    public static string LOT_TID0 { get; set; } = "TID is zero.";
-    public static string LOT_IDInvalid { get; set; } = "TID and SID combination is not possible.";
+    public static string LOT_IDEqual { get; set; } = "TID16 and SID16 are equal.";
+    public static string LOT_IDs0 { get; set; } = "TID16 and SID16 are 0.";
+    public static string LOT_SID0 { get; set; } = "SID16 is zero.";
+    public static string LOT_SID0Invalid { get; set; } = "SID16 should be 0.";
+    public static string LOT_TID0 { get; set; } = "TID16 is zero.";
+    public static string LOT_IDInvalid { get; set; } = "TID16 and SID16 combination is not possible.";
 
     public static string LPIDEncryptWurmple { get; set; } = "Wurmple evolution Encryption Constant mismatch.";
     public static string LPIDEncryptZero { get; set; } = "Encryption Constant is not set.";
@@ -464,6 +469,11 @@ public static class LegalityCheckStrings
     public static string LSuperUnavailable { get; set; } = "Super Training missions are not available in games visited.";
     public static string LSuperUnused { get; set; } = "Unused Super Training Flag is flagged.";
 
+    public static string LTeraTypeIncorrect { get; set; } = "Tera Type does not match the expected value.";
+    public static string LTeraTypeMismatch { get; set; } = "Tera Type does not match either of the default types.";
+
+    public static string LTradeNotAvailable { get; set; } = "Encounter cannot be traded to the active trainer.";
+
     public static string LTransferBad { get; set; } = "Incorrectly transferred from previous generation.";
 
     public static string LTransferCurrentHandlerInvalid { get; set; } = "Invalid Current handler value, trainer details for save file expected another value.";
@@ -481,6 +491,7 @@ public static class LegalityCheckStrings
     public static string LTransferMoveG4HM { get; set; } = "Defog and Whirlpool. One of the two moves should have been removed before transferred to Generation 5.";
     public static string LTransferMoveHM { get; set; } = "Generation {0} HM. Should have been removed before transferred to Generation {1}.";
     public static string LTransferNature { get; set; } = "Invalid Nature for transfer Experience.";
+    public static string LTransferObedienceLevel { get; set; } = "Invalid Obedience Level.";
     public static string LTransferOriginFInvalid0_1 { get; set; } = "{0} origin cannot exist in the currently loaded ({1}) save file.";
     public static string LTransferPIDECBitFlip { get; set; } = "PID should be equal to EC [with top bit flipped]!";
     public static string LTransferPIDECEquals { get; set; } = "PID should be equal to EC!";

@@ -4,7 +4,7 @@ using static PKHeX.Core.ContestStatGranting;
 namespace PKHeX.Core;
 
 /// <summary>
-/// Logic for checking and applying <see cref="IContestStats"/>.
+/// Logic for checking and applying <see cref="IContestStatsReadOnly"/>.
 /// </summary>
 public static class ContestStatInfo
 {
@@ -32,7 +32,7 @@ public static class ContestStatInfo
 
     public static void SetSuggestedContestStats(this PKM pk, IEncounterTemplate enc, EvolutionHistory h)
     {
-        if (pk is not IContestStatsMutable s)
+        if (pk is not IContestStats s)
             return;
 
         var restrict = GetContestStatRestriction(pk, pk.Generation, h);
@@ -45,7 +45,7 @@ public static class ContestStatInfo
 
     public static void SetMaxContestStats(this PKM pk, IEncounterTemplate enc, EvolutionHistory h)
     {
-        if (pk is not IContestStatsMutable s)
+        if (pk is not IContestStats s)
             return;
         var restrict = GetContestStatRestriction(pk, enc.Generation, h);
         var baseStat = GetReferenceTemplate(enc);
@@ -59,13 +59,13 @@ public static class ContestStatInfo
         3 => pk.Format < 6    ? CorrelateSheen : Mixed,
         4 => pk.Format < 6    ? CorrelateSheen : Mixed,
 
-        5 => pk.Format < 6           ? None : !h.HasVisitedBDSP ? NoSheen : Mixed, // ORAS Contests
-        6 => !pk.AO && pk.IsUntraded ? None : !h.HasVisitedBDSP ? NoSheen : Mixed,
+        5 => pk.Format < 6                         ? None : !h.HasVisitedBDSP ? NoSheen : Mixed, // ORAS Contests
+        6 => pk is { AO: false, IsUntraded: true } ? None : !h.HasVisitedBDSP ? NoSheen : Mixed,
 
         _ => h.HasVisitedBDSP ? CorrelateSheen : None, // BDSP Contests
     };
 
-    public static int CalculateMaximumSheen(IContestStats s, int nature, IContestStats initial, bool pokeBlock3)
+    public static int CalculateMaximumSheen(IContestStatsReadOnly s, int nature, IContestStatsReadOnly initial, bool pokeBlock3)
     {
         if (s.IsAnyContestStatMax())
             return MaxContestStat;
@@ -87,7 +87,7 @@ public static class ContestStatInfo
         return Math.Min(MaxContestStat, avg * HighestFeelPoffin8b);
     }
 
-    public static int CalculateMinimumSheen(IContestStats s, IContestStats initial, INature pk, ContestStatGrantingSheen method) => method switch
+    public static int CalculateMinimumSheen(IContestStatsReadOnly s, IContestStatsReadOnly initial, INature pk, ContestStatGrantingSheen method) => method switch
     {
         ContestStatGrantingSheen.Gen8b => CalculateMinimumSheen8b(s, pk.Nature, initial),
         ContestStatGrantingSheen.Gen3 => CalculateMinimumSheen3(s, pk.Nature, initial),
@@ -96,7 +96,7 @@ public static class ContestStatInfo
     };
 
     // Slightly better stat:sheen ratio than Gen4; prefer if has visited.
-    public static int CalculateMinimumSheen8b(IContestStats s, int nature, IContestStats initial)
+    public static int CalculateMinimumSheen8b(IContestStatsReadOnly s, int nature, IContestStatsReadOnly initial)
     {
         if (s.IsContestEqual(initial))
             return initial.CNT_Sheen;
@@ -109,10 +109,10 @@ public static class ContestStatInfo
         avg = Math.Min(rawAvg, avg); // be generous
         avg = (BestSheenStat8b * avg) / MaxContestStat;
 
-        return Math.Min(BestSheenStat8b, Math.Max(LowestFeelPoffin8b, avg));
+        return Math.Clamp(avg, LowestFeelPoffin8b, BestSheenStat8b);
     }
 
-    public static int CalculateMinimumSheen3(IContestStats s, int nature, IContestStats initial)
+    public static int CalculateMinimumSheen3(IContestStatsReadOnly s, int nature, IContestStatsReadOnly initial)
     {
         if (s.IsContestEqual(initial))
             return initial.CNT_Sheen;
@@ -125,10 +125,10 @@ public static class ContestStatInfo
         avg = Math.Min(rawAvg, avg); // be generous
 
         avg = (BestSheenStat3 * avg) / MaxContestStat;
-        return Math.Min(BestSheenStat3, Math.Max(LowestFeelBlock3, avg));
+        return Math.Clamp(avg, LowestFeelBlock3, BestSheenStat3);
     }
 
-    public static int CalculateMinimumSheen4(IContestStats s, int nature, IContestStats initial)
+    public static int CalculateMinimumSheen4(IContestStatsReadOnly s, int nature, IContestStatsReadOnly initial)
     {
         if (s.IsContestEqual(initial))
             return initial.CNT_Sheen;
@@ -140,10 +140,10 @@ public static class ContestStatInfo
         var avg = Math.Max(1, nature % 6 == 0 ? rawAvg : GetAverageFeel(s, nature, initial));
         avg = Math.Min(rawAvg, avg); // be generous
 
-        return Math.Min(MaxContestStat, Math.Max(LowestFeelPoffin4, avg));
+        return Math.Clamp(avg, LowestFeelPoffin4, MaxContestStat);
     }
 
-    private static int CalculateMaximumSheen3(IContestStats s, int nature, IContestStats initial)
+    private static int CalculateMaximumSheen3(IContestStatsReadOnly s, int nature, IContestStatsReadOnly initial)
     {
         // By using Enigma and Lansat and a 25 +1/-1, can get a +9/+19s at minimum RPM
         // By using Strib, Chilan, Niniku, or Topo, can get a black +2/2/2 & 83 block (6:83) at minimum RPM.
@@ -162,18 +162,18 @@ public static class ContestStatInfo
 
         // Prefer the bad-black-block correlation if more than 3 stats have gains >= 2.
         var permit = has3 ? (sum * 83 / 6) : (sum * 19 / 9);
-        return Math.Min(MaxContestStat, Math.Max(LowestFeelBlock3, permit));
+        return Math.Clamp(permit, LowestFeelBlock3, MaxContestStat);
     }
 
-    private static int GetAverageFeel(IContestStats s, int nature, IContestStats initial)
+    private static int GetAverageFeel(IContestStatsReadOnly s, int nature, IContestStatsReadOnly initial)
     {
         var sum = GetGainedSum(s, nature, initial);
         return (int)Math.Ceiling(sum / 5f);
     }
 
-    private static int GetGainedSum(IContestStats s, int nature, IContestStats initial)
+    private static int GetGainedSum(IContestStatsReadOnly s, int nature, IContestStatsReadOnly initial)
     {
-        ReadOnlySpan<sbyte> span = NatureAmpTable.AsSpan(5 * nature, 5);
+        var span = NatureAmpTable.Slice(5 * nature, 5);
         int sum = 0;
         sum += GetAmpedStat(span, 0, s.CNT_Cool - initial.CNT_Cool);
         sum += GetAmpedStat(span, 1, s.CNT_Beauty - initial.CNT_Beauty);
@@ -211,9 +211,9 @@ public static class ContestStatInfo
 
     private static readonly DummyContestNone DummyNone = new();
 
-    public static IContestStats GetReferenceTemplate(IEncounterTemplate initial) => initial as IContestStats ?? DummyNone;
+    public static IContestStatsReadOnly GetReferenceTemplate(IEncounterTemplate initial) => initial as IContestStatsReadOnly ?? DummyNone;
 
-    private sealed class DummyContestNone : IContestStats
+    private sealed class DummyContestNone : IContestStatsReadOnly
     {
         public byte CNT_Cool => 0;
         public byte CNT_Beauty => 0;
@@ -223,7 +223,7 @@ public static class ContestStatInfo
         public byte CNT_Sheen => 0;
     }
 
-    private static readonly sbyte[] NatureAmpTable =
+    private static ReadOnlySpan<sbyte> NatureAmpTable => new sbyte[]
     {
         // Spicy, Dry, Sweet, Bitter, Sour
         0, 0, 0, 0, 0, // Hardy

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -180,8 +180,9 @@ public sealed partial class SAV_EventFlags : Form
                 Width = 150,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BindingContext = BindingContext,
-                DropDownWidth = Width + 100,
             };
+            var font = cb.Font;
+            cb.DropDownWidth = entry.PredefinedValues.Max(z => TextRenderer.MeasureText(z.Name, font).Width);
             cb.InitializeBinding();
             cb.DataSource = map;
 
@@ -194,7 +195,7 @@ public sealed partial class SAV_EventFlags : Form
                     return;
 
                 updating = true;
-                var value = (ushort) mtb.Value;
+                var value = (ushort)mtb.Value;
                 var (_, valueID) = map.Find(z => z.Value == value) ?? map[0];
                 if (WinFormsUtil.GetIndex(cb) != valueID)
                     cb.SelectedValue = valueID;
@@ -229,7 +230,7 @@ public sealed partial class SAV_EventFlags : Form
         if (editing)
             return;
         editing = true;
-        var index = (int) NUD_Flag.Value;
+        var index = (int)NUD_Flag.Value;
         Editor.Flags[index] = c_CustomFlag.Checked;
         if (FlagDict.TryGetValue(index, out var rowIndex))
             dgv.Rows[rowIndex].Cells[0].Value = c_CustomFlag.Checked;

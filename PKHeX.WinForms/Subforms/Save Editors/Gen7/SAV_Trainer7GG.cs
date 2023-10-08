@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -45,7 +45,7 @@ public partial class SAV_Trainer7GG : Form
 
     private void Main_DragDrop(object? sender, DragEventArgs? e)
     {
-        if (e?.Data?.GetData(DataFormats.FileDrop) is not string[] {Length: not 0} files)
+        if (e?.Data?.GetData(DataFormats.FileDrop) is not string[] { Length: not 0 } files)
             return;
         ImportGP1From(files[0]);
         e.Effect = DragDropEffects.Copy;
@@ -71,7 +71,7 @@ public partial class SAV_Trainer7GG : Form
 
         CB_Game.SelectedValue = SAV.Game;
         CB_Gender.SelectedIndex = SAV.Gender;
-        trainerID1.LoadIDValues(SAV);
+        trainerID1.LoadIDValues(SAV, SAV.Generation);
 
         // Load Play Time
         MT_Hours.Text = SAV.PlayedHours.ToString();
@@ -97,8 +97,8 @@ public partial class SAV_Trainer7GG : Form
 
         // Save PlayTime
         SAV.PlayedHours = ushort.Parse(MT_Hours.Text);
-        SAV.PlayedMinutes = ushort.Parse(MT_Minutes.Text)%60;
-        SAV.PlayedSeconds = ushort.Parse(MT_Seconds.Text)%60;
+        SAV.PlayedMinutes = ushort.Parse(MT_Minutes.Text) % 60;
+        SAV.PlayedSeconds = ushort.Parse(MT_Seconds.Text) % 60;
     }
 
     private void ClickString(object sender, MouseEventArgs e)
@@ -183,7 +183,8 @@ public partial class SAV_Trainer7GG : Form
     private void ImportGP1From(string path)
     {
         int index = (int)NUD_GoIndex.Value;
-        index = Math.Min(GoParkStorage.Count - 1, Math.Max(0, index));
+        const int max = GoParkStorage.Count - 1;
+        index = Math.Clamp(index, 0, max);
         ImportGP1From(path, index);
     }
 
@@ -206,7 +207,8 @@ public partial class SAV_Trainer7GG : Form
     private void B_Export_Click(object sender, EventArgs e)
     {
         int index = (int)NUD_GoIndex.Value;
-        index = Math.Min(GoParkStorage.Count - 1, Math.Max(0, index));
+        const int max = GoParkStorage.Count - 1;
+        index = Math.Clamp(index, 0, max);
         var data = Park[index];
 
         using var sfd = new SaveFileDialog
@@ -248,7 +250,7 @@ public partial class SAV_Trainer7GG : Form
             Park[ctr] = new GP1(data);
             ctr++;
         }
-        UpdateGoSummary((int) NUD_GoIndex.Value);
+        UpdateGoSummary((int)NUD_GoIndex.Value);
         System.Media.SystemSounds.Asterisk.Play();
     }
 
@@ -256,7 +258,8 @@ public partial class SAV_Trainer7GG : Form
 
     private void UpdateGoSummary(int index)
     {
-        index = Math.Min(GoParkStorage.Count - 1, Math.Max(0, index));
+        const int max = GoParkStorage.Count - 1;
+        index = Math.Clamp(index, 0, max);
         int area = index / GoParkStorage.SlotsPerArea;
         int slot = index % GoParkStorage.SlotsPerArea;
 
@@ -272,14 +275,15 @@ public partial class SAV_Trainer7GG : Form
             return;
 
         Park.DeleteAll();
-        UpdateGoSummary((int) NUD_GoIndex.Value);
+        UpdateGoSummary((int)NUD_GoIndex.Value);
         System.Media.SystemSounds.Asterisk.Play();
     }
 
     private void B_DeleteGo_Click(object sender, EventArgs e)
     {
         int index = (int)NUD_GoIndex.Value;
-        index = Math.Min(GoParkStorage.Count - 1, Math.Max(0, index));
+        const int max = GoParkStorage.Count - 1;
+        index = Math.Clamp(index, 0, max);
         Park[index] = new GP1();
         UpdateGoSummary((int)NUD_GoIndex.Value);
         System.Media.SystemSounds.Asterisk.Play();
@@ -288,6 +292,13 @@ public partial class SAV_Trainer7GG : Form
     private void B_AllTrainerTitles_Click(object sender, EventArgs e)
     {
         SAV.Blocks.EventWork.UnlockAllTitleFlags();
+        System.Media.SystemSounds.Asterisk.Play();
+    }
+
+    private void B_AllFashionItems_Click(object sender, EventArgs e)
+    {
+        SAV.Blocks.FashionPlayer.UnlockAllAccessoriesPlayer();
+        SAV.Blocks.FashionStarter.UnlockAllAccessoriesStarter();
         System.Media.SystemSounds.Asterisk.Play();
     }
 }

@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PKHeX.Core;
 
@@ -34,20 +35,25 @@ public abstract class SCBlockAccessor : ISaveBlockAccessor<SCBlock>
     #endregion
 
     #region Ease of Use Overloads
-    /// <inheritdoc cref="GetBlock(string)"/>
+    /// <inheritdoc cref="GetBlock(uint)"/>
     /// <param name="name">Block name (un-hashed)</param>
-    public SCBlock GetBlock(string name) => GetBlock(Hash(name.AsSpan()));
-
-    /// <inheritdoc cref="GetBlock(string)"/>
     public SCBlock GetBlock(ReadOnlySpan<char> name) => GetBlock(Hash(name));
     private static uint Hash(ReadOnlySpan<char> name) => (uint)FnvHash.HashFnv1a_64(name);
 
-    /// <inheritdoc cref="GetBlock(string)"/>
+    /// <inheritdoc cref="GetBlock(ReadOnlySpan{char})"/>
     public SCBlock GetBlock(ReadOnlySpan<byte> name) => GetBlock(Hash(name));
     private static uint Hash(ReadOnlySpan<byte> name) => (uint)FnvHash.HashFnv1a_64(name);
     #endregion
 
     #region Safe Block Operations (no exceptions thrown)
+    /// <summary>
+    /// Tries to grab the actual block, and returns false if the block does not exist.
+    /// </summary>
+    /// <param name="key">Block Key</param>
+    /// <param name="block">Result, if found.</param>
+    /// <returns>True if found, false if not found.</returns>
+    public bool TryGetBlock(uint key, [NotNullWhen(true)] out SCBlock? block) => TryFind(BlockInfo, key, out block);
+
     /// <summary>
     /// Tries to grab the actual block, and returns a new dummy if the block does not exist.
     /// </summary>
@@ -64,7 +70,7 @@ public abstract class SCBlockAccessor : ISaveBlockAccessor<SCBlock>
             return default;
         var block = BlockInfo[index];
         if (block.Type != SCTypeCode.None) // not fake block
-            return (T)BlockInfo[index].GetValue();
+            return (T)block.GetValue();
         return default;
     }
 
@@ -82,6 +88,18 @@ public abstract class SCBlockAccessor : ISaveBlockAccessor<SCBlock>
     #endregion
 
     #region Block Fetching
+    private static bool TryFind(IReadOnlyList<SCBlock> array, uint key, [NotNullWhen(true)] out SCBlock? block)
+    {
+        var index = FindIndex(array, key);
+        if (index != -1)
+        {
+            block = array[index];
+            return true;
+        }
+        block = default;
+        return false;
+    }
+
     private static SCBlock Find(IReadOnlyList<SCBlock> array, uint key)
     {
         var index = FindIndex(array, key);

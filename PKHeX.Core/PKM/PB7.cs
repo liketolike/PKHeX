@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using static System.Buffers.Binary.BinaryPrimitives;
 
@@ -8,7 +7,7 @@ namespace PKHeX.Core;
 /// <summary> Generation 7 <see cref="PKM"/> format used for <see cref="GameVersion.GG"/>. </summary>
 public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, ICombatPower, IFavorite, IFormArgument
 {
-    public static readonly ushort[] Unused =
+    public override ReadOnlySpan<ushort> ExtraBytes => new ushort[]
     {
         0x2A, // Old Marking Value (PelagoEventStatus)
         0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, // Unused Ribbons
@@ -21,13 +20,11 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
         0xC8, 0xC9, // OT Terminator
     };
 
-    public override IReadOnlyList<ushort> ExtraBytes => Unused;
-
     public override int SIZE_PARTY => SIZE;
     public override int SIZE_STORED => SIZE;
     private const int SIZE = 260;
     public override EntityContext Context => EntityContext.Gen7b;
-    public override PersonalInfo PersonalInfo => PersonalTable.GG.GetFormEntry(Species, Form);
+    public override PersonalInfo7GG PersonalInfo => PersonalTable.GG.GetFormEntry(Species, Form);
 
     public PB7() : base(SIZE) { }
     public PB7(byte[] data) : base(DecryptParty(data)) { }
@@ -40,7 +37,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
         return data;
     }
 
-    public override PKM Clone() => new PB7((byte[])Data.Clone());
+    public override PB7 Clone() => new((byte[])Data.Clone());
 
     // Structure
     #region Block A
@@ -74,16 +71,22 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
         set => WriteUInt16LittleEndian(Data.AsSpan(0x0A), (ushort)value);
     }
 
-    public override int TID
+    public override uint ID32
     {
-        get => ReadUInt16LittleEndian(Data.AsSpan(0x0C));
-        set => WriteUInt16LittleEndian(Data.AsSpan(0x0C), (ushort)value);
+        get => ReadUInt32LittleEndian(Data.AsSpan(0x0C));
+        set => WriteUInt32LittleEndian(Data.AsSpan(0x0C), value);
     }
 
-    public override int SID
+    public override ushort TID16
+    {
+        get => ReadUInt16LittleEndian(Data.AsSpan(0x0C));
+        set => WriteUInt16LittleEndian(Data.AsSpan(0x0C), value);
+    }
+
+    public override ushort SID16
     {
         get => ReadUInt16LittleEndian(Data.AsSpan(0x0E));
-        set => WriteUInt16LittleEndian(Data.AsSpan(0x0E), (ushort)value);
+        set => WriteUInt16LittleEndian(Data.AsSpan(0x0E), value);
     }
 
     public override uint EXP
@@ -94,7 +97,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
 
     public override int Ability { get => Data[0x14]; set => Data[0x14] = (byte)value; }
     public override int AbilityNumber { get => Data[0x15] & 7; set => Data[0x15] = (byte)((Data[0x15] & ~7) | (value & 7)); }
-    public bool Favorite { get => (Data[0x15] & 8) != 0; set => Data[0x15] = (byte)((Data[0x15] & ~8) | ((value ? 1 : 0) << 3)); }
+    public bool IsFavorite { get => (Data[0x15] & 8) != 0; set => Data[0x15] = (byte)((Data[0x15] & ~8) | ((value ? 1 : 0) << 3)); }
     public override int MarkValue { get => ReadUInt16LittleEndian(Data.AsSpan(0x16)); set => WriteUInt16LittleEndian(Data.AsSpan(0x16), (ushort)value); }
 
     public override uint PID
@@ -138,7 +141,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
     public override string Nickname
     {
         get => StringConverter8.GetString(Nickname_Trash);
-        set => StringConverter8.SetString(Nickname_Trash, value.AsSpan(), 12, StringConverterOption.None);
+        set => StringConverter8.SetString(Nickname_Trash, value, 12, StringConverterOption.None);
     }
 
     public override ushort Move1
@@ -200,7 +203,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
 
     // 0x72 Unused
     // 0x73 Unused
-    private uint IV32 { get => ReadUInt32LittleEndian(Data.AsSpan(0x74)); set => WriteUInt32LittleEndian(Data.AsSpan(0x74), value); }
+    protected override uint IV32 { get => ReadUInt32LittleEndian(Data.AsSpan(0x74)); set => WriteUInt32LittleEndian(Data.AsSpan(0x74), value); }
     public override int IV_HP { get => (int)(IV32 >> 00) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 00)) | ((value > 31 ? 31u : (uint)value) << 00); }
     public override int IV_ATK { get => (int)(IV32 >> 05) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 05)) | ((value > 31 ? 31u : (uint)value) << 05); }
     public override int IV_DEF { get => (int)(IV32 >> 10) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 10)) | ((value > 31 ? 31u : (uint)value) << 10); }
@@ -214,7 +217,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
     public override string HT_Name
     {
         get => StringConverter8.GetString(HT_Trash);
-        set => StringConverter8.SetString(HT_Trash, value.AsSpan(), 12, StringConverterOption.None);
+        set => StringConverter8.SetString(HT_Trash, value, 12, StringConverterOption.None);
     }
 
     public override int HT_Gender { get => Data[0x92]; set => Data[0x92] = (byte)value; }
@@ -251,7 +254,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
     public override string OT_Name
     {
         get => StringConverter8.GetString(OT_Trash);
-        set => StringConverter8.SetString(OT_Trash, value.AsSpan(), 12, StringConverterOption.None);
+        set => StringConverter8.SetString(OT_Trash, value, 12, StringConverterOption.None);
     }
 
     public override int OT_Friendship { get => Data[0xCA]; set => Data[0xCA] = (byte)value; }
@@ -326,7 +329,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
     protected override bool TradeOT(ITrainerInfo tr)
     {
         // Check to see if the OT matches the SAV's OT info.
-        if (!(tr.TID == TID && tr.SID == SID && tr.Gender == OT_Gender && tr.OT == OT_Name))
+        if (!(tr.ID32 == ID32 && tr.Gender == OT_Gender && tr.OT == OT_Name))
             return false;
 
         CurrentHandler = 0;
@@ -410,29 +413,29 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
         return NatureAmpTable[(5 * nature) + index];
     }
 
-    private static readonly sbyte[] NatureAmpTable =
+    private static ReadOnlySpan<sbyte> NatureAmpTable => new sbyte[]
     {
         0, 0, 0, 0, 0, // Hardy
         1,-1, 0, 0, 0, // Lonely
         1, 0, 0, 0,-1, // Brave
         1, 0,-1, 0, 0, // Adamant
         1, 0, 0,-1, 0, // Naughty
-        -1, 1, 0, 0, 0, // Bold
+       -1, 1, 0, 0, 0, // Bold
         0, 0, 0, 0, 0, // Docile
         0, 1, 0, 0,-1, // Relaxed
         0, 1,-1, 0, 0, // Impish
         0, 1, 0,-1, 0, // Lax
-        -1, 0, 0, 0, 1, // Timid
+       -1, 0, 0, 0, 1, // Timid
         0,-1, 0, 0, 1, // Hasty
         0, 0, 0, 0, 0, // Serious
         0, 0,-1, 0, 1, // Jolly
         0, 0, 0,-1, 1, // Naive
-        -1, 0, 1, 0, 0, // Modest
+       -1, 0, 1, 0, 0, // Modest
         0,-1, 1, 0, 0, // Mild
         0, 0, 1, 0,-1, // Quiet
         0, 0, 0, 0, 0, // Bashful
         0, 0, 1,-1, 0, // Rash
-        -1, 0, 0, 1, 0, // Calm
+       -1, 0, 0, 1, 0, // Calm
         0,-1, 0, 1, 0, // Gentle
         0, 0, 0, 1,-1, // Sassy
         0, 0,-1, 1, 0, // Careful
@@ -505,9 +508,6 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
         ResetWeight();
     }
 
-    // Casts are as per the game code; they may seem redundant but every bit of precision matters?
-    // This still doesn't precisely match :( -- just use a tolerance check when updating.
-    // If anyone can figure out how to get all precision to match, feel free to update :)
     public float HeightRatio => GetHeightRatio(HeightScalar);
     public float WeightRatio => GetWeightRatio(WeightScalar);
 
@@ -518,7 +518,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
     public void ResetWeight() => WeightAbsolute = CalcWeightAbsolute;
 
     [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
-    private static float GetHeightRatio(int heightScalar)
+    private static float GetHeightRatio(byte heightScalar)
     {
         // + 40%, -20
         float result = heightScalar / 255f; // 0x437F0000
@@ -528,7 +528,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
     }
 
     [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
-    private static float GetWeightRatio(int weightScalar)
+    private static float GetWeightRatio(byte weightScalar)
     {
         // +/- 20%
         float result = weightScalar / 255f; // 0x437F0000
@@ -538,14 +538,14 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
     }
 
     [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
-    public static float GetHeightAbsolute(IPersonalMisc p, int heightScalar)
+    public static float GetHeightAbsolute(IPersonalMisc p, byte heightScalar)
     {
         float HeightRatio = GetHeightRatio(heightScalar);
         return HeightRatio * p.Height;
     }
 
     [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
-    public static float GetWeightAbsolute(IPersonalMisc p, int heightScalar, int weightScalar)
+    public static float GetWeightAbsolute(IPersonalMisc p, byte heightScalar, byte weightScalar)
     {
         float HeightRatio = GetHeightRatio(heightScalar);
         float WeightRatio = GetWeightRatio(weightScalar);
@@ -591,7 +591,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
             return GetRandomIndex(characterIndex);
         if (bits is 0)
             return 0;
-        Span<sbyte> amps = NatureAmpTable.AsSpan(5 * nature, 5);
+        var amps = NatureAmpTable.Slice(5 * nature, 5);
         if (amps[bits - 1] != -1) // not a negative stat
             return bits;
 
@@ -609,79 +609,4 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
         5 => 4,
         _ => throw new ArgumentOutOfRangeException(nameof(characterIndex)), // never happens, characteristic is always 0-29
     };
-
-    public PK8 ConvertToPK8()
-    {
-        var pk8 = new PK8
-        {
-            EncryptionConstant = EncryptionConstant,
-            Species = Species,
-            TID = TID,
-            SID = SID,
-            EXP = EXP,
-            PID = PID,
-            Ability = Ability,
-            AbilityNumber = AbilityNumber,
-            MarkValue = MarkValue & 0b1111_1111_1111,
-            Language = Language,
-            EV_HP = EV_HP,
-            EV_ATK = EV_ATK,
-            EV_DEF = EV_DEF,
-            EV_SPA = EV_SPA,
-            EV_SPD = EV_SPD,
-            EV_SPE = EV_SPE,
-            Move1 = Move1,
-            Move2 = Move2,
-            Move3 = Move3,
-            Move4 = Move4,
-            Move1_PPUps = Move1_PPUps,
-            Move2_PPUps = Move2_PPUps,
-            Move3_PPUps = Move3_PPUps,
-            Move4_PPUps = Move4_PPUps,
-            RelearnMove1 = RelearnMove1,
-            RelearnMove2 = RelearnMove2,
-            RelearnMove3 = RelearnMove3,
-            RelearnMove4 = RelearnMove4,
-            IV_HP = IV_HP,
-            IV_ATK = IV_ATK,
-            IV_DEF = IV_DEF,
-            IV_SPA = IV_SPA,
-            IV_SPD = IV_SPD,
-            IV_SPE = IV_SPE,
-            IsNicknamed = IsNicknamed,
-            FatefulEncounter = FatefulEncounter,
-            Gender = Gender,
-            Form = Form,
-            Nature = Nature,
-            Nickname = Nickname,
-            Version = Version,
-            OT_Name = OT_Name,
-            MetDate = MetDate,
-            Met_Location = Met_Location,
-            Ball = Ball,
-            Met_Level = Met_Level,
-            OT_Gender = OT_Gender,
-            HyperTrainFlags = HyperTrainFlags,
-
-            // Memories don't exist in LGPE, and no memories are set on transfer.
-
-            OT_Friendship = OT_Friendship,
-
-            // No Ribbons or Markings on transfer.
-
-            StatNature = Nature,
-            HeightScalar = HeightScalar,
-            WeightScalar = WeightScalar,
-
-            Favorite = Favorite,
-        };
-
-        // Fix PP and Stats
-        pk8.Heal();
-
-        // Fix Checksum
-        pk8.RefreshChecksum();
-
-        return pk8; // Done!
-    }
 }

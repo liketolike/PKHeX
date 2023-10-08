@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using static PKHeX.Core.Species;
 
 namespace PKHeX.Core;
 
@@ -25,21 +27,32 @@ public static class RibbonRules
     /// <summary>
     /// Checks if the input can receive the <see cref="IRibbonSetCommon3.RibbonEffort"/> ribbon.
     /// </summary>
-    public static bool IsRibbonValidEffort(PKM pk, EvolutionHistory evos, int gen) => gen switch
+    public static bool IsRibbonValidEffort(EvolutionHistory evos) => evos switch
     {
-        5 when pk.Format == 5 => false, // Not available in BW/B2W2
-        8 when !evos.HasVisitedSWSH && !evos.HasVisitedBDSP => false, // not available in PLA
-        _ => true,
+        { HasVisitedGen3: true } => true,
+        { HasVisitedGen4: true } => true,
+        // Not available in Gen5
+        { HasVisitedGen6: true } => true,
+        { HasVisitedGen7: true } => true,
+        { HasVisitedSWSH: true } => true,
+        { HasVisitedBDSP: true } => true,
+        // Not available in PLA
+        { HasVisitedGen9: true } => true,
+        _ => false,
     };
 
     /// <summary>
     /// Checks if the input can receive the <see cref="IRibbonSetCommon6.RibbonBestFriends"/> ribbon.
     /// </summary>
-    public static bool IsRibbonValidBestFriends(PKM pk, EvolutionHistory evos, int gen) => gen switch
+    public static bool IsRibbonValidBestFriends(PKM pk, EvolutionHistory evos) => evos switch
     {
-        < 7 when pk is { IsUntraded: true } and IAffection { OT_Affection: < 255 } => false, // Gen6/7 uses affection. Can't lower it on OT!
-        8 when !evos.HasVisitedSWSH && !evos.HasVisitedBDSP => false, // Gen8+ replaced with Max Friendship.
-        _ => true,
+        { HasVisitedSWSH: true } => true, // Max Friendship
+        { HasVisitedBDSP: true } => true, // Max Friendship
+        { HasVisitedGen9: true } => true, // Max Friendship
+
+        { HasVisitedGen6: true } when pk is not PK6 { IsUntraded: true, OT_Affection: < 255 } => true,
+        { HasVisitedGen7: true } when pk is not PK7 { IsUntraded: true, OT_Affection: < 255 } => true,
+        _ => false,
     };
 
     /// <summary>
@@ -73,28 +86,55 @@ public static class RibbonRules
         return false;
     }
 
+    public static bool IsRibbonValidMasterRank(PKM pk, IEncounterTemplate enc, EvolutionHistory evos)
+    {
+        // Legends can compete in Ranked starting from Series 10.
+        // Past gen Pokemon can get the ribbon only if they've been reset.
+        if (evos.HasVisitedSWSH && IsRibbonValidMasterRankSWSH(pk, enc))
+            return true;
+
+        // Legendaries can not compete in ranked yet.
+        if (evos.HasVisitedGen9 && IsRibbonValidMasterRankSV(pk))
+            return true;
+
+        return false;
+    }
+
     /// <summary>
     /// Checks if the entity participated in SW/SH ranked battles for the <see cref="IRibbonSetCommon8.RibbonMasterRank"/> ribbon.
     /// </summary>
-    public static bool IsRibbonValidMasterRankSWSH(PKM pk, IEncounterTemplate enc, EvolutionHistory evos)
+    private static bool IsRibbonValidMasterRankSWSH(PKM pk, IEncounterTemplate enc)
     {
-        if (!evos.HasVisitedSWSH)
-            return false;
-
-        if (enc.Generation < 8 && pk is IBattleVersion { BattleVersion: 0 })
+        // Transfers from prior games, as well as from GO, require the battle-ready symbol in order to participate in Ranked.
+        if ((enc.Generation < 8 || enc.Version == GameVersion.GO) && pk is IBattleVersion { BattleVersion: 0 })
             return false;
 
         // GO transfers: Capture date is global time, and not console changeable.
         bool hasRealDate = enc.Version == GameVersion.GO || enc is IEncounterServerDate { IsDateRestricted: true };
         if (hasRealDate)
         {
+            // Ranked is still ongoing, but the use of Mythicals was restricted to Series 13 only.
             var met = pk.MetDate;
-            if (met > new DateTime(2022, 11, 1)) // Series 13 end date +1 day (wiggle room)
-                return false; // Ranked is done!
+            if (SpeciesCategory.IsMythical(pk.Species) && met > new DateOnly(2022, 11, 1))
+                return false;
         }
 
         // Series 13 rule-set was the first time Ranked Battles allowed the use of Mythical Pokémon.
         // All species that can exist in SW/SH can compete in ranked.
+        return true;
+    }
+
+    private static bool IsRibbonValidMasterRankSV(ISpeciesForm pk)
+    {
+        var species = pk.Species;
+        if (species is (int)WalkingWake or (int)IronLeaves)
+            return false;
+        if (species is (int)Greninja)
+            return pk.Form == 0; // Disallow Ash-Greninja
+        if (SpeciesCategory.IsLegendary(species))
+            return false;
+        if (SpeciesCategory.IsMythical(species))
+            return false;
         return true;
     }
 
@@ -121,7 +161,7 @@ public static class RibbonRules
         if (!evos.HasVisitedBDSP)
             return false;
         // Mythicals cannot be used in BD/SP's Battle Tower
-        return !Legal.Mythicals.Contains(evos.Gen8b[0].Species);
+        return !SpeciesCategory.IsMythical(evos.Gen8b[0].Species);
     }
 
     /// <summary>
@@ -143,7 +183,7 @@ public static class RibbonRules
         if (enc.LevelMin <= 50)
             return true;
 
-        return enc is not (EncounterStaticShadow or WC3);
+        return enc is not (IShadow3 or WC3);
     }
 
     /// <summary>
@@ -191,7 +231,7 @@ public static class RibbonRules
 
     // Derived from ROM data: true for all Footprint types besides 5 (5 = no feet).
     // If true, requires gaining 30 levels to obtain ribbon. If false, can obtain ribbon at any level.
-    private static readonly bool[] HasFootprintBDSP =
+    private static ReadOnlySpan<bool> HasFootprintBDSP => new[]
     {
         true,  true,  true,  true,  true,  true,  true,  true,  true,  true,
         true, false,  true,  true, false,  true,  true,  true,  true,  true,
@@ -205,9 +245,9 @@ public static class RibbonRules
         true,  true,  true,  true,  true,  true,  true,  true,  true,  true,
         true,  true,  true,  true,  true,  true,  true,  true,  true,  true,
         true,  true,  true,  true,  true,  true,  true,  true,  true,  true,
-        false, false,  true,  true,  true,  true,  true,  true,  true,  true,
+       false, false,  true,  true,  true,  true,  true,  true,  true,  true,
         true,  true,  true,  true,  true,  true,  true, false,  true,  true,
-        false,  true,  true,  true,  true,  true,  true,  true,  true,  true,
+       false,  true,  true,  true,  true,  true,  true,  true,  true,  true,
         true,  true,  true,  true,  true,  true,  true,  true,  true,  true,
         true,  true,  true,  true,  true,  true,  true,  true,  true,  true,
         true,  true,  true,  true,  true,  true,  true,  true, false,  true,
@@ -222,7 +262,7 @@ public static class RibbonRules
         true,  true,  true,  true,  true,  true, false,  true, false,  true,
         true,  true,  true, false,  true,  true,  true,  true,  true,  true,
         true,  true,  true,  true,  true,  true,  true,  true,  true,  true,
-        false,  true,  true,  true,  true,  true,  true,  true,  true, false,
+       false,  true,  true,  true,  true,  true,  true,  true,  true, false,
         true,  true,  true,  true,  true,  true,  true,  true,  true,  true,
         true,  true,  true,  true,  true,  true,  true,  true,  true,  true,
         true,  true,  true,  true,  true,  true,  true,  true,  true,  true,
@@ -257,11 +297,11 @@ public static class RibbonRules
         if (enc.Generation != 3)
             return false;
 
-        if (enc is not EncounterStaticShadow)
+        if (enc is not IShadow3)
             return false;
 
         // Ribbon is awarded when the Pokémon is purified in the game of origin.
-        if (pk is IShadowPKM { IsShadow: true })
+        if (pk is IShadowCapture { IsShadow: true })
             return false;
 
         return true;
@@ -300,12 +340,18 @@ public static class RibbonRules
         return default;
     }
 
+    /// <summary>
+    /// Checks if the input evolution history could have participated in Generation 3 contests.
+    /// </summary>
     public static bool IsAllowedContest3(EvolutionHistory evos)
     {
         // Any species can enter contests in Gen3.
         return evos.HasVisitedGen3;
     }
 
+    /// <summary>
+    /// Checks if the input evolution history could have participated in Generation 4 contests.
+    /// </summary>
     public static bool IsAllowedContest4(EvolutionHistory evos)
     {
         if (!evos.HasVisitedGen4)
@@ -314,29 +360,57 @@ public static class RibbonRules
         return IsAllowedContest4(head.Species, head.Form);
     }
 
+    /// <summary>
+    /// Checks if the input species-form could have participated in Generation 4 contests.
+    /// </summary>
     public static bool IsAllowedContest4(ushort species, byte form) => species switch
     {
         // Disallow Unown and Ditto, and Spiky Pichu (cannot trade)
-        (int)Species.Ditto => false,
-        (int)Species.Unown => false,
-        (int)Species.Pichu when form == 1 => false,
+        (int)Ditto => false,
+        (int)Unown => false,
+        (int)Pichu when form == 1 => false,
         _ => true,
     };
 
-    public static bool IsAllowedBattleFrontier(ushort species) => !Legal.BattleFrontierBanlist.Contains(species);
+    /// <summary>
+    /// Checks if the input species could have participated in any Battle Frontier trial.
+    /// </summary>
+    public static bool IsAllowedBattleFrontier(ushort species) => !BattleFrontierBanlist.Contains(species);
 
+    /// <summary>
+    /// Checks if the input species could have participated in Generation 4's Battle Frontier.
+    /// </summary>
     public static bool IsAllowedBattleFrontier4(EvolutionHistory evos)
     {
         if (!evos.HasVisitedGen4)
             return false;
         var head = evos.Gen4[0];
-        return IsAllowedBattleFrontier(head.Species, head.Form, 4);
+        return IsAllowedBattleFrontier(head.Species, head.Form, EntityContext.Gen4);
     }
 
-    public static bool IsAllowedBattleFrontier(ushort species, byte form, int gen)
+    /// <summary>
+    /// Checks if the input species-form could have participated in a specific Battle Frontier trial.
+    /// </summary>
+    public static bool IsAllowedBattleFrontier(ushort species, byte form, EntityContext context)
     {
-        if (gen == 4 && species == (int)Species.Pichu && form == 1) // spiky
+        if (context == EntityContext.Gen4 && species == (int)Pichu && form == 1) // spiky
             return false;
         return IsAllowedBattleFrontier(species);
     }
+
+    /// <summary>
+    /// Generation 3 &amp; 4 Battle Frontier Species banlist. When referencing this in context to generation 4, be sure to disallow <see cref="Pichu"/> with Form 1 (Spiky).
+    /// </summary>
+    public static readonly HashSet<ushort> BattleFrontierBanlist = new()
+    {
+        (int)Mewtwo, (int)Mew,
+        (int)Lugia, (int)HoOh, (int)Celebi,
+        (int)Kyogre, (int)Groudon, (int)Rayquaza, (int)Jirachi, (int)Deoxys,
+        (int)Dialga, (int)Palkia, (int)Giratina, (int)Phione, (int)Manaphy, (int)Darkrai, (int)Shaymin, (int)Arceus,
+        (int)Victini, (int)Reshiram, (int)Zekrom, (int)Kyurem, (int)Keldeo, (int)Meloetta, (int)Genesect,
+        (int)Xerneas, (int)Yveltal, (int)Zygarde, (int)Diancie, (int)Hoopa, (int)Volcanion,
+        (int)Cosmog, (int)Cosmoem, (int)Solgaleo, (int)Lunala, (int)Necrozma, (int)Magearna, (int)Marshadow, (int)Zeraora,
+        (int)Meltan, (int)Melmetal,
+        (int)Koraidon, (int)Miraidon,
+    };
 }

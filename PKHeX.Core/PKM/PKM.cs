@@ -1,14 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using static PKHeX.Core.GameVersion;
+using static System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes;
 
 namespace PKHeX.Core;
 
 /// <summary>
 /// Object representing a <see cref="PKM"/>'s data and derived properties.
 /// </summary>
-public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILangNick, IGameValueLimit, INature
+[DynamicallyAccessedMembers(PublicProperties | NonPublicProperties | PublicParameterlessConstructor)]
+public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILangNick, IGameValueLimit, INature, IFatefulEncounter
 {
     /// <summary>
     /// Valid file extensions that represent <see cref="PKM"/> data, without the leading '.'
@@ -18,13 +21,13 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     public abstract int SIZE_STORED { get; }
     public string Extension => GetType().Name.ToLowerInvariant();
     public abstract PersonalInfo PersonalInfo { get; }
-    public virtual IReadOnlyList<ushort> ExtraBytes => Array.Empty<ushort>();
+    public virtual ReadOnlySpan<ushort> ExtraBytes => Array.Empty<ushort>();
 
     // Internal Attributes set on creation
     public readonly byte[] Data; // Raw Storage
 
     protected PKM(byte[] data) => Data = data;
-    protected PKM(int size) => Data = new byte[size];
+    protected PKM([ConstantExpected] int size) => Data = new byte[size];
 
     public virtual byte[] EncryptedPartyData => Encrypt().AsSpan(0, SIZE_PARTY).ToArray();
     public virtual byte[] EncryptedBoxData => Encrypt().AsSpan(0, SIZE_STORED).ToArray();
@@ -44,6 +47,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     protected abstract byte[] Encrypt();
     public abstract EntityContext Context { get; }
     public int Format => Context.Generation();
+    public TrainerIDFormat TrainerIDDisplayFormat => this.GetTrainerIDFormat();
 
     private byte[] Write()
     {
@@ -64,11 +68,18 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     public abstract bool IsEgg { get; set; }
     public abstract bool IsNicknamed { get; set; }
     public abstract uint EXP { get; set; }
-    public abstract int TID { get; set; }
+    public abstract ushort TID16 { get; set; }
+    public abstract ushort SID16 { get; set; }
     public abstract string OT_Name { get; set; }
     public abstract int OT_Gender { get; set; }
     public abstract int Ball { get; set; }
     public abstract int Met_Level { get; set; }
+
+    // Aliases of ID32
+    public uint TrainerTID7 { get => this.GetTrainerTID7(); set => this.SetTrainerTID7(value); }
+    public uint TrainerSID7 { get => this.GetTrainerSID7(); set => this.SetTrainerSID7(value); }
+    public uint DisplayTID { get => this.GetDisplayTID(); set => this.SetDisplayTID(value); }
+    public uint DisplaySID { get => this.GetDisplaySID(); set => this.SetDisplaySID(value); }
 
     // Battle
     public abstract ushort Move1 { get; set; }
@@ -107,7 +118,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
 
     // Hidden Properties
     public abstract int Version { get; set; }
-    public abstract int SID { get; set; }
+    public abstract uint ID32 { get; set; }
     public abstract int PKRS_Strain { get; set; }
     public abstract int PKRS_Days { get; set; }
 
@@ -117,8 +128,8 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     // Misc Properties
     public abstract int Language { get; set; }
     public abstract bool FatefulEncounter { get; set; }
-    public abstract int TSV { get; }
-    public abstract int PSV { get; }
+    public abstract uint TSV { get; }
+    public abstract uint PSV { get; }
     public abstract int Characteristic { get; }
     public abstract int MarkValue { get; set; }
     public abstract int Met_Location { get; set; }
@@ -148,14 +159,14 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     /// Not all <see cref="PKM"/> types support the <see cref="MetDate"/> property.  In these cases, this property will return null.
     /// If null is assigned to this property, it will be cleared.
     /// </remarks>
-    public DateTime? MetDate
+    public DateOnly? MetDate
     {
         get
         {
             // Check to see if date is valid
             if (!DateUtil.IsDateValid(2000 + Met_Year, Met_Month, Met_Day))
                 return null;
-            return new DateTime(2000 + Met_Year, Met_Month, Met_Day);
+            return new DateOnly(2000 + Met_Year, Met_Month, Met_Day);
         }
         set
         {
@@ -191,14 +202,14 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     /// Not all <see cref="PKM"/> types support the <see cref="EggMetDate"/> property.  In these cases, this property will return null.
     /// If null is assigned to this property, it will be cleared.
     /// </remarks>
-    public DateTime? EggMetDate
+    public DateOnly? EggMetDate
     {
         get
         {
             // Check to see if date is valid
             if (!DateUtil.IsDateValid(2000 + Egg_Year, Egg_Month, Egg_Day))
                 return null;
-            return new DateTime(2000 + Egg_Year, Egg_Month, Egg_Day);
+            return new DateOnly(2000 + Egg_Year, Egg_Month, Egg_Day);
         }
         set
         {
@@ -238,42 +249,20 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     public virtual int MinGameID => 0;
     public abstract int MaxIV { get; }
     public abstract int MaxEV { get; }
-    public abstract int OTLength { get; }
-    public abstract int NickLength { get; }
+    public abstract int MaxStringLengthOT { get; }
+    public abstract int MaxStringLengthNickname { get; }
 
     // Derived
     public virtual int SpriteItem => HeldItem;
     public virtual bool IsShiny => TSV == PSV;
-    public int TrainerID7 { get => (int)((uint)(TID | (SID << 16)) % 1000000); set => SetID7(TrainerSID7, value); }
-    public int TrainerSID7 { get => (int)((uint)(TID | (SID << 16)) / 1000000); set => SetID7(value, TrainerID7); }
 
-    public uint ShinyXor
+    public ushort ShinyXor
     {
         get
         {
-            var pid = PID;
-            var upper = (pid >> 16) ^ (uint)SID;
-            return (pid & 0xFFFF) ^ (uint)TID ^ upper;
+            var tmp = ID32 ^ PID;
+            return (ushort)(tmp ^ (tmp >> 16));
         }
-    }
-
-    public int DisplayTID
-    {
-        get => Generation >= 7 ? TrainerID7 : TID;
-        set { if (Generation >= 7) TrainerID7 = value; else TID = value; }
-    }
-
-    public int DisplaySID
-    {
-        get => Generation >= 7 ? TrainerSID7 : SID;
-        set { if (Generation >= 7) TrainerSID7 = value; else SID = value; }
-    }
-
-    private void SetID7(int sid7, int tid7)
-    {
-        var oid = (sid7 * 1_000_000) + (tid7 % 1_000_000);
-        TID = (ushort)oid;
-        SID = oid >> 16;
     }
 
     public bool E => Version == (int)GameVersion.E;
@@ -293,11 +282,13 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     public bool SWSH => Version is (int)SW or (int)SH;
     public virtual bool BDSP => Version is (int)BD or (int)SP;
     public virtual bool LA => Version is (int)PLA;
+    public virtual bool SV => Version is (int)SL or (int)VL;
 
     public bool GO_LGPE => GO && Met_Location == Locations.GO7;
     public bool GO_HOME => GO && Met_Location == Locations.GO8;
     public bool VC => VC1 || VC2;
     public bool GG => LGPE || GO_LGPE;
+    public bool Gen9 => SV;
     public bool Gen8 => Version is >= 44 and <= 49 || GO_HOME;
     public bool Gen7 => Version is >= 30 and <= 33 || GG;
     public bool Gen6 => Version is >= 24 and <= 29;
@@ -312,6 +303,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     {
         get
         {
+            if (Gen9) return 9;
             if (Gen8) return 8;
             if (Gen7) return 7;
             if (Gen6) return 6;
@@ -326,7 +318,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         }
     }
 
-    public bool PKRS_Infected { get => PKRS_Strain != 0; set => PKRS_Strain = value ? Math.Max(PKRS_Strain, 1) : 0; }
+    public bool PKRS_Infected { get => PKRS_Days != 0 || PKRS_Strain != 0; set => PKRS_Strain = value ? Math.Max(PKRS_Strain, 1) : 0; }
 
     public bool PKRS_Cured
     {
@@ -463,6 +455,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         Move2 = value.Move2;
         Move3 = value.Move3;
         Move4 = value.Move4;
+        this.SetMaximumPPCurrent(value);
     }
 
     public void SetMoves(ReadOnlySpan<ushort> value)
@@ -471,6 +464,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         Move2 = value.Length > 1 ? value[1] : default;
         Move3 = value.Length > 2 ? value[2] : default;
         Move4 = value.Length > 3 ? value[3] : default;
+        this.SetMaximumPPCurrent(value);
     }
 
     public ushort[] RelearnMoves
@@ -487,12 +481,12 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         RelearnMove4 = value.Move4;
     }
 
-    public void SetRelearnMoves(IReadOnlyList<ushort> value)
+    public void SetRelearnMoves(ReadOnlySpan<ushort> value)
     {
-        RelearnMove1 = value.Count > 0 ? value[0] : default;
-        RelearnMove2 = value.Count > 1 ? value[1] : default;
-        RelearnMove3 = value.Count > 2 ? value[2] : default;
-        RelearnMove4 = value.Count > 3 ? value[3] : default;
+        RelearnMove1 = value.Length > 0 ? value[0] : default;
+        RelearnMove2 = value.Length > 1 ? value[1] : default;
+        RelearnMove3 = value.Length > 2 ? value[2] : default;
+        RelearnMove4 = value.Length > 3 ? value[3] : default;
     }
 
     public int PIDAbility
@@ -556,7 +550,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     public virtual bool IsGenderValid()
     {
         int gender = Gender;
-        int gv = PersonalInfo.Gender;
+        var gv = PersonalInfo.Gender;
         if (gv == PersonalInfo.RatioMagicGenderless)
             return gender == 2;
         if (gv == PersonalInfo.RatioMagicFemale)
@@ -600,26 +594,39 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     /// </summary>
     private void ReorderMoves()
     {
-        if (Move1 == 0 && Move2 != 0)
+        // Loop to catch multiple empty slots. X2X4 needs 3 shifts, XX34 needs 4.
+        while (true)
         {
-            Move1 = Move2;
-            Move1_PP = Move2_PP;
-            Move1_PPUps = Move2_PPUps;
-            Move2 = 0;
-        }
-        if (Move2 == 0 && Move3 != 0)
-        {
-            Move2 = Move3;
-            Move2_PP = Move3_PP;
-            Move2_PPUps = Move3_PPUps;
-            Move3 = 0;
-        }
-        if (Move3 == 0 && Move4 != 0)
-        {
-            Move3 = Move4;
-            Move3_PP = Move4_PP;
-            Move3_PPUps = Move4_PPUps;
-            Move4 = 0;
+            if (Move1 == 0 && Move2 != 0)
+            {
+                // This branch can only be true once, as Move1 is the top move.
+                Move1 = Move2;
+                Move1_PP = Move2_PP;
+                Move1_PPUps = Move2_PPUps;
+                Move2 = 0;
+            }
+            else if (Move2 == 0 && Move3 != 0)
+            {
+                // This branch can be true more than once, if shifting 3 & 4 down into 1 & 2.
+                Move2 = Move3;
+                Move2_PP = Move3_PP;
+                Move2_PPUps = Move3_PPUps;
+                Move3 = 0;
+            }
+            else if (Move3 == 0 && Move4 != 0)
+            {
+                // This branch can be true only once, as Move4 is the lowest move and nothing can refill it.
+                Move3 = Move4;
+                Move3_PP = Move4_PP;
+                Move3_PPUps = Move4_PPUps;
+                Move4 = 0;
+                // Still need to loop as Move 3 may still have empty slots before it.
+            }
+            else
+            {
+                // No more reordering, current moveset has no empty slots exist before nonzero slots.
+                return;
+            }
         }
     }
 
@@ -638,7 +645,10 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     /// <summary>
     /// Gets the IV Judge Rating value.
     /// </summary>
-    /// <remarks>IV Judge scales his response 0 (worst) to 3 (best).</remarks>
+    /// <remarks>
+    /// IV Judge scales his response 0 (worst) to 3 (best).<br/>
+    /// Assumes IVs are in the 0-31 range, so this isn't really useful for Gen1/2 formats that are 0-15 per IV.
+    /// </remarks>
     public int PotentialRating => IVTotal switch
     {
         <=  90 => 0,
@@ -667,7 +677,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         else
             LoadStats(stats, p, level);
 
-        // Account for nature
+        // Amplify stats based on the stat nature.
         NatureAmp.ModifyStatsForNature(stats, StatNature);
     }
 
@@ -745,7 +755,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         1 => Move2_PP = GetMovePP(Move2, Move2_PPUps),
         2 => Move3_PP = GetMovePP(Move3, Move3_PPUps),
         3 => Move4_PP = GetMovePP(Move4, Move4_PPUps),
-        _ => throw new ArgumentOutOfRangeException(nameof(index)),
+        _ => throw new ArgumentOutOfRangeException(nameof(index), index, "Index must be between 0 and 3."),
     };
 
     /// <summary>
@@ -765,7 +775,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     /// </summary>
     /// <param name="valid">Items that the <see cref="PKM"/> can hold.</param>
     /// <returns>True/False if the <see cref="PKM"/> can hold its <see cref="HeldItem"/>.</returns>
-    public virtual bool CanHoldItem(IReadOnlyList<ushort> valid) => valid.Contains((ushort)HeldItem);
+    public virtual bool CanHoldItem(ReadOnlySpan<ushort> valid) => valid.Contains((ushort)HeldItem);
 
     /// <summary>
     /// Deep clones the <see cref="PKM"/> object. The clone will not have any shared resources with the source.
@@ -820,22 +830,23 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     }
 
     /// <summary>
-    /// Applies a shiny <see cref="SID"/> to the <see cref="PKM"/>.
+    /// Applies a shiny <see cref="ITrainerID32.SID16"/> to the <see cref="PKM"/>.
     /// </summary>
     public void SetShinySID(Shiny shiny = Shiny.Random)
     {
         if (IsShiny && shiny.IsValid(this))
             return;
 
-        var xor = TID ^ (PID >> 16) ^ (PID & 0xFFFF);
-        var bits = shiny switch
+        ushort bits = shiny switch
         {
             Shiny.AlwaysSquare => 0,
             Shiny.AlwaysStar => 1,
-            _ => Util.Rand.Next(8),
+            _ => (ushort)Util.Rand.Next(8),
         };
 
-        SID = (int)xor ^ bits;
+        var current = ShinyXor;
+        current ^= bits;
+        SID16 ^= current;
     }
 
     /// <summary>
@@ -887,16 +898,16 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
     }
 
     /// <inheritdoc cref="SetRandomIVs(Span{int},int)"/>
-    public void SetRandomIVs(int minFlawless = -1) => SetRandomIVs(stackalloc int[6], minFlawless);
+    public void SetRandomIVs(int minFlawless = 0) => SetRandomIVs(stackalloc int[6], minFlawless);
 
     /// <summary>
     /// Randomizes the IVs within game constraints.
     /// </summary>
     /// <param name="ivs">Temporary variable storage</param>
     /// <param name="minFlawless">Count of flawless IVs to set. If none provided, a count will be detected.</param>
-    public void SetRandomIVs(Span<int> ivs, int minFlawless = -1)
+    public void SetRandomIVs(Span<int> ivs, int minFlawless = 0)
     {
-        if (Version == (int)GameVersion.GO && minFlawless != 6)
+        if (Version == (int)GameVersion.GO)
         {
             SetRandomIVsGO(ivs);
             return;
@@ -906,12 +917,11 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         for (int i = 0; i < 6; i++)
             ivs[i] = rnd.Next(MaxIV + 1);
 
-        int count = minFlawless == -1 ? GetFlawlessIVCount() : minFlawless;
-        if (count != 0)
+        if (minFlawless != 0)
         {
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < minFlawless; i++)
                 ivs[i] = MaxIV;
-            Util.Shuffle(ivs, 0, ivs.Length, rnd); // Randomize IV order
+            rnd.Shuffle(ivs); // Randomize IV order
         }
         SetIVs(ivs);
     }
@@ -927,52 +937,6 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         ivs[2] = ivs[5] = (rnd.Next(minIV, maxIV + 1) << 1) | 1; // defense
         ivs[3] = rnd.Next(MaxIV + 1); // speed
         SetIVs(ivs);
-    }
-
-    /// <summary>
-    /// Randomizes the IVs within game constraints.
-    /// </summary>
-    /// <param name="template">IV template to generate from</param>
-    /// <param name="minFlawless">Count of flawless IVs to set. If none provided, a count will be detected.</param>
-    /// <returns>Randomized IVs if desired.</returns>
-    public void SetRandomIVsTemplate(IndividualValueSet template, int minFlawless = -1)
-    {
-        int count = minFlawless == -1 ? GetFlawlessIVCount() : minFlawless;
-        Span<int> ivs = stackalloc int[6];
-        var rnd = Util.Rand;
-        do
-        {
-            for (int i = 0; i < 6; i++)
-                ivs[i] = template[i] < 0 ? rnd.Next(MaxIV + 1) : template[i];
-        } while (ivs.Count(MaxIV) < count);
-
-        SetIVs(ivs);
-    }
-
-    /// <summary>
-    /// Gets the amount of flawless IVs that the <see cref="PKM"/> should have.
-    /// </summary>
-    /// <returns>Count of IVs that should be max.</returns>
-    public int GetFlawlessIVCount()
-    {
-        if (Generation >= 6)
-        {
-            var species = Species;
-            if (Legal.Legends.Contains(species) || Legal.SubLegends.Contains(species))
-                return 3;
-        }
-        if (XY)
-        {
-            if (PersonalInfo.EggGroup1 == 15) // Undiscovered
-                return 3;
-            if (Met_Location == 148 && Met_Level == 30) // Friend Safari
-                return 2;
-        }
-        if (VC)
-            return Species is (int)Core.Species.Mew or (int)Core.Species.Celebi ? 5 : 3;
-        if (this is IAlpha {IsAlpha: true})
-            return 3;
-        return 0;
     }
 
     /// <summary>
@@ -1006,11 +970,21 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         var shared = destProperties.Intersect(srcProperties);
         foreach (string property in shared)
         {
+            // Setter sanity check: a derived type may not implement a setter if its parent type has one.
+            if (!BatchEditing.TryGetHasProperty(result, property, out var pi))
+                continue;
+            if (!pi.CanWrite)
+                continue;
+
+            // Fetch the current value.
             if (!BatchEditing.TryGetHasProperty(this, property, out var src))
                 continue;
             var prop = src.GetValue(this);
-            if (prop is not (byte[] or null) && BatchEditing.TryGetHasProperty(result, property, out var pi))
-                ReflectUtil.SetValue(pi, result, prop);
+            if (prop is byte[] or null)
+                continue; // not a valid property transfer
+
+            // Write it to the destination.
+            ReflectUtil.SetValue(pi, result, prop);
         }
 
         // set shared properties for the Gen1/2 base class
@@ -1031,7 +1005,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         1 => Move2,
         2 => Move3,
         3 => Move4,
-        _ => throw new IndexOutOfRangeException(nameof(index)),
+        _ => throw new ArgumentOutOfRangeException(nameof(index), index, "Move index must be between 0 and 3."),
     };
 
     public ushort SetMove(int index, ushort value) => index switch
@@ -1040,7 +1014,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         1 => Move2 = value,
         2 => Move3 = value,
         3 => Move4 = value,
-        _ => throw new IndexOutOfRangeException(nameof(index)),
+        _ => throw new ArgumentOutOfRangeException(nameof(index), index, "Move index must be between 0 and 3."),
     };
 
     public ushort GetRelearnMove(int index) => index switch
@@ -1049,7 +1023,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         1 => RelearnMove2,
         2 => RelearnMove3,
         3 => RelearnMove4,
-        _ => throw new IndexOutOfRangeException(nameof(index)),
+        _ => throw new ArgumentOutOfRangeException(nameof(index), index, "Move index must be between 0 and 3."),
     };
 
     public ushort SetRelearnMove(int index, ushort value) => index switch
@@ -1058,7 +1032,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         1 => RelearnMove2 = value,
         2 => RelearnMove3 = value,
         3 => RelearnMove4 = value,
-        _ => throw new IndexOutOfRangeException(nameof(index)),
+        _ => throw new ArgumentOutOfRangeException(nameof(index), index, "Move index must be between 0 and 3."),
     };
 
     /// <summary>
@@ -1114,7 +1088,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         3 => EV_SPE,
         4 => EV_SPA,
         5 => EV_SPD,
-        _ => throw new ArgumentOutOfRangeException(nameof(index)),
+        _ => throw new ArgumentOutOfRangeException(nameof(index), index, "EV index must be between 0 and 5."),
     };
 
     /// <summary>
@@ -1129,6 +1103,6 @@ public abstract class PKM : ISpeciesForm, ITrainerID, IGeneration, IShiny, ILang
         3 => IV_SPE,
         4 => IV_SPA,
         5 => IV_SPD,
-        _ => throw new ArgumentOutOfRangeException(nameof(index)),
+        _ => throw new ArgumentOutOfRangeException(nameof(index), index, "IV index must be between 0 and 5."),
     };
 }

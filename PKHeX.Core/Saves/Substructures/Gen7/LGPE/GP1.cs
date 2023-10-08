@@ -8,7 +8,7 @@ namespace PKHeX.Core;
 /// <summary>
 /// Go Park Entity transferred from <see cref="GameVersion.GO"/> to <see cref="GameVersion.GG"/>.
 /// </summary>
-public sealed class GP1 : IEncounterInfo, IFixedAbilityNumber
+public sealed class GP1 : IEncounterInfo, IFixedAbilityNumber, IScaledSizeReadOnly, IEncounterConvertible<PB7>
 {
     public const int SIZE = 0x1B0;
     public readonly byte[] Data;
@@ -20,11 +20,9 @@ public sealed class GP1 : IEncounterInfo, IFixedAbilityNumber
     public int Generation => 7;
     public EntityContext Context => EntityContext.Gen7b;
     public AbilityPermission Ability => AbilityPermission.Any12;
-    public PKM ConvertToPKM(ITrainerInfo tr) => ConvertToPB7(tr);
-    public PKM ConvertToPKM(ITrainerInfo tr, EncounterCriteria criteria) => ConvertToPB7(tr, criteria);
 
     public GP1(byte[] data) => Data = data;
-    public GP1() : this((byte[])Blank.Clone()) { }
+    public GP1() : this(new byte[SIZE]) => InitializeBlank(Data);
     public void WriteTo(byte[] data, int offset) => Data.CopyTo(data, offset);
 
     public static GP1 FromData(byte[] data, int offset)
@@ -35,15 +33,15 @@ public sealed class GP1 : IEncounterInfo, IFixedAbilityNumber
 
     private static GP1 FromData(ReadOnlySpan<byte> span)
     {
-        var gpkm = new GP1();
-        span[..SIZE].CopyTo(gpkm.Data);
-        return gpkm;
+        var result = new GP1();
+        span[..SIZE].CopyTo(result.Data);
+        return result;
     }
 
     /// <summary>
     /// First 0x20 bytes of an empty <see cref="GP1"/>, all other bytes are 0.
     /// </summary>
-    private static readonly byte[] Blank20 =
+    private static ReadOnlySpan<byte> Blank20 => new byte[]
     {
         0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x80, 0x3F, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x3F,
@@ -51,17 +49,10 @@ public sealed class GP1 : IEncounterInfo, IFixedAbilityNumber
         0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x85, 0xEC, 0x33, 0x01,
     };
 
-    public static readonly byte[] Blank = GetBlank();
+    public static void InitializeBlank(Span<byte> data) => Blank20.CopyTo(data);
 
-    public static byte[] GetBlank()
-    {
-        byte[] data = new byte[SIZE];
-        Blank20.CopyTo(data, 0x20);
-        return data;
-    }
-
-    public string Username1 => Util.TrimFromZero(Encoding.ASCII.GetString(Data, 0x00, 0x10));
-    public string Username2 => Util.TrimFromZero(Encoding.ASCII.GetString(Data, 0x10, 0x20));
+    public string Username1 => Util.TrimFromZero(Encoding.ASCII.GetString(Data.AsSpan(0x00, 0x10)));
+    public string Username2 => Util.TrimFromZero(Encoding.ASCII.GetString(Data.AsSpan(0x10, 0x10)));
 
     public ushort Species => ReadUInt16LittleEndian(Data.AsSpan(0x28)); // s32, just read as u16
     public int CP => ReadInt32LittleEndian(Data.AsSpan(0x2C));
@@ -138,9 +129,16 @@ public sealed class GP1 : IEncounterInfo, IFixedAbilityNumber
     public string StatMove => $"{IV_HP:00}/{IV_ATK:00}/{IV_DEF:00}, CP {CP:0000} (Moves {Move1:000}, {Move2:000})";
     public string Dump(IReadOnlyList<string> speciesNames, int index) => $"{index:000} {Nickname} ({speciesNames[Species]}{FormString} {ShinyString}[{GenderString}]) @ Lv. {Level:00} - {StatMove}, {GeoTime}.";
 
-    public PB7 ConvertToPB7(ITrainerInfo sav) => ConvertToPB7(sav, EncounterCriteria.Unrestricted);
+    /// <summary>
+    /// GO Park transfers start with 2 AVs for all stats.
+    /// </summary>
+    public const byte InitialAV = 2;
 
-    public PB7 ConvertToPB7(ITrainerInfo sav, EncounterCriteria criteria)
+    PKM IEncounterConvertible.ConvertToPKM(ITrainerInfo tr) => ConvertToPKM(tr);
+    PKM IEncounterConvertible.ConvertToPKM(ITrainerInfo tr, EncounterCriteria criteria) => ConvertToPKM(tr, criteria);
+    public PB7 ConvertToPKM(ITrainerInfo sav) => ConvertToPKM(sav, EncounterCriteria.Unrestricted);
+
+    public PB7 ConvertToPKM(ITrainerInfo sav, EncounterCriteria criteria)
     {
         var rnd = Util.Rand;
         var pk = new PB7
@@ -156,8 +154,8 @@ public sealed class GP1 : IEncounterInfo, IFixedAbilityNumber
             Met_Day = Day,
             CurrentLevel = Level,
             Met_Level = Level,
-            TID = sav.TID,
-            SID = sav.SID,
+            TID16 = sav.TID16,
+            SID16 = sav.SID16,
             OT_Name = sav.OT,
             Ball = 4,
             Language = sav.Language,
@@ -181,25 +179,30 @@ public sealed class GP1 : IEncounterInfo, IFixedAbilityNumber
 
         var pi = pk.PersonalInfo;
         pk.Gender = criteria.GetGender(Gender, pi);
-        pk.Nature = (int)criteria.GetNature(Nature.Random);
+        pk.Nature = (int)criteria.GetNature();
         pk.RefreshAbility(criteria.GetAbilityFromNumber(Ability));
 
         bool isShiny = pk.IsShiny;
         if (IsShiny && !isShiny) // Force Square
-            pk.PID = (uint)(((sav.TID ^ sav.SID ^ (pk.PID & 0xFFFF) ^ 0) << 16) | (pk.PID & 0xFFFF));
+        {
+            var low = pk.PID & 0xFFFF;
+            pk.PID = ((low ^ sav.TID16 ^ sav.SID16) << 16) | low;
+        }
         else if (isShiny)
+        {
             pk.PID ^= 0x1000_0000;
+        }
 
         Span<ushort> moves = stackalloc ushort[4];
-        MoveLevelUp.GetEncounterMoves(moves, pk, pk.CurrentLevel, GameVersion.GO);
+        ILearnSource source = LearnSource7GG.Instance;
+        source.SetEncounterMoves(Species, Form, Level, moves);
         pk.SetMoves(moves);
-        pk.SetMaximumPPCurrent(moves);
         pk.OT_Friendship = pk.PersonalInfo.BaseFriendship;
 
         pk.HeightScalar = HeightScalar;
         pk.WeightScalar = WeightScalar;
 
-        pk.AwakeningSetAllTo(2);
+        pk.AwakeningSetAllTo(InitialAV); // 2
         pk.ResetCalculatedValues();
 
         return pk;

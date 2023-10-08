@@ -9,6 +9,7 @@ public sealed class LearnGroup7b : ILearnGroup
 {
     public static readonly LearnGroup7b Instance = new();
     private const int Generation = 7;
+    public ushort MaxMoveID => Legal.MaxMoveID_7b;
 
     public ILearnGroup? GetPrevious(PKM pk, EvolutionHistory history, IEncounterTemplate enc, LearnOption option) => null;
     public bool HasVisited(PKM pk, EvolutionHistory history) => history.HasVisitedLGPE;
@@ -43,7 +44,7 @@ public sealed class LearnGroup7b : ILearnGroup
 
     public void GetAllMoves(Span<bool> result, PKM pk, EvolutionHistory history, IEncounterTemplate enc, MoveSourceType types = MoveSourceType.All, LearnOption option = LearnOption.Current)
     {
-        if (types.HasFlagFast(MoveSourceType.Encounter) && enc.Generation == Generation)
+        if (types.HasFlag(MoveSourceType.Encounter) && enc.Generation == Generation)
             FlagEncounterMoves(enc, result);
 
         foreach (var evo in history.Gen7b)

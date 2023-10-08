@@ -1,4 +1,4 @@
-﻿using static PKHeX.Core.GameVersion;
+using static PKHeX.Core.GameVersion;
 
 namespace PKHeX.Core;
 
@@ -33,7 +33,7 @@ public static class EggStateLegality
     /// <returns>Usually 0...</returns>
     public static int GetMinimumEggHatchCycles(PKM pk) => pk switch
     {
-        PK2 or PB8 => 1, // no grace period between 1 step remaining and hatch
+        PK2 or PB8 or PK9 => 1, // no grace period between 1 step remaining and hatch
         _ => 0, // having several Eggs in your party and then hatching one will give the rest 0... they can then be boxed!
     };
 
@@ -54,7 +54,7 @@ public static class EggStateLegality
     /// <returns>Maximum value the Hatch Counter can be.</returns>
     public static int GetMaximumEggHatchCycles(PKM pk, IEncounterTemplate enc)
     {
-        if (enc is EncounterStatic { EggCycles: not 0 } s)
+        if (enc is IHatchCycle { EggCycles: not 0 } s)
             return s.EggCycles;
         return pk.PersonalInfo.HatchCycles;
     }
@@ -65,6 +65,9 @@ public static class EggStateLegality
     /// <param name="generation">Generation the egg is given in</param>
     public static byte GetEggLevel(int generation) => generation >= 4 ? (byte)1 : (byte)5;
 
+    public const byte EggMetLevel34 = 0;
+    public const byte EggMetLevel = 1;
+
     /// <summary>
     /// Met Level which eggs are given to the player. May change if transferred to future games.
     /// </summary>
@@ -72,9 +75,9 @@ public static class EggStateLegality
     /// <param name="generation">Generation the egg is given in</param>
     public static int GetEggLevelMet(GameVersion version, int generation) => generation switch
     {
-        2 => version is C ? 1 : 0, // GS do not store met data
-        3 or 4 => 0,
-        _ => 1,
+        2 => version is C ? EggMetLevel : 0, // GS do not store met data
+        3 or 4 => EggMetLevel34,
+        _ => EggMetLevel,
     };
 
     /// <summary>
@@ -85,7 +88,20 @@ public static class EggStateLegality
     public static bool IsValidHTEgg(PKM pk) => pk switch
     {
         PB8 { Met_Location: Locations.LinkTrade6NPC } pb8 when pb8.HT_Friendship == PersonalTable.BDSP[pb8.Species].BaseFriendship => true,
+        PK9 { Met_Location: Locations.LinkTrade6, HT_Language: not 0 } => true, // fine regardless of handler (trade-back)
         _ => false,
+    };
+
+    /// <summary>
+    /// Gets a suggested Version for a hatched egg that originally lacked a Version value.
+    /// </summary>
+    /// <param name="pk">Egg Entity</param>
+    /// <param name="version">Potential version the egg was hatched in</param>
+    /// <returns>Very roughly sanitized version the egg was hatched in.</returns>
+    public static GameVersion GetEggHatchVersion(PKM pk, GameVersion version) => pk switch
+    {
+        PK9 => version is SL or VL ? version : SL,
+        _ => version,
     };
 
     /// <summary>
@@ -98,6 +114,7 @@ public static class EggStateLegality
     {
         EncounterStatic7 => false,
         WB8 or EncounterStatic8b when pk.IsUntraded => false,
+        EncounterStatic9 { EggLocation: 60005 } => false, // Jacq Egg does not have flag set!
         { Generation: 4 } => false,
         _ => true,
     };
@@ -132,6 +149,8 @@ public static class EggStateLegality
 
         SW or SH => Locations.HatchLocation8,
         BD or SP => Locations.HatchLocation8b,
+
+        SL or VL => Locations.HatchLocation9,
         _ => -1,
     };
 }

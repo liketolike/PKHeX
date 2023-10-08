@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Windows.Forms;
 using PKHeX.Core;
@@ -27,7 +27,7 @@ public partial class SAV_Trainer8 : Form
         CB_Gender.Items.Clear();
         CB_Gender.Items.AddRange(Main.GenderSymbols.Take(2).ToArray()); // m/f depending on unicode selection
 
-        TrainerStats.LoadRecords(SAV, Records.RecordList_8);
+        TrainerStats.LoadRecords(SAV, RecordLists.RecordList_8);
 
         NUD_BP.Value = Math.Min(SAV.Misc.BP, 9999);
         GetComboBoxes();
@@ -66,7 +66,7 @@ public partial class SAV_Trainer8 : Form
         TB_TrainerCardNumber.Text = SAV.Blocks.TrainerCard.Number;
         MT_TrainerCardID.Text = SAV.Blocks.TrainerCard.TrainerID.ToString("000000");
         MT_RotoRally.Text = SAV.Blocks.TrainerCard.RotoRallyScore.ToString();
-        trainerID1.LoadIDValues(SAV);
+        trainerID1.LoadIDValues(SAV, SAV.Generation);
         MT_Money.Text = SAV.Money.ToString();
         MT_Watt.Text = SAV.MyStatus.Watt.ToString();
         CB_Language.SelectedValue = SAV.Language;
@@ -97,12 +97,10 @@ public partial class SAV_Trainer8 : Form
         L_LastSaved.Visible = CAL_LastSavedDate.Visible = CAL_LastSavedTime.Visible = false;
         //}
 
-        L_Started.Visible = CAL_AdventureStartDate.Visible = CAL_AdventureStartTime.Visible = false;
+        CAL_AdventureStartTime.Visible = false;
+        CAL_AdventureStartDate.Value = new DateTime(SAV.TrainerCard.StartedYear, SAV.TrainerCard.StartedMonth, SAV.TrainerCard.StartedDay);
+
         L_Fame.Visible = CAL_HoFDate.Visible = CAL_HoFTime.Visible = false;
-        // DateUtil.GetDateTime2000(SAV.SecondsToStart, out var date, out var time);
-        // CAL_AdventureStartDate.Value = date;
-        // CAL_AdventureStartTime.Value = time;
-        // 
         // DateUtil.GetDateTime2000(SAV.SecondsToFame, out date, out time);
         // CAL_HoFDate.Value = date;
         // CAL_HoFTime.Value = time;
@@ -125,8 +123,8 @@ public partial class SAV_Trainer8 : Form
         SAV.SetValue(SaveBlockAccessor8SWSH.KBattleTowerSinglesStreak, (ushort)Math.Min(300, Util.ToUInt32(MT_BattleTowerSinglesStreak.Text)));
         SAV.SetValue(SaveBlockAccessor8SWSH.KBattleTowerDoublesStreak, (ushort)Math.Min(300, Util.ToUInt32(MT_BattleTowerDoublesStreak.Text)));
 
-        SAV.SetRecord(Records.G8BattleTowerSingleWin, (int)singles);
-        SAV.SetRecord(Records.G8BattleTowerDoubleWin, (int)doubles);
+        SAV.SetRecord(RecordLists.G8BattleTowerSingleWin, (int)singles);
+        SAV.SetRecord(RecordLists.G8BattleTowerDoubleWin, (int)doubles);
     }
 
     private void Save()
@@ -168,10 +166,13 @@ public partial class SAV_Trainer8 : Form
 
         // Save PlayTime
         SAV.PlayedHours = ushort.Parse(MT_Hours.Text);
-        SAV.PlayedMinutes = ushort.Parse(MT_Minutes.Text)%60;
-        SAV.PlayedSeconds = ushort.Parse(MT_Seconds.Text)%60;
+        SAV.PlayedMinutes = ushort.Parse(MT_Minutes.Text) % 60;
+        SAV.PlayedSeconds = ushort.Parse(MT_Seconds.Text) % 60;
 
-        //SAV.SecondsToStart = (uint)DateUtil.GetSecondsFrom2000(CAL_AdventureStartDate.Value, CAL_AdventureStartTime.Value);
+        SAV.TrainerCard.StartedYear = (ushort)CAL_AdventureStartDate.Value.Year;
+        SAV.TrainerCard.StartedMonth = (byte)CAL_AdventureStartDate.Value.Month;
+        SAV.TrainerCard.StartedDay = (byte)CAL_AdventureStartDate.Value.Day;
+
         //SAV.SecondsToFame = (uint)DateUtil.GetSecondsFrom2000(CAL_HoFDate.Value, CAL_HoFTime.Value);
         //
         //if (SAV.Played.LastSavedDate.HasValue)

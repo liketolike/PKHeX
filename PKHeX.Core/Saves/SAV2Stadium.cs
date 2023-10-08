@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
@@ -12,18 +11,18 @@ public sealed class SAV2Stadium : SAV_STADIUM
     public override int SaveRevision => Japanese ? 0 : 1;
     public override string SaveRevisionString => Japanese ? "J" : "U";
 
-    public override IPersonalTable Personal => PersonalTable.C;
-    public override int MaxEV => ushort.MaxValue;
-    public override IReadOnlyList<ushort> HeldItems => Legal.HeldItems_GSC;
+    public override PersonalTable2 Personal => PersonalTable.C;
+    public override int MaxEV => EffortValues.Max12;
+    public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_GSC;
     public override GameVersion Version { get; protected set; } = GameVersion.Stadium2;
 
-    protected override SaveFile CloneInternal() => new SAV2Stadium((byte[])Data.Clone(), Japanese);
+    protected override SAV2Stadium CloneInternal() => new((byte[])Data.Clone(), Japanese);
 
     public override int Generation => 2;
     public override EntityContext Context => EntityContext.Gen2;
     private const int StringLength = 12;
-    public override int OTLength => StringLength;
-    public override int NickLength => StringLength;
+    public override int MaxStringLengthOT => StringLength;
+    public override int MaxStringLengthNickname => StringLength;
     public override int BoxCount => Japanese ? 9 : 14;
     public override int BoxSlotCount => Japanese ? 30 : 20;
 
@@ -33,8 +32,8 @@ public sealed class SAV2Stadium : SAV_STADIUM
     public override int MaxItemID => Legal.MaxItemID_2;
 
     public override Type PKMType => typeof(SK2);
-    public override PKM BlankPKM => new SK2(Japanese);
-    protected override PKM GetPKM(byte[] data) => new SK2(data, Japanese);
+    public override SK2 BlankPKM => new(Japanese);
+    protected override SK2 GetPKM(byte[] data) => new(data, Japanese);
 
     private const int SIZE_SK2 = PokeCrypto.SIZE_2STADIUM; // 60
     protected override int SIZE_STORED => SIZE_SK2;
@@ -99,7 +98,7 @@ public sealed class SAV2Stadium : SAV_STADIUM
             Data[boxOfs] = 1;
             Data[boxOfs + 1] = (byte)count;
             Data[boxOfs + 4] = StringConverter12.G1TerminatorCode;
-            StringConverter12.SetString(Data.AsSpan(boxOfs + 0x10, 4), "1234".AsSpan(), 4, Japanese, StringConverterOption.None);
+            StringConverter12.SetString(Data.AsSpan(boxOfs + 0x10, 4), "1234", 4, Japanese, StringConverterOption.None);
         }
         else
         {
@@ -137,7 +136,7 @@ public sealed class SAV2Stadium : SAV_STADIUM
         var name = $"{((Stadium2TeamType) (team / TeamCountType)).ToString().Replace('_', ' ')} {(team % 10) + 1}";
 
         var ofs = GetTeamOffset(team);
-        var str = GetString(ofs + 4, 7);
+        var str = GetString(Data.AsSpan(ofs + 4, 7));
         if (string.IsNullOrWhiteSpace(str))
             return name;
         var id = ReadUInt16BigEndian(Data.AsSpan(ofs + 2));
@@ -147,7 +146,8 @@ public sealed class SAV2Stadium : SAV_STADIUM
     public override string GetBoxName(int box)
     {
         var ofs = GetBoxOffset(box) - 0x10;
-        var str = GetString(ofs, 0x10);
+        var boxNameSpan = Data.AsSpan(ofs, 0x10);
+        var str = GetString(boxNameSpan);
         if (string.IsNullOrWhiteSpace(str))
             return $"Box {box + 1}";
         return str;
@@ -164,7 +164,7 @@ public sealed class SAV2Stadium : SAV_STADIUM
         for (int i = 0; i < 6; i++)
         {
             var rel = ofs + ListHeaderSizeTeam + (i * SIZE_STORED);
-            members[i] = (SK2)GetStoredSlot(Data, rel);
+            members[i] = (SK2)GetStoredSlot(Data.AsSpan(rel));
         }
         return new SlotGroup(name, members);
     }

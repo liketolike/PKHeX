@@ -19,11 +19,11 @@ public abstract class SAV6 : SAV_BEEF, ITrainerStatRecord, ISaveBlock6Core, IReg
     // Configuration
     protected override int SIZE_STORED => PokeCrypto.SIZE_6STORED;
     protected override int SIZE_PARTY => PokeCrypto.SIZE_6PARTY;
-    public override PKM BlankPKM => new PK6();
+    public override PK6 BlankPKM => new();
     public override Type PKMType => typeof(PK6);
 
     public override int BoxCount => 31;
-    public override int MaxEV => 252;
+    public override int MaxEV => EffortValues.Max252;
     public override int Generation => 6;
     public override EntityContext Context => EntityContext.Gen6;
     protected override int GiftCountMax => 24;
@@ -32,14 +32,14 @@ public abstract class SAV6 : SAV_BEEF, ITrainerStatRecord, ISaveBlock6Core, IReg
     public int EventWorkCount => (EventFlag - EventWork) / sizeof(ushort);
     protected abstract int EventFlag { get; }
     protected abstract int EventWork { get; }
-    public override int OTLength => 12;
-    public override int NickLength => 12;
+    public override int MaxStringLengthOT => 12;
+    public override int MaxStringLengthNickname => 12;
 
     public override ushort MaxSpeciesID => Legal.MaxSpeciesID_6;
     public override int MaxBallID => Legal.MaxBallID_6;
     public override int MaxGameID => Legal.MaxGameID_6; // OR
 
-    protected override PKM GetPKM(byte[] data) => new PK6(data);
+    protected override PK6 GetPKM(byte[] data) => new(data);
     protected override byte[] DecryptPKM(byte[] data) => PokeCrypto.DecryptArray6(data);
 
     protected int WondercardFlags { get; set; } = int.MinValue;
@@ -58,8 +58,9 @@ public abstract class SAV6 : SAV_BEEF, ITrainerStatRecord, ISaveBlock6Core, IReg
     protected internal const int ShortStringLength = 0x1A; // bytes, not characters
 
     // Player Information
-    public override int TID { get => Status.TID; set => Status.TID = value; }
-    public override int SID { get => Status.SID; set => Status.SID = value; }
+    public override uint ID32 { get => Status.ID32; set => Status.ID32 = value; }
+    public override ushort TID16 { get => Status.TID16; set => Status.TID16 = value; }
+    public override ushort SID16 { get => Status.SID16; set => Status.SID16 = value; }
     public override int Game { get => Status.Game; set => Status.Game = value; }
     public override int Gender { get => Status.Gender; set => Status.Gender = value; }
     public override int Language { get => Status.Language; set => Status.Language = value; }
@@ -99,10 +100,10 @@ public abstract class SAV6 : SAV_BEEF, ITrainerStatRecord, ISaveBlock6Core, IReg
         return GetString(Data.AsSpan(GetBoxNameOffset(box), LongStringLength));
     }
 
-    public override void SetBoxName(int box, string value)
+    public override void SetBoxName(int box, ReadOnlySpan<char> value)
     {
         var span = Data.AsSpan(GetBoxNameOffset(box), LongStringLength);
-        SetString(span, value.AsSpan(), LongStringLength / 2, StringConverterOption.ClearZero);
+        SetString(span, value, LongStringLength / 2, StringConverterOption.ClearZero);
     }
 
     protected override void SetPKM(PKM pk, bool isParty = false)
@@ -110,8 +111,8 @@ public abstract class SAV6 : SAV_BEEF, ITrainerStatRecord, ISaveBlock6Core, IReg
         PK6 pk6 = (PK6)pk;
         // Apply to this Save File
         int CT = pk6.CurrentHandler;
-        DateTime Date = DateTime.Now;
-        pk6.Trade(this, Date.Day, Date.Month, Date.Year);
+        var now = EncounterDate.GetDate3DS();
+        pk6.Trade(this, now.Day, now.Month, now.Year);
         if (CT != pk6.CurrentHandler) // Logic updated Friendship
         {
             // Copy over the Friendship Value only under certain circumstances

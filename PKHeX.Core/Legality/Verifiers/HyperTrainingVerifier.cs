@@ -1,4 +1,5 @@
-﻿using static PKHeX.Core.LegalityCheckStrings;
+using System;
+using static PKHeX.Core.LegalityCheckStrings;
 
 namespace PKHeX.Core;
 
@@ -24,9 +25,10 @@ public sealed class HyperTrainingVerifier : Verifier
             return;
         }
 
-        if (pk.CurrentLevel != 100)
+        var minLevel = t.GetHyperTrainMinLevel(data.Info.EvoChainsAllGens, pk.Context);
+        if (pk.CurrentLevel < minLevel)
         {
-            data.AddLine(GetInvalid(LHyperBelow100));
+            data.AddLine(GetInvalid(string.Format(LHyperTooLow_0, minLevel)));
             return;
         }
 
@@ -37,16 +39,42 @@ public sealed class HyperTrainingVerifier : Verifier
             return;
         }
 
-        // LGPE gold bottle cap applies to all IVs regardless
-        if (pk.GG && t.IsHyperTrainedAll()) // already checked for 6IV, therefore we're flawed on at least one IV
-            return;
+        // already checked for 6IV, therefore we're flawed on at least one IV
+        if (t.IsHyperTrainedAll())
+        {
+            if (HasVisitedGoldBottleFlawless(data.Info.EvoChainsAllGens))
+                return;
+            // Otherwise, could not have hyper trained a flawless IV. Flag a flawless IV with the usual logic.
+        }
 
+        if (IsFlawlessHyperTrained(pk, t, max))
+            data.AddLine(GetInvalid(LHyperPerfectOne));
+    }
+
+    private static bool HasVisitedGoldBottleFlawless(EvolutionHistory evos)
+    {
+        // S/V gold bottle cap applies to all IVs regardless
+        // LGP/E gold bottle cap applies to all IVs regardless
+        foreach (ref readonly var x in evos.Gen9.AsSpan())
+        {
+            if (x.LevelMax >= 50)
+                return true;
+        }
+        foreach (ref readonly var x in evos.Gen7b.AsSpan())
+        {
+            if (x.LevelMax >= 100)
+                return true;
+        }
+        return false;
+    }
+
+    public static bool IsFlawlessHyperTrained(PKM pk, IHyperTrain t, int max)
+    {
         for (int i = 0; i < 6; i++) // Check individual IVs
         {
-            if (pk.GetIV(i) != max || !t.IsHyperTrained(i))
-                continue;
-            data.AddLine(GetInvalid(LHyperPerfectOne));
-            break;
+            if (pk.GetIV(i) == max && t.IsHyperTrained(i))
+                return true;
         }
+        return false;
     }
 }

@@ -8,10 +8,10 @@ namespace PKHeX.Core;
 /// </summary>
 public sealed class PersonalTable4 : IPersonalTable, IPersonalTable<PersonalInfo4>
 {
-    internal readonly PersonalInfo4[] Table;
+    private readonly PersonalInfo4[] Table;
     private const int SIZE = PersonalInfo4.SIZE;
-    private const int MaxSpecies = Legal.MaxSpeciesID_4;
-    public int MaxSpeciesID => MaxSpecies;
+    private const ushort MaxSpecies = Legal.MaxSpeciesID_4;
+    public ushort MaxSpeciesID => MaxSpecies;
 
     public PersonalTable4(ReadOnlySpan<byte> data)
     {
@@ -30,12 +30,12 @@ public sealed class PersonalTable4 : IPersonalTable, IPersonalTable<PersonalInfo
 
     public int GetFormIndex(ushort species, byte form)
     {
-        if ((uint)species <= MaxSpecies)
+        if (species <= MaxSpecies)
             return Table[species].FormIndex(species, form);
         return 0;
     }
 
-    public bool IsSpeciesInGame(ushort species) => (uint)species <= MaxSpecies;
+    public bool IsSpeciesInGame(ushort species) => species <= MaxSpecies;
     public bool IsPresentInGame(ushort species, byte form)
     {
         if (!IsSpeciesInGame(species))
@@ -61,4 +61,21 @@ public sealed class PersonalTable4 : IPersonalTable, IPersonalTable<PersonalInfo
     PersonalInfo IPersonalTable.this[int index] => this[index];
     PersonalInfo IPersonalTable.this[ushort species, byte form] => this[species, form];
     PersonalInfo IPersonalTable.GetFormEntry(ushort species, byte form) => GetFormEntry(species, form);
+
+    public void LoadTables(BinLinkerAccessor tutors)
+    {
+        var table = Table;
+        for (ushort i = Legal.MaxSpeciesID_4; i != 0; i--)
+        {
+            // Alt forms can be different bits, so don't copy from form 0.
+            var form0 = table[i];
+            form0.AddTypeTutors(tutors[i]);
+            var fc = form0.FormCount;
+            for (byte f = 1; f < fc; f++)
+            {
+                var index = form0.FormIndex(i, f);
+                table[index].AddTypeTutors(tutors[index]);
+            }
+        }
+    }
 }

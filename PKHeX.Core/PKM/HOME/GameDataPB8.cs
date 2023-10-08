@@ -6,57 +6,52 @@ namespace PKHeX.Core;
 /// <summary>
 /// Side game data for <see cref="PB8"/> data transferred into HOME.
 /// </summary>
-public sealed class GameDataPB8 : HomeOptional1, IGameDataSide
+public sealed class GameDataPB8 : HomeOptional1, IGameDataSide<PB8>, IGameDataSplitAbility, IPokerusStatus
 {
-    private const int SIZE = HomeCrypto.SIZE_1GAME_PB8;
-    private const HomeGameDataFormat Format = HomeGameDataFormat.PB8;
+    private const HomeGameDataFormat ExpectFormat = HomeGameDataFormat.PB8;
+    private const int SIZE = HomeCrypto.SIZE_2GAME_PB8;
+    protected override HomeGameDataFormat Format => ExpectFormat;
 
-    public GameDataPB8() : base(Format, SIZE) { }
-    public GameDataPB8(byte[] data, int offset = 0) : base(Format, SIZE, data, offset) { }
-    public GameDataPB8 Clone() => new(ToArray(SIZE));
-    public int CopyTo(Span<byte> result) => CopyTo(result, SIZE);
+    public GameDataPB8() : base(SIZE) { }
+    public GameDataPB8(Memory<byte> data) : base(data) => EnsureSize(SIZE);
+    public GameDataPB8 Clone() => new(ToArray());
+    public int WriteTo(Span<byte> result) => WriteWithHeader(result);
 
     #region Structure
 
-    public ushort Move1 { get => ReadUInt16LittleEndian(Data.AsSpan(Offset + 0x00)); set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 0x00), value); }
-    public ushort Move2 { get => ReadUInt16LittleEndian(Data.AsSpan(Offset + 0x02)); set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 0x02), value); }
-    public ushort Move3 { get => ReadUInt16LittleEndian(Data.AsSpan(Offset + 0x04)); set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 0x04), value); }
-    public ushort Move4 { get => ReadUInt16LittleEndian(Data.AsSpan(Offset + 0x06)); set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 0x06), value); }
+    public ushort Move1 { get => ReadUInt16LittleEndian(Data); set => WriteUInt16LittleEndian(Data, value); }
+    public ushort Move2 { get => ReadUInt16LittleEndian(Data[0x02..]); set => WriteUInt16LittleEndian(Data[0x02..], value); }
+    public ushort Move3 { get => ReadUInt16LittleEndian(Data[0x04..]); set => WriteUInt16LittleEndian(Data[0x04..], value); }
+    public ushort Move4 { get => ReadUInt16LittleEndian(Data[0x06..]); set => WriteUInt16LittleEndian(Data[0x06..], value); }
 
-    public int Move1_PP { get => Data[Offset + 0x08]; set => Data[Offset + 0x08] = (byte)value; }
-    public int Move2_PP { get => Data[Offset + 0x09]; set => Data[Offset + 0x09] = (byte)value; }
-    public int Move3_PP { get => Data[Offset + 0x0A]; set => Data[Offset + 0x0A] = (byte)value; }
-    public int Move4_PP { get => Data[Offset + 0x0B]; set => Data[Offset + 0x0B] = (byte)value; }
-    public int Move1_PPUps { get => Data[Offset + 0x0C]; set => Data[Offset + 0x0C] = (byte)value; }
-    public int Move2_PPUps { get => Data[Offset + 0x0D]; set => Data[Offset + 0x0D] = (byte)value; }
-    public int Move3_PPUps { get => Data[Offset + 0x0E]; set => Data[Offset + 0x0E] = (byte)value; }
-    public int Move4_PPUps { get => Data[Offset + 0x0F]; set => Data[Offset + 0x0F] = (byte)value; }
+    public int Move1_PP { get => Data[0x08]; set => Data[0x08] = (byte)value; }
+    public int Move2_PP { get => Data[0x09]; set => Data[0x09] = (byte)value; }
+    public int Move3_PP { get => Data[0x0A]; set => Data[0x0A] = (byte)value; }
+    public int Move4_PP { get => Data[0x0B]; set => Data[0x0B] = (byte)value; }
+    public int Move1_PPUps { get => Data[0x0C]; set => Data[0x0C] = (byte)value; }
+    public int Move2_PPUps { get => Data[0x0D]; set => Data[0x0D] = (byte)value; }
+    public int Move3_PPUps { get => Data[0x0E]; set => Data[0x0E] = (byte)value; }
+    public int Move4_PPUps { get => Data[0x0F]; set => Data[0x0F] = (byte)value; }
 
-    public ushort RelearnMove1 { get => ReadUInt16LittleEndian(Data.AsSpan(Offset + 0x10)); set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 0x10), value); }
-    public ushort RelearnMove2 { get => ReadUInt16LittleEndian(Data.AsSpan(Offset + 0x12)); set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 0x12), value); }
-    public ushort RelearnMove3 { get => ReadUInt16LittleEndian(Data.AsSpan(Offset + 0x14)); set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 0x14), value); }
-    public ushort RelearnMove4 { get => ReadUInt16LittleEndian(Data.AsSpan(Offset + 0x16)); set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 0x16), value); }
-    public bool GetMoveRecordFlag(int index)
-    {
-        if ((uint)index > 112) // 14 bytes, 8 bits
-            throw new ArgumentOutOfRangeException(nameof(index));
-        int ofs = index >> 3;
-        return FlagUtil.GetFlag(Data, Offset + 0x18 + ofs, index & 7);
-    }
+    public ushort RelearnMove1 { get => ReadUInt16LittleEndian(Data[0x10..]); set => WriteUInt16LittleEndian(Data[0x10..], value); }
+    public ushort RelearnMove2 { get => ReadUInt16LittleEndian(Data[0x12..]); set => WriteUInt16LittleEndian(Data[0x12..], value); }
+    public ushort RelearnMove3 { get => ReadUInt16LittleEndian(Data[0x14..]); set => WriteUInt16LittleEndian(Data[0x14..], value); }
+    public ushort RelearnMove4 { get => ReadUInt16LittleEndian(Data[0x16..]); set => WriteUInt16LittleEndian(Data[0x16..], value); }
 
-    public void SetMoveRecordFlag(int index, bool value)
-    {
-        if ((uint)index > 112) // 14 bytes, 8 bits
-            throw new ArgumentOutOfRangeException(nameof(index));
-        int ofs = index >> 3;
-        FlagUtil.SetFlag(Data, Offset + 0x18 + ofs, index & 7, value);
-    }
+    private Span<byte> RecordFlag => Data.Slice(0x18, 14);
+    public bool GetMoveRecordFlag(int index) => FlagUtil.GetFlag(RecordFlag, index >> 3, index & 7);
+    public void SetMoveRecordFlag(int index, bool value) => FlagUtil.SetFlag(RecordFlag, index >> 3, index & 7, value);
+    public bool GetMoveRecordFlagAny() => RecordFlag.IndexOfAnyExcept<byte>(0) >= 0;
+    public void ClearMoveRecordFlags() => RecordFlag.Clear();
 
-    public bool GetMoveRecordFlagAny() => Array.FindIndex(Data, Offset + 0x18, 14, static z => z != 0) >= 0;
+    public int Ball { get => Data[0x26]; set => Data[0x26] = (byte)value; }
+    public int Egg_Location { get => ReadUInt16LittleEndian(Data[0x27..]); set => WriteUInt16LittleEndian(Data[0x27..], (ushort)value); }
+    public int Met_Location { get => ReadUInt16LittleEndian(Data[0x29..]); set => WriteUInt16LittleEndian(Data[0x29..], (ushort)value); }
 
-    public int Ball { get => Data[Offset + 0x26]; set => Data[Offset + 0x26] = (byte)value; }
-    public int Egg_Location { get => ReadUInt16LittleEndian(Data.AsSpan(Offset + 0x27)); set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 0x27), (ushort)value); }
-    public int Met_Location { get => ReadUInt16LittleEndian(Data.AsSpan(Offset + 0x29)); set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 0x29), (ushort)value); }
+    // Rev2 Additions
+    public byte PKRS { get => Data[0x2B]; set => Data[0x2B] = value; }
+    public ushort Ability { get => ReadUInt16LittleEndian(Data[0x2C..]); set => WriteUInt16LittleEndian(Data[0x2C..], value); }
+    public byte AbilityNumber { get => Data[0x2E]; set => Data[0x2E] = value; }
 
     #endregion
 
@@ -64,19 +59,32 @@ public sealed class GameDataPB8 : HomeOptional1, IGameDataSide
 
     public PersonalInfo GetPersonalInfo(ushort species, byte form) => PersonalTable.BDSP.GetFormEntry(species, form);
 
-    public void CopyTo(PB8 pk)
+    public void CopyTo(PB8 pk, PKH pkh)
     {
-        ((IGameDataSide)this).CopyTo(pk);
+        this.CopyTo(pk);
         // Move Records are not settable in PB8; do not copy even if nonzero (illegal).
+        pk.PKRS = PKRS;
+        pk.AbilityNumber = AbilityNumber;
+        pk.Ability = Ability;
     }
 
-    public PKM ConvertToPKM(PKH pkh) => ConvertToPB8(pkh);
+    public void CopyFrom(PB8 pk, PKH pkh)
+    {
+        this.CopyFrom(pk);
+        // Move Records are not settable in PB8; do not copy even if nonzero (illegal).
+        PKRS = pk.PKRS;
+        AbilityNumber = (byte)pk.AbilityNumber;
+        Ability = (ushort)pk.Ability;
+    }
 
-    public PB8 ConvertToPB8(PKH pkh)
+    public PB8 ConvertToPKM(PKH pkh)
     {
         var pk = new PB8();
         pkh.CopyTo(pk);
-        CopyTo(pk);
+        CopyTo(pk, pkh);
+
+        pk.ResetPartyStats();
+        pk.RefreshChecksum();
         return pk;
     }
 
@@ -85,26 +93,42 @@ public sealed class GameDataPB8 : HomeOptional1, IGameDataSide
     /// <summary> Reconstructive logic to best apply suggested values. </summary>
     public static GameDataPB8? TryCreate(PKH pkh)
     {
-        if (pkh.DataPB7 is { } x)
-            return Create(x);
-        if (pkh.DataPK8 is { } b)
-            return Create(b);
-        if (pkh.DataPA8 is { } a)
-            return Create(a);
-        return null;
+        var side = GetNearestNeighbor(pkh);
+        if (side == null)
+            return null;
+
+        var result = new GameDataPB8();
+        result.InitializeFrom(side, pkh);
+        return result;
     }
 
-    public static T Create<T>(GameDataPB8 data) where T : IGameDataSide, new() => new()
-    {
-        Ball = data.Ball,
-        Met_Location = data.Met_Location == Locations.Default8bNone ? 0 : data.Met_Location,
-        Egg_Location = data.Egg_Location == Locations.Default8bNone ? 0 : data.Egg_Location,
-    };
+    private static IGameDataSide? GetNearestNeighbor(PKH pkh) => pkh.DataPK9 as IGameDataSide
+                                                              ?? pkh.DataPK8 as IGameDataSide
+                                                              ?? pkh.DataPB7 as IGameDataSide
+                                                              ?? pkh.DataPA8;
 
-    public static GameDataPB8 Create(IGameDataSide data) => new()
+    public void InitializeFrom(IGameDataSide side, PKH pkh)
     {
-        Ball = data.Ball,
-        Met_Location = data.Met_Location == 0 ? Locations.Default8bNone : data.Met_Location,
-        Egg_Location = data.Egg_Location == 0 ? Locations.Default8bNone : data.Egg_Location,
-    };
+        Ball = side.Ball;
+        Met_Location = side.Met_Location == 0 ? Locations.Default8bNone : side.Met_Location;
+        Egg_Location = side.Egg_Location == 0 ? Locations.Default8bNone : side.Egg_Location;
+
+        if (side is IPokerusStatus p)
+            PKRS = p.PKRS;
+        if (side is IGameDataSplitAbility a)
+            AbilityNumber = a.AbilityNumber;
+        else
+            AbilityNumber = 1;
+
+        PopulateFromCore(pkh);
+    }
+
+    private void PopulateFromCore(PKH pkh)
+    {
+        var pi = PersonalTable.BDSP.GetFormEntry(pkh.Species, pkh.Form);
+        Ability = (ushort)pi.GetAbilityAtIndex(AbilityNumber >> 1);
+
+        var level = Experience.GetLevel(pkh.EXP, pi.EXPGrowth);
+        this.ResetMoves(pkh.Species, pkh.Form, level, LearnSource8BDSP.Instance, EntityContext.Gen8b);
+    }
 }

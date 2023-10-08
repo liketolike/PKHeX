@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -7,13 +7,27 @@ using System.Reflection;
 
 namespace PKHeX.Core;
 
+/// <summary>
+/// Utility class for reflection.
+/// </summary>
 public static class ReflectUtil
 {
-    public static bool IsValueEqual(this PropertyInfo pi, object obj, object value)
+    /// <summary>
+    /// Fetches the requested property from <see cref="obj"/>, and compares it to <see cref="value"/>.
+    /// </summary>
+    /// <param name="pi">Property to fetch</param>
+    /// <param name="obj">Object to fetch property from</param>
+    /// <param name="value">Value to compare to</param>
+    /// <returns>Comparison result</returns>
+    public static int CompareTo(this PropertyInfo pi, object obj, object value)
     {
         var v = pi.GetValue(obj, null);
         var c = ConvertValue(value, pi.PropertyType);
-        return v.Equals(c);
+        if (v is null)
+            return 0;
+        if (c is IComparable c1 && v is IComparable c2)
+            return c2.CompareTo(c1);
+        return 0;
     }
 
     public static void SetValue(PropertyInfo pi, object obj, object value)
@@ -22,10 +36,21 @@ public static class ReflectUtil
         pi.SetValue(obj, c, null);
     }
 
-    public static object? GetValue(object obj, string name) => GetPropertyInfo(obj.GetType().GetTypeInfo(), name)?.GetValue(obj);
-    public static void SetValue(object obj, string name, object value) => GetPropertyInfo(obj.GetType().GetTypeInfo(), name)?.SetValue(obj, value, null);
-    public static object GetValue(Type t, string propertyName) => t.GetTypeInfo().GetDeclaredProperty(propertyName).GetValue(null);
-    public static void SetValue(Type t, string propertyName, object value) => t.GetTypeInfo().GetDeclaredProperty(propertyName).SetValue(null, value);
+    public static object? GetValue(object obj, string name)
+    {
+        if (TryGetPropertyInfo(obj.GetType().GetTypeInfo(), name, out var pi))
+            return pi.GetValue(obj, null);
+        return default;
+    }
+    public static bool SetValue(object obj, string name, object value)
+    {
+        if (!TryGetPropertyInfo(obj.GetType().GetTypeInfo(), name, out var pi))
+            return false;
+        if (!pi.CanWrite)
+            return false;
+        pi.SetValue(obj, value);
+        return true;
+    }
 
     public static IEnumerable<string> GetPropertiesStartWithPrefix(Type type, string prefix)
     {
@@ -46,14 +71,17 @@ public static class ReflectUtil
     public static IEnumerable<PropertyInfo> GetAllPropertyInfoCanWritePublic(Type type)
     {
         return type.GetTypeInfo().GetAllTypeInfo().SelectMany(GetAllProperties)
-            .Where(p => p.CanWrite && p.SetMethod.IsPublic);
+            .Where(CanWritePublic);
     }
 
     public static IEnumerable<PropertyInfo> GetAllPropertyInfoPublic(Type type)
     {
         return type.GetTypeInfo().GetAllTypeInfo().SelectMany(GetAllProperties)
-            .Where(p => (p.CanRead && p.GetMethod.IsPublic) || (p.CanWrite && p.SetMethod.IsPublic));
+            .Where(p => p.CanReadPublic() || p.CanWritePublic());
     }
+
+    private static bool CanReadPublic(this PropertyInfo p) => p.CanRead && (p.GetMethod?.IsPublic ?? false);
+    private static bool CanWritePublic(this PropertyInfo p) => p.CanWrite && (p.SetMethod?.IsPublic ?? false);
 
     public static IEnumerable<string> GetPropertiesPublic(Type type)
     {
@@ -65,7 +93,7 @@ public static class ReflectUtil
     public static IEnumerable<string> GetPropertiesCanWritePublicDeclared(Type type)
     {
         return type.GetTypeInfo().GetAllProperties()
-                .Where(p => p.CanWrite && p.SetMethod.IsPublic)
+                .Where(CanWritePublic)
                 .Select(p => p.Name)
                 .Distinct()
             ;
@@ -73,16 +101,16 @@ public static class ReflectUtil
 
     private static object? ConvertValue(object value, Type type)
     {
-        if (type == typeof(DateTime?)) // Used for PKM.MetDate and other similar properties
+        if (type == typeof(DateOnly?)) // Used for PKM.MetDate and other similar properties
         {
-            return DateTime.TryParseExact(value.ToString(), "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dateValue)
-                ? new DateTime?(dateValue)
+            return DateOnly.TryParseExact(value.ToString(), "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly dateValue)
+                ? new DateOnly?(dateValue)
                 : null;
         }
 
         if (type.IsEnum)
         {
-            var str = value.ToString();
+            var str = value.ToString() ?? string.Empty;
             if (int.TryParse(str, out var integer))
                 return Convert.ChangeType(integer, type);
             return Enum.Parse(type, str, true);
@@ -128,11 +156,28 @@ public static class ReflectUtil
     /// <param name="name">Name of the property.</param>
     /// <param name="pi">Reference to the property info for the object, if it exists.</param>
     /// <returns>True if has property, and false if does not have property. <see cref="pi"/> is null when returning false.</returns>
-    public static bool HasProperty(object obj, string name, [NotNullWhen(true)] out PropertyInfo? pi) => (pi = GetPropertyInfo(obj.GetType().GetTypeInfo(), name)) != null;
-
-    public static PropertyInfo? GetPropertyInfo(this TypeInfo typeInfo, string name)
+    public static bool HasProperty(object obj, string name, [NotNullWhen(true)] out PropertyInfo? pi)
     {
-        return typeInfo.GetAllTypeInfo().Select(t => t.GetDeclaredProperty(name)).FirstOrDefault(pi => pi != null);
+        var type = obj.GetType();
+        return TryGetPropertyInfo(type.GetTypeInfo(), name, out pi);
+    }
+
+    public static bool TryGetPropertyInfo(this TypeInfo typeInfo, string name, [NotNullWhen(true)] out PropertyInfo? pi)
+    {
+        foreach (var t in typeInfo.GetAllTypeInfo())
+        {
+            pi = t.GetDeclaredProperty(name);
+            if (pi != null)
+                return true;
+            foreach (var i in t.ImplementedInterfaces)
+            {
+                pi = i.GetTypeInfo().GetDeclaredProperty(name);
+                if (pi != null)
+                    return true;
+            }
+        }
+        pi = null;
+        return false;
     }
 
     private static IEnumerable<T> GetAll<T>(this TypeInfo typeInfo, Func<TypeInfo, IEnumerable<T>> accessor)
@@ -143,14 +188,14 @@ public static class ReflectUtil
     public static Dictionary<T, string> GetAllConstantsOfType<T>(this Type type) where T : struct
     {
         var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.FlattenHierarchy);
-        var consts = fields.Where(fi => fi.IsLiteral && !fi.IsInitOnly && fi.FieldType == typeof(T));
-        return consts.ToDictionary(x => (T)x.GetRawConstantValue(), z => z.Name);
+        var consts = fields.Where(fi => fi is { IsLiteral: true, IsInitOnly: false } && fi.FieldType == typeof(T));
+        return consts.ToDictionary(z => (T)(z.GetRawConstantValue() ?? throw new NullReferenceException(nameof(z.Name))), z => z.Name);
     }
 
     public static Dictionary<T, string> GetAllPropertiesOfType<T>(this Type type, object obj) where T : class
     {
         var props = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
         var ofType = props.Where(fi => typeof(T).IsAssignableFrom(fi.PropertyType));
-        return ofType.ToDictionary(x => (T)x.GetValue(obj), z => z.Name);
+        return ofType.ToDictionary(x => (T)(x.GetValue(obj) ?? throw new NullReferenceException(nameof(x.Name))), z => z.Name);
     }
 }

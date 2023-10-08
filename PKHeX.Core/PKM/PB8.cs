@@ -1,12 +1,11 @@
 using System;
-using System.Collections.Generic;
 
 namespace PKHeX.Core;
 
 /// <summary> Generation 8 <see cref="PKM"/> format. </summary>
 public sealed class PB8 : G8PKM
 {
-    private static readonly ushort[] Unused =
+    public override ReadOnlySpan<ushort> ExtraBytes => new ushort[]
     {
         // Alignment bytes
         0x17, 0x1A, 0x1B, 0x23, 0x33, 0x3E, 0x3F,
@@ -26,8 +25,8 @@ public sealed class PB8 : G8PKM
         0x140, 0x141, 0x142, 0x143, 0x144, 0x145, 0x146, 0x147,
     };
 
-    public override IReadOnlyList<ushort> ExtraBytes => Unused;
-    public override PersonalInfo PersonalInfo => PersonalTable.BDSP.GetFormEntry(Species, Form);
+    public override PersonalInfo8BDSP PersonalInfo => PersonalTable.BDSP.GetFormEntry(Species, Form);
+    public override IPermitRecord Permit => PersonalInfo;
     public override bool IsNative => BDSP;
     public override EntityContext Context => EntityContext.Gen8b;
 
@@ -38,7 +37,7 @@ public sealed class PB8 : G8PKM
     }
 
     public PB8(byte[] data) : base(data) { }
-    public override PKM Clone() => new PB8((byte[])Data.Clone());
+    public override PB8 Clone() => new((byte[])Data.Clone());
 
     public bool IsDprIllegal
     {
@@ -51,7 +50,7 @@ public sealed class PB8 : G8PKM
         if (IsEgg)
         {
             // Apply link trade data, only if it left the OT (ignore if dumped & imported, or cloned, etc)
-            if ((tr.TID != TID) || (tr.SID != SID) || (tr.Gender != OT_Gender) || (tr.OT != OT_Name))
+            if ((tr.TID16 != TID16) || (tr.SID16 != SID16) || (tr.Gender != OT_Gender) || (tr.OT != OT_Name))
                 SetLinkTradeEgg(Day, Month, Year, Locations.LinkTrade6NPC);
 
             // Unfortunately, BDSP doesn't return if it's an egg, and can update the HT details & handler.
@@ -99,7 +98,7 @@ public sealed class PB8 : G8PKM
     private bool TradeOT(ITrainerInfo tr)
     {
         // Check to see if the OT matches the SAV's OT info.
-        if (!(tr.TID == TID && tr.SID == SID && tr.Gender == OT_Gender && tr.OT == OT_Name))
+        if (!(tr.ID32 == ID32 && tr.Gender == OT_Gender && tr.OT == OT_Name))
             return false;
 
         CurrentHandler = 0;
@@ -125,51 +124,9 @@ public sealed class PB8 : G8PKM
     public override int MaxAbilityID => Legal.MaxAbilityID_8b;
     public override int MaxItemID => Legal.MaxItemID_8b;
     public override int MaxBallID => Legal.MaxBallID_8b;
-    public override int MaxGameID => Legal.MaxGameID_8b;
+    public override int MaxGameID => Legal.MaxGameID_HOME;
 
     public override bool WasEgg => IsEgg || Egg_Day != 0;
 
-    public PK8 ConvertToPK8()
-    {
-        var pk = ConvertTo<PK8>();
-        pk.SanitizeImport();
-        pk.Egg_Location = GetEggLocationPK8();
-        return pk;
-    }
-
-    private int GetEggLocationPK8()
-    {
-        var egg = Egg_Location;
-        if (egg == Locations.Default8bNone)
-            return 0;
-        return Version switch
-        {
-            (int)GameVersion.BD => egg is Locations.LinkTrade6NPC ? Locations.HOME_SWBD : Locations.HOME_SWSHBDSPEgg,
-            (int)GameVersion.SH => egg is Locations.LinkTrade6NPC ? Locations.HOME_SHSP : Locations.HOME_SWSHBDSPEgg,
-            _ => egg,
-        };
-    }
-
-    public override PA8 ConvertToPA8()
-    {
-        var pk = base.ConvertToPA8();
-        if (pk.Egg_Location == Locations.Default8bNone)
-            pk.Egg_Location = 0;
-        return pk;
-    }
-
-    public override bool HasOriginalMetLocation => base.HasOriginalMetLocation && !(LA && Met_Location == Locations.HOME_SWLA);
-
-    public override void ResetMoves()
-    {
-        var learnsets = Legal.LevelUpBDSP;
-        var table = PersonalTable.BDSP;
-
-        var index = table.GetFormIndex(Species, Form);
-        var learn = learnsets[index];
-        Span<ushort> moves = stackalloc ushort[4];
-        learn.SetEncounterMoves(CurrentLevel, moves);
-        SetMoves(moves);
-        this.SetMaximumPPCurrent(moves);
-    }
+    public override bool HasOriginalMetLocation => base.HasOriginalMetLocation && !(LA && Met_Location == LocationsHOME.SWLA);
 }

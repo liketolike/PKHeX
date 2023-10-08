@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
@@ -218,14 +218,10 @@ public enum Funfest5Mission
     TheBerryHuntingAdventure = 44,
 }
 
-public record struct Funfest5Score
+public record struct Funfest5Score(uint RawValue)
 {
-    public uint RawValue { get; set; }
-    public Funfest5Score(uint raw) => RawValue = raw;
-
-    public Funfest5Score(int total, int score, int level, bool isNew)
+    public Funfest5Score(int total, int score, int level, bool isNew) : this(0)
     {
-        RawValue = 0;
         Total = total;
         Score = score;
         Level = level;
@@ -240,25 +236,25 @@ public record struct Funfest5Score
 
     public int Total
     {
-        get => (int)(RawValue & 0x3FFFu);
+        readonly get => (int)(RawValue & 0x3FFFu);
         set => RawValue = (RawValue & ~0x3FFFu) | ((uint)value & 0x3FFFu);
     }
 
     public int Score
     {
-        get => (int)((RawValue >> 14) & 0x3FFFu);
+        readonly get => (int)((RawValue >> 14) & 0x3FFFu);
         set => RawValue = (RawValue & 0xF0003FFFu) | (((uint)value & 0x3FFFu) << 14);
     }
 
     public int Level
     {
-        get => (int)((RawValue >> 28) & 0x7u);
+        readonly get => (int)((RawValue >> 28) & 0x7u);
         set => RawValue = (RawValue & 0x8FFFFFFFu) | (((uint)value & 0x7u) << 28);
     }
 
     public bool IsNew
     {
-        get => RawValue >> 31 == 1;
+        readonly get => RawValue >> 31 == 1;
         set => RawValue = (RawValue & 0x7FFFFFFFu) | ((value ? 1u : 0) << 31);
     }
 }

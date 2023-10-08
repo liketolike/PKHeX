@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
@@ -13,18 +12,18 @@ public sealed class SAV1StadiumJ : SAV_STADIUM
     public override int SaveRevision => 0;
     public override string SaveRevisionString => "0"; // so we're different from Japanese SAV1Stadium naming...
 
-    public override IPersonalTable Personal => PersonalTable.Y;
-    public override int MaxEV => ushort.MaxValue;
-    public override IReadOnlyList<ushort> HeldItems => Array.Empty<ushort>();
+    public override PersonalTable1 Personal => PersonalTable.Y;
+    public override int MaxEV => EffortValues.Max12;
+    public override ReadOnlySpan<ushort> HeldItems => Array.Empty<ushort>();
     public override GameVersion Version { get; protected set; } = GameVersion.StadiumJ;
 
-    protected override SaveFile CloneInternal() => new SAV1StadiumJ((byte[])Data.Clone());
+    protected override SAV1StadiumJ CloneInternal() => new((byte[])Data.Clone());
 
     public override int Generation => 1;
     public override EntityContext Context => EntityContext.Gen1;
     private const int StringLength = 6; // Japanese Only
-    public override int OTLength => StringLength;
-    public override int NickLength => StringLength;
+    public override int MaxStringLengthOT => StringLength;
+    public override int MaxStringLengthNickname => StringLength;
     public override int BoxCount => 4; // 8 boxes stored sequentially; latter 4 are backups
     public override int BoxSlotCount => 30;
 
@@ -37,7 +36,7 @@ public sealed class SAV1StadiumJ : SAV_STADIUM
     protected override int SIZE_PARTY => SIZE_PK1J;
 
     public override Type PKMType => typeof(PK1);
-    public override PKM BlankPKM => new PK1(true);
+    public override PK1 BlankPKM => new(true);
 
     private const int ListHeaderSize = 0x14;
     private const int ListFooterSize = 6; // POKE + 2byte checksum
@@ -81,15 +80,15 @@ public sealed class SAV1StadiumJ : SAV_STADIUM
         // Not implemented
     }
 
-    protected override PKM GetPKM(byte[] data)
+    protected override PK1 GetPKM(byte[] data)
     {
         const int len = StringLength;
         var nick = data.AsSpan(0x21, len);
         var ot = data.AsSpan(0x21 + len, len);
         data = data.Slice(0, 0x21);
         var pk1 = new PK1(data, true);
-        nick.CopyTo(pk1.RawNickname);
-        ot.CopyTo(pk1.RawOT);
+        nick.CopyTo(pk1.Nickname_Trash);
+        ot.CopyTo(pk1.OT_Trash);
         return pk1;
     }
 
@@ -101,8 +100,8 @@ public sealed class SAV1StadiumJ : SAV_STADIUM
         var data = pk.Data;
         const int len = StringLength;
         data.CopyTo(result, 0);
-        gb.RawNickname.CopyTo(result, PokeCrypto.SIZE_1STORED);
-        gb.RawOT.CopyTo(result, PokeCrypto.SIZE_1STORED + len);
+        gb.Nickname_Trash.CopyTo(result.AsSpan(PokeCrypto.SIZE_1STORED));
+        gb.OT_Trash.CopyTo(result.AsSpan(PokeCrypto.SIZE_1STORED + len));
         return result;
     }
 
@@ -118,7 +117,7 @@ public sealed class SAV1StadiumJ : SAV_STADIUM
         var name = $"Team {team + 1}";
 
         var ofs = GetTeamOffset(team);
-        var str = GetString(ofs + 2, 5);
+        var str = GetString(Data.AsSpan(ofs + 2, 5));
         if (string.IsNullOrWhiteSpace(str))
             return name;
         var id = ReadUInt16BigEndian(Data.AsSpan(ofs + 8));
@@ -136,25 +135,25 @@ public sealed class SAV1StadiumJ : SAV_STADIUM
         for (int i = 0; i < 6; i++)
         {
             var rel = ofs + ListHeaderSize + (i * SIZE_STORED);
-            members[i] = (PK1)GetStoredSlot(Data, rel);
+            members[i] = (PK1)GetStoredSlot(Data.AsSpan(rel));
         }
         return new SlotGroup(name, members);
     }
 
-    public override void WriteSlotFormatStored(PKM pk, Span<byte> data, int offset)
+    public override void WriteSlotFormatStored(PKM pk, Span<byte> data)
     {
         // pk that have never been boxed have yet to save the 'current level' for box indication
         // set this value at this time
         ((PK1)pk).Stat_LevelBox = pk.CurrentLevel;
-        base.WriteSlotFormatStored(pk, Data, offset);
+        base.WriteSlotFormatStored(pk, data);
     }
 
-    public override void WriteBoxSlot(PKM pk, Span<byte> data, int offset)
+    public override void WriteBoxSlot(PKM pk, Span<byte> data)
     {
         // pk that have never been boxed have yet to save the 'current level' for box indication
         // set this value at this time
         ((PK1)pk).Stat_LevelBox = pk.CurrentLevel;
-        base.WriteBoxSlot(pk, Data, offset);
+        base.WriteBoxSlot(pk, data);
     }
 
     public static bool IsStadium(ReadOnlySpan<byte> data)

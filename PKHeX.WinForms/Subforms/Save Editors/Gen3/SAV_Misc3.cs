@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 using PKHeX.Core;
 using static System.Buffers.Binary.BinaryPrimitives;
@@ -49,7 +50,7 @@ public partial class SAV_Misc3 : Form
                 cba[i].InitializeBinding();
                 cba[i].DataSource = new BindingSource(legal, null);
                 var g3Species = SAV.GetWork(0x43 + i);
-                var species = SpeciesConverter.GetG4Species(g3Species);
+                var species = SpeciesConverter.GetNational3(g3Species);
                 cba[i].SelectedValue = (int)species;
             }
         }
@@ -73,8 +74,8 @@ public partial class SAV_Misc3 : Form
             ComboBox[] cba = { CB_TCM1, CB_TCM2, CB_TCM3, CB_TCM4, CB_TCM5, CB_TCM6 };
             for (int i = 0; i < cba.Length; i++)
             {
-                var species = (ushort) WinFormsUtil.GetIndex(cba[i]);
-                var g3Species = SpeciesConverter.GetG3Species(species);
+                var species = (ushort)WinFormsUtil.GetIndex(cba[i]);
+                var g3Species = SpeciesConverter.GetInternal3(species);
                 SAV.SetWork(0x43 + i, g3Species);
             }
         }
@@ -93,10 +94,10 @@ public partial class SAV_Misc3 : Form
     private void ReadJoyful(IGen3Joyful j)
     {
         TB_J1.Text = Math.Min((ushort)9999, j.JoyfulJumpInRow).ToString();
-        TB_J2.Text = Math.Min(        9999, j.JoyfulJumpScore).ToString();
+        TB_J2.Text = Math.Min(9999, j.JoyfulJumpScore).ToString();
         TB_J3.Text = Math.Min((ushort)9999, j.JoyfulJump5InRow).ToString();
         TB_B1.Text = Math.Min((ushort)9999, j.JoyfulBerriesInRow).ToString();
-        TB_B2.Text = Math.Min(        9999, j.JoyfulBerriesScore).ToString();
+        TB_B2.Text = Math.Min(9999, j.JoyfulBerriesScore).ToString();
         TB_B3.Text = Math.Min((ushort)9999, j.JoyfulBerries5InRow).ToString();
     }
 
@@ -105,36 +106,42 @@ public partial class SAV_Misc3 : Form
         j.JoyfulJumpInRow = (ushort)Util.ToUInt32(TB_J1.Text);
         j.JoyfulJumpScore = (ushort)Util.ToUInt32(TB_J2.Text);
         j.JoyfulJump5InRow = (ushort)Util.ToUInt32(TB_J3.Text);
-        j.JoyfulBerriesInRow  = (ushort)Util.ToUInt32(TB_B1.Text);
-        j.JoyfulBerriesScore  = (ushort)Util.ToUInt32(TB_B2.Text);
+        j.JoyfulBerriesInRow = (ushort)Util.ToUInt32(TB_B1.Text);
+        j.JoyfulBerriesScore = (ushort)Util.ToUInt32(TB_B2.Text);
         j.JoyfulBerries5InRow = (ushort)Util.ToUInt32(TB_B3.Text);
     }
     #endregion
+
+    private const ushort ItemIDOldSeaMap = 0x178;
+    private static ReadOnlySpan<ushort> TicketItemIDs => new ushort[] { 0x109, 0x113, 0x172, 0x173, ItemIDOldSeaMap }; // item IDs
 
     #region Ferry
     private void B_GetTickets_Click(object sender, EventArgs e)
     {
         var Pouches = SAV.Inventory;
-        var itemlist = GameInfo.Strings.GetItemStrings(SAV.Context, SAV.Version).ToArray();
-        for (int i = 0; i < itemlist.Length; i++)
-        {
-            if (string.IsNullOrEmpty(itemlist[i]))
-                itemlist[i] = $"(Item #{i:000})";
-        }
+        var itemlist = GameInfo.Strings.GetItemStrings(SAV.Context, SAV.Version);
 
-        const int oldsea = 0x178;
-        int[] tickets = {0x109, 0x113, 0x172, 0x173, oldsea }; // item IDs
-        if (!SAV.Japanese && DialogResult.Yes != WinFormsUtil.Prompt(MessageBoxButtons.YesNo, $"Non Japanese save file. Add {itemlist[oldsea]} (unreleased)?"))
-            tickets = tickets.Take(tickets.Length - 1).ToArray(); // remove old sea map
-
-        var p = Pouches.FirstOrDefault(z => z.Type == InventoryType.KeyItems);
-        if (p == null)
-            throw new ArgumentException(nameof(InventoryType));
+        var tickets = TicketItemIDs;
+        var p = Pouches.First(z => z.Type == InventoryType.KeyItems);
+        bool hasOldSea = Array.Exists(p.Items, static z => z.Index == ItemIDOldSeaMap);
+        if (!hasOldSea && !SAV.Japanese && DialogResult.Yes != WinFormsUtil.Prompt(MessageBoxButtons.YesNo, $"Non Japanese save file. Add {itemlist[ItemIDOldSeaMap]} (unreleased)?"))
+            tickets = tickets[..^1]; // remove old sea map
 
         // check for missing tickets
-        var missing = tickets.Where(z => !p.Items.Any(item => item.Index == z && item.Count == 1)).ToList();
-        var have = tickets.Except(missing).ToList();
-        if (missing.Count == 0)
+        Span<ushort> have = stackalloc ushort[tickets.Length]; int h = 0;
+        Span<ushort> missing = stackalloc ushort[tickets.Length]; int m = 0;
+        foreach (var item in tickets)
+        {
+            bool has = Array.Exists(p.Items, z => z.Index == item);
+            if (has)
+                have[h++] = item;
+            else
+                missing[m++] = item;
+        }
+        have = have[..h];
+        missing = missing[..m];
+
+        if (missing.Length == 0)
         {
             WinFormsUtil.Alert("Already have all tickets.");
             B_GetTickets.Enabled = false;
@@ -143,18 +150,29 @@ public partial class SAV_Misc3 : Form
 
         // check for space
         int end = Array.FindIndex(p.Items, static z => z.Index == 0);
-        if (end + missing.Count >= p.Items.Length)
+        if (end == -1 || end + missing.Length >= p.Items.Length)
         {
             WinFormsUtil.Alert("Not enough space in pouch.", "Please use the InventoryEditor.");
             B_GetTickets.Enabled = false;
             return;
         }
 
-        var added = string.Join(", ", missing.Select(u => itemlist[u]));
-        var addmsg = $"Add the following items?{Environment.NewLine}{added}";
-        if (have.Count > 0)
+        static string Format(ReadOnlySpan<ushort> items, ReadOnlySpan<string> names)
         {
-            string had = string.Join(", ", have.Select(u => itemlist[u]));
+            var sbAdd = new StringBuilder();
+            foreach (var item in items)
+            {
+                if (sbAdd.Length > 0)
+                    sbAdd.Append(", ");
+                sbAdd.Append(names[item]);
+            }
+            return sbAdd.ToString();
+        }
+        var added = Format(missing, itemlist);
+        var addmsg = $"Add the following items?{Environment.NewLine}{added}";
+        if (have.Length > 0)
+        {
+            string had = Format(have, itemlist);
             var havemsg = $"Already have:{Environment.NewLine}{had}";
             addmsg += Environment.NewLine + Environment.NewLine + havemsg;
         }
@@ -162,7 +180,7 @@ public partial class SAV_Misc3 : Form
             return;
 
         // insert items at the end
-        for (int i = 0; i < missing.Count; i++)
+        for (int i = 0; i < missing.Length; i++)
         {
             var item = p.Items[end + i];
             item.Index = missing[i];
@@ -178,16 +196,16 @@ public partial class SAV_Misc3 : Form
 
     private void ReadFerry()
     {
-        CHK_Catchable.Checked       = SAV.GetEventFlag(0x864);
-        CHK_ReachSouthern.Checked   = SAV.GetEventFlag(0x8B3);
-        CHK_ReachBirth.Checked      = SAV.GetEventFlag(0x8D5);
-        CHK_ReachFaraway.Checked    = SAV.GetEventFlag(0x8D6);
-        CHK_ReachNavel.Checked      = SAV.GetEventFlag(0x8E0);
-        CHK_ReachBF.Checked         = SAV.GetEventFlag(0x1D0);
+        CHK_Catchable.Checked = SAV.GetEventFlag(0x864);
+        CHK_ReachSouthern.Checked = SAV.GetEventFlag(0x8B3);
+        CHK_ReachBirth.Checked = SAV.GetEventFlag(0x8D5);
+        CHK_ReachFaraway.Checked = SAV.GetEventFlag(0x8D6);
+        CHK_ReachNavel.Checked = SAV.GetEventFlag(0x8E0);
+        CHK_ReachBF.Checked = SAV.GetEventFlag(0x1D0);
         CHK_InitialSouthern.Checked = SAV.GetEventFlag(0x1AE);
-        CHK_InitialBirth.Checked    = SAV.GetEventFlag(0x1AF);
-        CHK_InitialFaraway.Checked  = SAV.GetEventFlag(0x1B0);
-        CHK_InitialNavel.Checked    = SAV.GetEventFlag(0x1DB);
+        CHK_InitialBirth.Checked = SAV.GetEventFlag(0x1AF);
+        CHK_InitialFaraway.Checked = SAV.GetEventFlag(0x1B0);
+        CHK_InitialNavel.Checked = SAV.GetEventFlag(0x1DB);
     }
 
     private void SaveFerry()
@@ -300,7 +318,7 @@ public partial class SAV_Misc3 : Form
             int p = BFF[Facility][2 + BFV[BFF[Facility][0]].Length + BattleType] + RBi;
             const int offset = 0xCDC;
             var current = ReadUInt32LittleEndian(SAV.Small.AsSpan(offset));
-            var update = (current & (uint)~(1 << p)) | (uint)((CHK_Continue.Checked ? 1 : 0) << p);
+            var update = (current & ~(1u << p)) | (CHK_Continue.Checked ? 1u : 0) << p;
             WriteUInt32LittleEndian(SAV.Small.AsSpan(offset), update);
             return;
         }
@@ -447,7 +465,7 @@ public partial class SAV_Misc3 : Form
                 return;
 
             var index = WinFormsUtil.GetIndex(CB_Record);
-            var value = (uint) NUD_RecordValue.Value;
+            var value = (uint)NUD_RecordValue.Value;
             records.SetRecord(index, value);
             if (index == 1)
                 LoadFame(value);

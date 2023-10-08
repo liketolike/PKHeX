@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using static PKHeX.Core.LegalityCheckStrings;
 
 namespace PKHeX.Core;
@@ -44,13 +44,13 @@ public sealed class TrainerNameVerifier : Verifier
 
         if (ParseSettings.CheckWordFilter)
         {
-            if (WordFilter.IsFiltered(ot, out string bad))
-                data.AddLine(GetInvalid($"Wordfilter: {bad}"));
+            if (WordFilter.IsFiltered(ot, out var badPattern))
+                data.AddLine(GetInvalid($"Word Filter: {badPattern}"));
             if (ContainsTooManyNumbers(ot, data.Info.Generation))
-                data.AddLine(GetInvalid("Wordfilter: Too many numbers."));
+                data.AddLine(GetInvalid("Word Filter: Too many numbers."));
 
-            if (WordFilter.IsFiltered(pk.HT_Name, out bad))
-                data.AddLine(GetInvalid($"Wordfilter: {bad}"));
+            if (WordFilter.IsFiltered(pk.HT_Name, out badPattern))
+                data.AddLine(GetInvalid($"Word Filter: {badPattern}"));
         }
     }
 
@@ -59,7 +59,7 @@ public sealed class TrainerNameVerifier : Verifier
     /// </summary>
     internal static bool IsPlayerOriginalTrainer(IEncounterable enc) => enc switch
     {
-        EncounterTrade { HasTrainerName: true } => false,
+        IFixedTrainer { IsFixedTrainer: true } => false,
         MysteryGift { IsEgg: false } => false,
         EncounterStatic5N => false,
         _ => true,
@@ -78,7 +78,7 @@ public sealed class TrainerNameVerifier : Verifier
             return ot.Length <= len;
         }
 
-        if (e is EncounterTrade { HasTrainerName: true })
+        if (e is IFixedTrainer { IsFixedTrainer: true })
             return true; // already verified
 
         if (e is MysteryGift mg && mg.OT_Name.Length == ot.Length)
@@ -93,7 +93,7 @@ public sealed class TrainerNameVerifier : Verifier
 
         if (tr.Length == 0)
         {
-            if (pk is SK2 {TID: 0, IsRental: true})
+            if (pk is SK2 {TID16: 0, IsRental: true})
             {
                 data.AddLine(Get(LOTShort, Severity.Fishy));
             }
@@ -104,11 +104,11 @@ public sealed class TrainerNameVerifier : Verifier
             }
         }
 
-        VerifyG1OTWithinBounds(data, tr.AsSpan());
+        VerifyG1OTWithinBounds(data, tr);
 
         if (pk.OT_Gender == 1)
         {
-            if (pk is ICaughtData2 {CaughtData:0} || (pk.Format > 2 && pk.VC1) || data is {EncounterOriginal: {Generation:1} or EncounterStatic2E {IsGift:true}})
+            if (pk is ICaughtData2 {CaughtData:0} or { Format: > 2, VC1: true } || data is {EncounterOriginal: {Generation:1} or EncounterGift2 {IsGift:true}})
                 data.AddLine(GetInvalid(LG1OTGender));
         }
     }
@@ -117,7 +117,7 @@ public sealed class TrainerNameVerifier : Verifier
     {
         if (StringConverter12.GetIsG1English(str))
         {
-            if (str.Length > 7 && data.EncounterOriginal is not EncounterTradeGB) // OT already verified; GER shuckle has 8 chars
+            if (str.Length > 7 && data.EncounterOriginal is not IFixedTrainer { IsFixedTrainer: true }) // OT already verified; GER shuckle has 8 chars
                 data.AddLine(GetInvalid(LOTLong));
         }
         else if (StringConverter12.GetIsG1Japanese(str))

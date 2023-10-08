@@ -33,7 +33,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
     public readonly ContextMenuSAV menu;
     public readonly BoxMenuStrip SortMenu;
 
-    public bool  HaX;
+    public bool HaX;
     public bool ModifyPKM { private get; set; }
     private bool _hideSecret;
     public bool HideSecretDetails { private get => _hideSecret; set => ToggleSecrets(SAV, _hideSecret = value); }
@@ -73,7 +73,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
         SlotPictureBoxes = new[] { dcpkx1, dcpkx2 };
 
         Tab_Box.ContextMenuStrip = SortMenu = new BoxMenuStrip(this);
-        M = new SlotChangeManager(this) {Env = EditEnv};
+        M = new SlotChangeManager(this) { Env = EditEnv };
         Box.Setup(M);
         SL_Party.Setup(M);
 
@@ -140,10 +140,6 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
     }
 
     // Generic Subfunctions //
-    public int GetSlotOffset(int slot)
-    {
-        return SAV.GetDaycareSlotOffset(SAV.DaycareIndex, slot);
-    }
 
     public int SwapBoxesViewer(int viewBox)
     {
@@ -158,6 +154,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
         {
             v.FlagIllegal = Box.FlagIllegal;
             v.ResetSlots();
+            v.ResetBoxNames();
         }
     }
 
@@ -173,6 +170,9 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
 
     public int GetViewIndex(ISlotInfo slot)
     {
+        if (!SAV.HasDaycare)
+            return -1;
+
         for (int i = 0; i < SlotPictureBoxes.Count; i++)
         {
             var data = GetSlotData(i);
@@ -201,9 +201,9 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
         return GetSlotData(index);
     }
 
-    public ISlotInfo GetSlotData(int index)
+    private ISlotInfo GetSlotData(int index)
     {
-        var ofs = GetSlotOffset(index);
+        var ofs = SAV.GetDaycareSlotOffset(SAV.DaycareIndex, index);
         return new SlotInfoMisc(SAV, index, ofs);
     }
 
@@ -409,12 +409,12 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
             z.BringToFront();
             return;
         }
-        new SAV_BoxViewer(this, M).Show();
+        new SAV_BoxViewer(this, M, Box.CurrentBox).Show();
     }
 
     private void ClickClone(object sender, EventArgs e)
     {
-        var detail = Box.GetSlotData((PictureBox) sender);
+        var detail = Box.GetSlotData((PictureBox)sender);
         if (detail is SlotInfoBox)
             RequestCloneData?.Invoke(sender, e);
     }
@@ -516,12 +516,14 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
     private void B_OpenTrainerInfo_Click(object sender, EventArgs e) => OpenDialog(GetTrainerEditor(SAV));
     private void B_OpenOPowers_Click(object sender, EventArgs e) => OpenDialog(new SAV_OPower((ISaveBlock6Main)SAV));
     private void B_OpenHoneyTreeEditor_Click(object sender, EventArgs e) => OpenDialog(new SAV_HoneyTree((SAV4Sinnoh)SAV));
+    private void B_OpenGeonetEditor_Click(object sender, EventArgs e) => OpenDialog(new SAV_Geonet4((SAV4)SAV));
+    private void B_OpenUnityTowerEditor_Click(object sender, EventArgs e) => OpenDialog(new SAV_UnityTower((SAV5)SAV));
 
     private void B_OpenEventFlags_Click(object sender, EventArgs e)
     {
         using var form = SAV switch
         {
-            SAV1 s => (Form) new SAV_EventReset1(s),
+            SAV1 s => (Form)new SAV_EventReset1(s),
             SAV7b s => new SAV_EventWork(s),
             SAV8BS s => new SAV_FlagWork8b(s),
             IEventFlag37 g37 => new SAV_EventFlags(g37),
@@ -547,19 +549,30 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
         SAV8SWSH swsh => new SAV_Trainer8(swsh),
         SAV8BS bs => new SAV_Trainer8b(bs),
         SAV8LA la => new SAV_Trainer8a(la),
+        SAV9SV sv => new SAV_Trainer9(sv),
         _ => new SAV_SimpleTrainer(sav),
     };
 
     private void B_OpenRaids_Click(object sender, EventArgs e)
     {
-        if (SAV is not SAV8SWSH swsh)
-            return;
-        if (sender == B_Raids)
-            OpenDialog(new SAV_Raid8(swsh, swsh.Raid));
-        else if (sender == B_RaidArmor)
-            OpenDialog(new SAV_Raid8(swsh, swsh.RaidArmor));
-        else
-            OpenDialog(new SAV_Raid8(swsh, swsh.RaidCrown));
+        if (SAV is SAV9SV sv)
+        {
+            if (sender == B_Raids)
+                OpenDialog(new SAV_Raid9(sv, sv.RaidPaldea));
+            else if (sender == B_RaidKitakami)
+                OpenDialog(new SAV_Raid9(sv, sv.RaidKitakami));
+            else if (sender == B_RaidsSevenStar)
+                OpenDialog(new SAV_RaidSevenStar9(sv, sv.RaidSevenStar));
+        }
+        else if (SAV is SAV8SWSH swsh)
+        {
+            if (sender == B_Raids)
+                OpenDialog(new SAV_Raid8(swsh, swsh.Raid));
+            else if (sender == B_RaidArmor)
+                OpenDialog(new SAV_Raid8(swsh, swsh.RaidArmor));
+            else
+                OpenDialog(new SAV_Raid8(swsh, swsh.RaidCrown));
+        }
     }
 
     private void B_OtherSlots_Click(object sender, EventArgs e)
@@ -611,7 +624,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
             MaximizeBox = false,
             Icon = Properties.Resources.Icon,
         };
-        var pg = new PropertyGrid {SelectedObject = sav, Dock = DockStyle.Fill};
+        var pg = new PropertyGrid { SelectedObject = sav, Dock = DockStyle.Fill };
         form.Controls.Add(pg);
         return form;
     }
@@ -642,6 +655,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
             SAV8SWSH swsh => new SAV_PokedexSWSH(swsh),
             SAV8BS bs => new SAV_PokedexBDSP(bs),
             SAV8LA la => new SAV_PokedexLA(la),
+            SAV9SV sv => sv.SaveRevision == 0 ? new SAV_PokedexSV(sv) : new SAV_PokedexSVKitakami(sv),
             _ => (Form?)null,
         };
         form?.ShowDialog();
@@ -652,7 +666,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
         using var form = SAV.Generation switch
         {
             3 => new SAV_Misc3(SAV),
-            4 => new SAV_Misc4((SAV4) SAV),
+            4 => new SAV_Misc4((SAV4)SAV),
             5 => new SAV_Misc5(SAV),
             8 when SAV is SAV8BS bs => new SAV_Misc8b(bs),
             _ => (Form?)null,
@@ -665,7 +679,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
         switch (SAV.Generation)
         {
             case 2:
-                var sav2 = ((SAV2) SAV);
+                var sav2 = ((SAV2)SAV);
                 var msg = MsgSaveGen2RTCResetBitflag;
                 if (!sav2.Japanese) // show Reset Key for non-Japanese saves
                     msg = string.Format(MsgSaveGen2RTCResetPassword, sav2.ResetKey) + Environment.NewLine + Environment.NewLine + msg;
@@ -735,7 +749,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
 
     private void ClickVerifyStoredEntities(object sender, EventArgs e)
     {
-        var bulk = new BulkAnalysis(SAV, Main.Settings.Bulk);
+        var bulk = new Core.Bulk.BulkAnalysis(SAV, Main.Settings.Bulk);
         if (bulk.Valid)
         {
             WinFormsUtil.Alert("Clean!");
@@ -804,7 +818,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
         }
 
         var suggestion = Util.CleanFileName(SAV.Metadata.BAKName);
-        using var sfd = new SaveFileDialog {FileName = suggestion};
+        using var sfd = new SaveFileDialog { FileName = suggestion };
         if (sfd.ShowDialog() != DialogResult.OK)
             return false;
 
@@ -820,7 +834,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
         return true;
     }
 
-    public bool OpenPCBoxBin(byte[] input, out string c)
+    public bool OpenPCBoxBin(ReadOnlySpan<byte> input, out string c)
     {
         if (SAV.GetPCBinary().Length == input.Length)
         {
@@ -997,13 +1011,12 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
 
                 var grid = Box.BoxPokeGrid;
                 var height = grid.Height + grid.Location.Y + Box.Location.Y; // needed height
-                var required = height + 16;
                 var allowed = Tab_Box.Height;
-                if (required > allowed)
+                if (height > allowed)
                 {
                     var form = FindForm();
                     if (form != null)
-                        form.Height += required - allowed;
+                        form.Height += height - allowed;
                 }
             }
         }
@@ -1088,7 +1101,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
     {
         if (!sav.State.Exportable || sav is BulkStorage)
         {
-            GB_SAVtools.Visible = false;
+            FLP_SAVtools.Visible = false;
             B_JPEG.Visible = false;
             SL_Extra.HideAllSlots();
             return;
@@ -1117,15 +1130,19 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
 
         B_OpenHoneyTreeEditor.Visible = sav is SAV4Sinnoh;
         B_OpenUGSEditor.Visible = sav is SAV4Sinnoh or SAV8BS;
+        B_OpenGeonetEditor.Visible = sav is SAV4;
+        B_OpenUnityTowerEditor.Visible = sav is SAV5;
         B_OpenSealStickers.Visible = B_Poffins.Visible = sav is SAV8BS;
         B_OpenApricorn.Visible = sav is SAV4HGSS;
         B_OpenRTCEditor.Visible = sav.Generation == 2 || sav is IGen3Hoenn;
         B_MailBox.Visible = sav is SAV2 or SAV3 or SAV4 or SAV5;
 
-        B_Raids.Visible = sav is SAV8SWSH;
-        B_RaidArmor.Visible = sav is SAV8SWSH {SaveRevision: >= 1};
-        B_RaidCrown.Visible = sav is SAV8SWSH {SaveRevision: >= 2};
-        GB_SAVtools.Visible = B_Blocks.Visible = true;
+        B_Raids.Visible = sav is SAV8SWSH or SAV9SV;
+        B_RaidsSevenStar.Visible = sav is SAV9SV;
+        B_RaidArmor.Visible = sav is SAV8SWSH { SaveRevision: >= 1 };
+        B_RaidCrown.Visible = sav is SAV8SWSH { SaveRevision: >= 2 };
+        B_RaidKitakami.Visible = sav is SAV9SV { SaveRevision: >= 1 };
+        FLP_SAVtools.Visible = B_Blocks.Visible = true;
 
         var list = FLP_SAVtools.Controls.OfType<Control>().OrderBy(z => z.Text).ToArray();
         FLP_SAVtools.Controls.Clear();

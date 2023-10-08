@@ -1,7 +1,6 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 // ReSharper disable UnusedMember.Local
-#pragma warning disable IDE0051 // Remove unused private members
-#pragma warning disable RCS1213 // Remove unused member declaration.
+#pragma warning disable IDE0051, RCS1213 // Remove unused private members
 
 namespace PKHeX.Core;
 
@@ -13,7 +12,7 @@ public sealed class SaveBlockAccessor8SWSH : SCBlockAccessor, ISaveBlock8Main
     public override IReadOnlyList<SCBlock> BlockInfo { get; }
     public Box8 BoxInfo { get; }
     public Party8 PartyInfo { get; }
-    public MyItem Items { get; }
+    public MyItem8 Items { get; }
     public MyStatus8 MyStatus { get; }
     public Misc8 Misc { get; }
     public Zukan8 Zukan { get; }
@@ -45,7 +44,7 @@ public sealed class SaveBlockAccessor8SWSH : SCBlockAccessor, ISaveBlock8Main
         Played = new PlayTime8(sav, GetBlock(KPlayTime));
         Fused = new Fused8(sav, GetBlock(KFused));
         Daycare = new Daycare8(sav, GetBlock(KDaycare));
-        Records = new Record8(sav, GetBlock(KRecord), Core.Records.MaxType_SWSH);
+        Records = new Record8(sav, GetBlock(KRecord));
         Fashion = new FashionUnlock8(sav, GetBlock(KFashionUnlock));
         Raid = new RaidSpawnList8(sav, GetBlock(KRaidSpawnList), RaidSpawnList8.RaidCountLegal_O0);
         RaidArmor = new RaidSpawnList8(sav, GetBlockSafe(KRaidSpawnListR1), RaidSpawnList8.RaidCountLegal_R1);
@@ -264,6 +263,8 @@ public sealed class SaveBlockAccessor8SWSH : SCBlockAccessor, ISaveBlock8Main
     public const uint KStorySoniaCTQuestProgress = 0xCB135C68; // U32 Swords of Justice Quest progress. Values are from 0-7; 7=completed
     public const uint KBikeBoostChargeSteps = 0x57F29628; // U32 Current step counter, fully charged when this value matches KBikeBoostChargeLimit
     public const uint KBikeBoostChargeLimit = 0xF64719D9; // U32 Steps to charge bike boost, starts at 128 -> 64 when fully upgraded
+    public const uint KEggHatchCycleSteps = 0x6C99F9A0; // U16 Current step counter for an egg cycle, 0-127
+    public const uint KFriendshipWalkSteps = 0xE2798DDE; // U8 Current step counter for party to gain friendship, 0-127
 
     public const uint KSparringStreakNormal = 0xDB5E16CB; // U32 Best Normal-Type Restricted Sparring Streak
     public const uint KSparringNormalPartySlot1Species = 0x7BF09DD3; // U16 Species ID of 1st PKM used in party

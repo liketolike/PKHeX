@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using static PKHeX.Core.GameVersion;
 using static PKHeX.Core.Locations;
 
@@ -21,6 +22,7 @@ public sealed class MetDataSource
     private readonly List<ComboItem> MetGen8;
     private readonly List<ComboItem> MetGen8a;
     private readonly List<ComboItem> MetGen8b;
+    private readonly List<ComboItem> MetGen9;
 
     private IReadOnlyList<ComboItem>? MetGen4Transfer;
     private IReadOnlyList<ComboItem>? MetGen5Transfer;
@@ -38,38 +40,39 @@ public sealed class MetDataSource
         MetGen8 = CreateGen8(s);
         MetGen8a = CreateGen8a(s);
         MetGen8b = CreateGen8b(s);
+        MetGen9 = CreateGen9(s);
     }
 
     private static List<ComboItem> CreateGen2(GameStrings s)
     {
-        var locations = Util.GetCBList(s.metGSC_00000.AsSpan(0, 0x5F));
-        Util.AddCBWithOffset(locations, s.metGSC_00000.AsSpan(0x7E, 2), 0x7E);
+        var locations = Util.GetCBList(s.Gen2.Met0.AsSpan(0, 0x5F));
+        Util.AddCBWithOffset(locations, s.Gen2.Met0.AsSpan(0x7E, 2), 0x7E);
         return locations;
     }
 
     private static List<ComboItem> CreateGen3(GameStrings s)
     {
-        var locations = Util.GetCBList(s.metRSEFRLG_00000.AsSpan(0, 213));
-        Util.AddCBWithOffset(locations, s.metRSEFRLG_00000.AsSpan(253, 3), 253);
+        var locations = Util.GetCBList(s.Gen3.Met0.AsSpan(0, 213));
+        Util.AddCBWithOffset(locations, s.Gen3.Met0.AsSpan(253, 3), 253);
         return locations;
     }
 
     private static List<ComboItem> CreateGen3CXD(GameStrings s)
     {
-        var list = Util.GetCBList(s.metCXD_00000);
+        var list = Util.GetCBList(s.CXD.Met0);
         list.RemoveAll(z => z.Text.Length == 0);
         return list;
     }
 
     private static List<ComboItem> CreateGen4(GameStrings s)
     {
-        var locations = Util.GetCBList(s.metHGSS_00000, 0);
-        Util.AddCBWithOffset(locations, s.metHGSS_02000, 2000, Locations.Daycare4);
-        Util.AddCBWithOffset(locations, s.metHGSS_02000, 2000, Locations.LinkTrade4);
-        Util.AddCBWithOffset(locations, s.metHGSS_03000, 3000, Locations.Ranger4);
-        Util.AddCBWithOffset(locations, s.metHGSS_00000, 0000, Locations4.Met0);
-        Util.AddCBWithOffset(locations, s.metHGSS_02000, 2000, Locations4.Met2);
-        Util.AddCBWithOffset(locations, s.metHGSS_03000, 3000, Locations4.Met3);
+        var locations = Util.GetCBList(s.Gen4.Met0, 0);
+        Util.AddCBWithOffset(locations, s.Gen4.Met2, 2000, Locations.Daycare4);
+        Util.AddCBWithOffset(locations, s.Gen4.Met2, 2000, Locations.LinkTrade4);
+        Util.AddCBWithOffset(locations, s.Gen4.Met3, 3000, Locations.Ranger4);
+        Util.AddCBWithOffset(locations, s.Gen4.Met0, 0000, Locations4.Met0);
+        Util.AddCBWithOffset(locations, s.Gen4.Met2, 2000, Locations4.Met2);
+        Util.AddCBWithOffset(locations, s.Gen4.Met3, 3000, Locations4.Met3);
         return locations;
     }
 
@@ -86,110 +89,127 @@ public sealed class MetDataSource
 
     private static List<ComboItem> CreateGen5(GameStrings s)
     {
-        var locations = Util.GetCBList(s.metBW2_00000, 0);
-        Util.AddCBWithOffset(locations, s.metBW2_60000, 60000, Locations.Daycare5);
-        Util.AddCBWithOffset(locations, s.metBW2_30000, 30000, Locations.LinkTrade5);
-        Util.AddCBWithOffset(locations, s.metBW2_00000, 00000, Locations5.Met0);
-        Util.AddCBWithOffset(locations, s.metBW2_30000, 30000, Locations5.Met3);
-        Util.AddCBWithOffset(locations, s.metBW2_40000, 40000, Locations5.Met4);
-        Util.AddCBWithOffset(locations, s.metBW2_60000, 60000, Locations5.Met6);
+        var locations = Util.GetCBList(s.Gen5.Met0, 0);
+        Util.AddCBWithOffset(locations, s.Gen5.Met6, 60000, Locations.Daycare5);
+        Util.AddCBWithOffset(locations, s.Gen5.Met3, 30000, Locations.LinkTrade5);
+        Util.AddCBWithOffset(locations, s.Gen5.Met0, 00000, Locations5.Met0);
+        Util.AddCBWithOffset(locations, s.Gen5.Met3, 30000, Locations5.Met3);
+        Util.AddCBWithOffset(locations, s.Gen5.Met4, 40000, Locations5.Met4);
+        Util.AddCBWithOffset(locations, s.Gen5.Met6, 60000, Locations5.Met6);
         return locations;
     }
 
     private IReadOnlyList<ComboItem> CreateGen5Transfer()
     {
         // PokéTransfer to front
-        var met = MetGen5.ToArray();
-        var index = Array.FindIndex(met, static z => z.Value == Locations.Transfer4);
-        var xfr = met[index];
-        Array.Copy(met, 0, met, 1, index);
-        met[0] = xfr;
-        return met;
+        var index = MetGen5.FindIndex(static z => z.Value == Locations.Transfer4);
+        var xfr = MetGen5[index];
+        var result = new ComboItem[MetGen5.Count];
+        result[0] = xfr;
+        var dest = result.AsSpan(1);
+        var span = CollectionsMarshal.AsSpan(MetGen5);
+        span[..index].CopyTo(dest);
+        span[(index + 1)..].CopyTo(dest[index..]);
+        return result;
     }
 
     private static List<ComboItem> CreateGen6(GameStrings s)
     {
-        var locations = Util.GetCBList(s.metXY_00000, 0);
-        Util.AddCBWithOffset(locations, s.metXY_60000, 60000, Locations.Daycare5);
-        Util.AddCBWithOffset(locations, s.metXY_30000, 30000, Locations.LinkTrade6);
-        Util.AddCBWithOffset(locations, s.metXY_00000, 00000, Locations6.Met0);
-        Util.AddCBWithOffset(locations, s.metXY_30000, 30000, Locations6.Met3);
-        Util.AddCBWithOffset(locations, s.metXY_40000, 40000, Locations6.Met4);
-        Util.AddCBWithOffset(locations, s.metXY_60000, 60000, Locations6.Met6);
+        var locations = Util.GetCBList(s.Gen6.Met0, 0);
+        Util.AddCBWithOffset(locations, s.Gen6.Met6, 60000, Locations.Daycare5);
+        Util.AddCBWithOffset(locations, s.Gen6.Met3, 30000, Locations.LinkTrade6);
+        Util.AddCBWithOffset(locations, s.Gen6.Met0, 00000, Locations6.Met0);
+        Util.AddCBWithOffset(locations, s.Gen6.Met3, 30000, Locations6.Met3);
+        Util.AddCBWithOffset(locations, s.Gen6.Met4, 40000, Locations6.Met4);
+        Util.AddCBWithOffset(locations, s.Gen6.Met6, 60000, Locations6.Met6);
         return locations;
     }
 
     private static List<ComboItem> CreateGen7(GameStrings s)
     {
-        var locations = Util.GetCBList(s.metSM_00000, 0);
-        Util.AddCBWithOffset(locations, s.metSM_60000, 60000, Locations.Daycare5);
-        Util.AddCBWithOffset(locations, s.metSM_30000, 30000, Locations.LinkTrade6);
-        Util.AddCBWithOffset(locations, s.metSM_00000, 00000, Locations7.Met0);
-        Util.AddCBWithOffset(locations, s.metSM_30000, 30000, Locations7.Met3);
-        Util.AddCBWithOffset(locations, s.metSM_40000, 40000, Locations7.Met4);
-        Util.AddCBWithOffset(locations, s.metSM_60000, 60000, Locations7.Met6);
+        var locations = Util.GetCBList(s.Gen7.Met0, 0);
+        Util.AddCBWithOffset(locations, s.Gen7.Met6, 60000, Locations.Daycare5);
+        Util.AddCBWithOffset(locations, s.Gen7.Met3, 30000, Locations.LinkTrade6);
+        Util.AddCBWithOffset(locations, s.Gen7.Met0, 00000, Locations7.Met0);
+        Util.AddCBWithOffset(locations, s.Gen7.Met3, 30000, Locations7.Met3);
+        Util.AddCBWithOffset(locations, s.Gen7.Met4, 40000, Locations7.Met4);
+        Util.AddCBWithOffset(locations, s.Gen7.Met6, 60000, Locations7.Met6);
         return locations;
     }
 
     private static List<ComboItem> CreateGen7GG(GameStrings s)
     {
-        var locations = Util.GetCBList(s.metGG_00000, 0);
-        Util.AddCBWithOffset(locations, s.metGG_60000, 60000, Locations.Daycare5);
-        Util.AddCBWithOffset(locations, s.metGG_30000, 30000, Locations.LinkTrade6);
-        Util.AddCBWithOffset(locations, s.metGG_00000, 00000, Locations7b.Met0);
-        Util.AddCBWithOffset(locations, s.metGG_30000, 30000, Locations7b.Met3);
-        Util.AddCBWithOffset(locations, s.metGG_40000, 40000, Locations7b.Met4);
-        Util.AddCBWithOffset(locations, s.metGG_60000, 60000, Locations7b.Met6);
+        var locations = Util.GetCBList(s.Gen7b.Met0, 0);
+        Util.AddCBWithOffset(locations, s.Gen7b.Met6, 60000, Locations.Daycare5);
+        Util.AddCBWithOffset(locations, s.Gen7b.Met3, 30000, Locations.LinkTrade6);
+        Util.AddCBWithOffset(locations, s.Gen7b.Met0, 00000, Locations7b.Met0);
+        Util.AddCBWithOffset(locations, s.Gen7b.Met3, 30000, Locations7b.Met3);
+        Util.AddCBWithOffset(locations, s.Gen7b.Met4, 40000, Locations7b.Met4);
+        Util.AddCBWithOffset(locations, s.Gen7b.Met6, 60000, Locations7b.Met6);
         return locations;
     }
 
     private static List<ComboItem> CreateGen8(GameStrings s)
     {
-        var locations = Util.GetCBList(s.metSWSH_00000, 0);
-        Util.AddCBWithOffset(locations, s.metSWSH_60000, 60000, Locations.Daycare5);
-        Util.AddCBWithOffset(locations, s.metSWSH_30000, 30000, Locations.LinkTrade6);
-        Util.AddCBWithOffset(locations, s.metSWSH_00000, 00000, Locations8.Met0);
-        Util.AddCBWithOffset(locations, s.metSWSH_30000, 30000, Locations8.Met3);
-        Util.AddCBWithOffset(locations, s.metSWSH_40000, 40000, Locations8.Met4);
-        Util.AddCBWithOffset(locations, s.metSWSH_60000, 60000, Locations8.Met6);
+        var locations = Util.GetCBList(s.Gen8.Met0, 0);
+        Util.AddCBWithOffset(locations, s.Gen8.Met6, 60000, Locations.Daycare5);
+        Util.AddCBWithOffset(locations, s.Gen8.Met3, 30000, Locations.LinkTrade6);
+        Util.AddCBWithOffset(locations, s.Gen8.Met0, 00000, Locations8.Met0);
+        Util.AddCBWithOffset(locations, s.Gen8.Met3, 30000, Locations8.Met3);
+        Util.AddCBWithOffset(locations, s.Gen8.Met4, 40000, Locations8.Met4);
+        Util.AddCBWithOffset(locations, s.Gen8.Met6, 60000, Locations8.Met6);
 
         // Add in the BDSP+PLA magic met locations.
-        locations.Add(new ComboItem($"{s.EggName} (BD/SP)", Locations.HOME_SWSHBDSPEgg));
-        locations.Add(new ComboItem(s.gamelist[(int)BD], Locations.HOME_SWBD));
-        locations.Add(new ComboItem(s.gamelist[(int)SP], Locations.HOME_SHSP));
-        locations.Add(new ComboItem(s.gamelist[(int)PLA], Locations.HOME_SWLA));
+        locations.Add(new ComboItem($"{s.EggName} (HOME)", LocationsHOME.SWSHEgg));
+        locations.Add(new ComboItem(s.gamelist[(int)SL], LocationsHOME.SWSL));
+        locations.Add(new ComboItem(s.gamelist[(int)VL], LocationsHOME.SHVL));
+        locations.Add(new ComboItem(s.gamelist[(int)BD], LocationsHOME.SWBD));
+        locations.Add(new ComboItem(s.gamelist[(int)SP], LocationsHOME.SHSP));
+        locations.Add(new ComboItem(s.gamelist[(int)PLA], LocationsHOME.SWLA));
 
         return locations;
     }
 
     private static List<ComboItem> CreateGen8a(GameStrings s)
     {
-        var locations = Util.GetCBList(s.metLA_00000, 0);
-        Util.AddCBWithOffset(locations, s.metLA_30000, 30000, Locations.LinkTrade6);
-        Util.AddCBWithOffset(locations, s.metLA_00000, 00000, Locations8a.Met0);
-        Util.AddCBWithOffset(locations, s.metLA_30000, 30000, Locations8a.Met3);
-        Util.AddCBWithOffset(locations, s.metLA_40000, 40000, Locations8a.Met4);
-        Util.AddCBWithOffset(locations, s.metLA_60000, 60000, Locations8a.Met6);
+        var locations = Util.GetCBList(s.Gen8a.Met0, 0);
+        Util.AddCBWithOffset(locations, s.Gen8a.Met3, 30000, Locations.LinkTrade6);
+        Util.AddCBWithOffset(locations, s.Gen8a.Met0, 00000, Locations8a.Met0);
+        Util.AddCBWithOffset(locations, s.Gen8a.Met3, 30000, Locations8a.Met3);
+        Util.AddCBWithOffset(locations, s.Gen8a.Met4, 40000, Locations8a.Met4);
+        Util.AddCBWithOffset(locations, s.Gen8a.Met6, 60000, Locations8a.Met6);
 
         // Add in the BDSP+PLA magic met locations.
-        locations.Add(new ComboItem($"{s.EggName} (BD/SP)", Locations.HOME_SWSHBDSPEgg));
-        locations.Add(new ComboItem(s.gamelist[(int)BD], Locations.HOME_SWBD));
-        locations.Add(new ComboItem(s.gamelist[(int)SP], Locations.HOME_SHSP));
-        locations.Add(new ComboItem(s.gamelist[(int)PLA], Locations.HOME_SWLA));
+        locations.Add(new ComboItem($"{s.EggName} (HOME)", LocationsHOME.SWSHEgg));
+        locations.Add(new ComboItem(s.gamelist[(int)BD], LocationsHOME.SWBD));
+        locations.Add(new ComboItem(s.gamelist[(int)SP], LocationsHOME.SHSP));
+        locations.Add(new ComboItem(s.gamelist[(int)PLA], LocationsHOME.SWLA));
 
         return locations;
     }
 
     private static List<ComboItem> CreateGen8b(GameStrings s)
     {
-        // Manually add invalid (-1) location from SWSH as ID 65535
-        var locations = new List<ComboItem> { new(s.metSWSH_00000[0], Locations.Default8bNone) };
-        Util.AddCBWithOffset(locations, s.metBDSP_60000, 60000, Locations.Daycare5);
-        Util.AddCBWithOffset(locations, s.metBDSP_30000, 30000, Locations.LinkTrade6);
-        Util.AddCBWithOffset(locations, s.metBDSP_00000, 00000, Locations8b.Met0);
-        Util.AddCBWithOffset(locations, s.metBDSP_30000, 30000, Locations8b.Met3);
-        Util.AddCBWithOffset(locations, s.metBDSP_40000, 40000, Locations8b.Met4);
-        Util.AddCBWithOffset(locations, s.metBDSP_60000, 60000, Locations8b.Met6);
+        // Manually add invalid (-1) location from SW/SH as ID 65535
+        var locations = new List<ComboItem> { new(s.Gen8.Met0[0], Locations.Default8bNone) };
+        Util.AddCBWithOffset(locations, s.Gen8b.Met6, 60000, Locations.Daycare5);
+        Util.AddCBWithOffset(locations, s.Gen8b.Met3, 30000, Locations.LinkTrade6);
+        Util.AddCBWithOffset(locations, s.Gen8b.Met0, 00000, Locations8b.Met0);
+        Util.AddCBWithOffset(locations, s.Gen8b.Met3, 30000, Locations8b.Met3);
+        Util.AddCBWithOffset(locations, s.Gen8b.Met4, 40000, Locations8b.Met4);
+        Util.AddCBWithOffset(locations, s.Gen8b.Met6, 60000, Locations8b.Met6);
+        return locations;
+    }
+
+    private static List<ComboItem> CreateGen9(GameStrings s)
+    {
+        var locations = Util.GetCBList(s.Gen9.Met0, 0);
+        Util.AddCBWithOffset(locations, s.Gen9.Met6, 60000, Locations.Daycare5);
+        Util.AddCBWithOffset(locations, s.Gen9.Met3, 30000, Locations.LinkTrade6);
+        Util.AddCBWithOffset(locations, s.Gen9.Met0, 00000, Locations9.Met0);
+        Util.AddCBWithOffset(locations, s.Gen9.Met3, 30000, Locations9.Met3);
+        Util.AddCBWithOffset(locations, s.Gen9.Met4, 40000, Locations9.Met4);
+        Util.AddCBWithOffset(locations, s.Gen9.Met6, 60000, Locations9.Met6);
         return locations;
     }
 
@@ -214,10 +234,15 @@ public sealed class MetDataSource
         // Insert the BDSP none location if the format requires it.
         if (context is EntityContext.Gen8b && !BDSP.Contains(version))
         {
-            var list = new List<ComboItem>(result.Count + 1);
-            list.AddRange(result);
-            list.Insert(1, new ComboItem($"{list[0].Text} (BD/SP)", Locations.Default8bNone));
-            result = list;
+            var bdsp = new ComboItem[result.Count + 1];
+            var none = bdsp[0] = result[0];
+            bdsp[1] = new ComboItem($"{none.Text} (BD/SP)", Locations.Default8bNone);
+            var dest = bdsp.AsSpan(2);
+            if (result is ComboItem[] arr)
+                arr.AsSpan(1).CopyTo(dest);
+            else if (result is List<ComboItem> list)
+                CollectionsMarshal.AsSpan(list)[1..].CopyTo(dest);
+            return bdsp;
         }
 
         return result;
@@ -247,22 +272,34 @@ public sealed class MetDataSource
             SW or SH => Partition2(MetGen8, IsMetLocation8SWSH),
             BD or SP => Partition2(MetGen8b, IsMetLocation8BDSP),
             PLA => Partition2(MetGen8a, IsMetLocation8LA),
-            _ => new List<ComboItem>(GetLocationListModified(version, context)),
+            SL or VL => Partition2(MetGen9, IsMetLocation9SV),
+            _ => GetLocationListModified(version, context),
         };
 
-        static IReadOnlyList<ComboItem> Partition1(IReadOnlyList<ComboItem> list, Func<ushort, bool> criteria)
+        static ComboItem[] Partition1(List<ComboItem> list, Func<ushort, bool> criteria)
         {
+            var span = CollectionsMarshal.AsSpan(list);
             var result = new ComboItem[list.Count];
-            return GetOrderedList(list, result, criteria);
+            ReorderList(span, result, criteria);
+            return result;
         }
 
-        static IReadOnlyList<ComboItem> GetOrderedList(IReadOnlyList<ComboItem> list, ComboItem[] result,
-            Func<ushort, bool> criteria, int start = 0)
+        static ComboItem[] Partition2(List<ComboItem> list, Func<ushort, bool> criteria, int keepFirst = 3)
+        {
+            var span = CollectionsMarshal.AsSpan(list);
+            var result = new ComboItem[span.Length];
+            for (int i = 0; i < keepFirst; i++)
+                result[i] = list[i];
+            ReorderList(span, result, criteria, keepFirst);
+            return result;
+        }
+
+        static void ReorderList(Span<ComboItem> list, Span<ComboItem> result, Func<ushort, bool> criteria, int start = 0)
         {
             // store values that match criteria at the next available position of the array
             // store non-matches starting at the end. reverse before returning
-            int end = list.Count - 1;
-            for (var index = start; index < list.Count; index++)
+            int end = list.Length - 1;
+            for (var index = start; index < list.Length; index++)
             {
                 var item = list[index];
                 if (criteria((ushort)item.Value))
@@ -271,18 +308,8 @@ public sealed class MetDataSource
                     result[end--] = item;
             }
 
-            // since the non-matches are reversed in order, we swap them back since we know where they end up at.
-            Array.Reverse(result, start, list.Count - start);
-            return result;
-        }
-
-        static IReadOnlyList<ComboItem> Partition2(IReadOnlyList<ComboItem> list, Func<ushort, bool> criteria,
-            int keepFirst = 3)
-        {
-            var result = new ComboItem[list.Count];
-            for (int i = 0; i < keepFirst; i++)
-                result[i] = list[i];
-            return GetOrderedList(list, result, criteria, keepFirst);
+            // since the non-matches are reversed in order, we reverse that section.
+            result[start..].Reverse();
         }
     }
 

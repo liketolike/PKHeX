@@ -1,15 +1,15 @@
 using System;
-using System.Collections.Generic;
+using System.Numerics;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
 
 /// <summary> Generation 5 <see cref="PKM"/> format. </summary>
 public sealed class PK5 : PKM, ISanityChecksum,
-    IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetUnique3, IRibbonSetUnique4, IRibbonSetCommon3, IRibbonSetCommon4,
-    IContestStats, IContestStatsMutable, IGroundTile
+    IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetUnique3, IRibbonSetUnique4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetRibbons,
+    IContestStats, IGroundTile
 {
-    private static readonly ushort[] Unused =
+    public override ReadOnlySpan<ushort> ExtraBytes => new ushort[]
     {
         0x43, 0x44, 0x45, 0x46, 0x47,
         0x5E, // unused
@@ -19,12 +19,10 @@ public sealed class PK5 : PKM, ISanityChecksum,
         0x87, // PokeStar Fame
     };
 
-    public override IReadOnlyList<ushort> ExtraBytes => Unused;
-
     public override int SIZE_PARTY => PokeCrypto.SIZE_5PARTY;
     public override int SIZE_STORED => PokeCrypto.SIZE_5STORED;
     public override EntityContext Context => EntityContext.Gen5;
-    public override PersonalInfo PersonalInfo => PersonalTable.B2W2.GetFormEntry(Species, Form);
+    public override PersonalInfo5B2W2 PersonalInfo => PersonalTable.B2W2.GetFormEntry(Species, Form);
 
     public PK5() : base(PokeCrypto.SIZE_5PARTY) { }
     public PK5(byte[] data) : base(DecryptParty(data)) { }
@@ -36,11 +34,11 @@ public sealed class PK5 : PKM, ISanityChecksum,
         return data;
     }
 
-    public override PKM Clone() => new PK5((byte[])Data.Clone());
+    public override PK5 Clone() => new((byte[])Data.Clone());
     public override void RefreshChecksum() => Checksum = CalculateChecksum();
     public override bool ChecksumValid => CalculateChecksum() == Checksum;
     public override bool Valid { get => Sanity == 0 && ChecksumValid; set { if (!value) return; Sanity = 0; RefreshChecksum(); } }
-    private ushort CalculateChecksum() => PokeCrypto.GetCHK(Data, PokeCrypto.SIZE_4STORED);
+    private ushort CalculateChecksum() => Checksums.Add16(Data.AsSpan()[8..PokeCrypto.SIZE_4STORED]);
 
     // Trash Bytes
     public override Span<byte> Nickname_Trash => Data.AsSpan(0x48, 22);
@@ -60,8 +58,9 @@ public sealed class PK5 : PKM, ISanityChecksum,
     #region Block A
     public override ushort Species { get => ReadUInt16LittleEndian(Data.AsSpan(0x08)); set => WriteUInt16LittleEndian(Data.AsSpan(0x08), value); }
     public override int HeldItem { get => ReadUInt16LittleEndian(Data.AsSpan(0x0A)); set => WriteUInt16LittleEndian(Data.AsSpan(0x0A), (ushort)value); }
-    public override int TID { get => ReadUInt16LittleEndian(Data.AsSpan(0x0C)); set => WriteUInt16LittleEndian(Data.AsSpan(0x0C), (ushort)value); }
-    public override int SID { get => ReadUInt16LittleEndian(Data.AsSpan(0x0E)); set => WriteUInt16LittleEndian(Data.AsSpan(0x0E), (ushort)value); }
+    public override uint ID32 { get => ReadUInt32LittleEndian(Data.AsSpan(0x0C)); set => WriteUInt32LittleEndian(Data.AsSpan(0x0C), value); }
+    public override ushort TID16 { get => ReadUInt16LittleEndian(Data.AsSpan(0x0C)); set => WriteUInt16LittleEndian(Data.AsSpan(0x0C), value); }
+    public override ushort SID16 { get => ReadUInt16LittleEndian(Data.AsSpan(0x0E)); set => WriteUInt16LittleEndian(Data.AsSpan(0x0E), value); }
     public override uint EXP { get => ReadUInt32LittleEndian(Data.AsSpan(0x10)); set => WriteUInt32LittleEndian(Data.AsSpan(0x10), value); }
     public override int OT_Friendship { get => Data[0x14]; set => Data[0x14] = (byte)value; }
     public override int Ability { get => Data[0x15]; set => Data[0x15] = (byte)value; }
@@ -82,8 +81,8 @@ public sealed class PK5 : PKM, ISanityChecksum,
 
     private byte RIB0 { get => Data[0x24]; set => Data[0x24] = value; } // Sinnoh 1
     private byte RIB1 { get => Data[0x25]; set => Data[0x25] = value; } // Sinnoh 2
-    private byte RIB2 { get => Data[0x26]; set => Data[0x26] = value; } // Unova 1
-    private byte RIB3 { get => Data[0x27]; set => Data[0x27] = value; } // Unova 2
+    private byte RIB2 { get => Data[0x26]; set => Data[0x26] = value; } // Sinnoh 3
+    private byte RIB3 { get => Data[0x27]; set => Data[0x27] = value; } // Sinnoh 4
     public bool RibbonChampionSinnoh    { get => (RIB0 & (1 << 0)) == 1 << 0; set => RIB0 = (byte)((RIB0 & ~(1 << 0)) | (value ? 1 << 0 : 0)); }
     public bool RibbonAbility           { get => (RIB0 & (1 << 1)) == 1 << 1; set => RIB0 = (byte)((RIB0 & ~(1 << 1)) | (value ? 1 << 1 : 0)); }
     public bool RibbonAbilityGreat      { get => (RIB0 & (1 << 2)) == 1 << 2; set => RIB0 = (byte)((RIB0 & ~(1 << 2)) | (value ? 1 << 2 : 0)); }
@@ -116,6 +115,10 @@ public sealed class PK5 : PKM, ISanityChecksum,
     public bool RIB3_5 { get => (RIB3 & (1 << 5)) == 1 << 5; set => RIB3 = (byte)((RIB3 & ~(1 << 5)) | (value ? 1 << 5 : 0)); } // Unused
     public bool RIB3_6 { get => (RIB3 & (1 << 6)) == 1 << 6; set => RIB3 = (byte)((RIB3 & ~(1 << 6)) | (value ? 1 << 6 : 0)); } // Unused
     public bool RIB3_7 { get => (RIB3 & (1 << 7)) == 1 << 7; set => RIB3 = (byte)((RIB3 & ~(1 << 7)) | (value ? 1 << 7 : 0)); } // Unused
+
+    public int RibbonCount => BitOperations.PopCount(ReadUInt32LittleEndian(Data.AsSpan(0x30)) & 0b00001111_11111111__11111111_11111111)
+                            + BitOperations.PopCount(ReadUInt32LittleEndian(Data.AsSpan(0x3C)))
+                            + BitOperations.PopCount(ReadUInt32LittleEndian(Data.AsSpan(0x60)) & 0b00000000_00001111__11111111_11111111);
     #endregion
 
     #region Block B
@@ -188,7 +191,7 @@ public sealed class PK5 : PKM, ISanityChecksum,
     #endregion
 
     #region Block C
-    public override string Nickname { get => StringConverter5.GetString(Nickname_Trash); set => StringConverter5.SetString(Nickname_Trash, value.AsSpan(), 10, StringConverterOption.None); }
+    public override string Nickname { get => StringConverter5.GetString(Nickname_Trash); set => StringConverter5.SetString(Nickname_Trash, value, 10, StringConverterOption.None); }
     // 0x5E unused
     public override int Version { get => Data[0x5F]; set => Data[0x5F] = (byte)value; }
     private byte RIB8 { get => Data[0x60]; set => Data[0x60] = value; } // Sinnoh 3
@@ -231,7 +234,7 @@ public sealed class PK5 : PKM, ISanityChecksum,
     #endregion
 
     #region Block D
-    public override string OT_Name { get => StringConverter5.GetString(OT_Trash); set => StringConverter5.SetString(OT_Trash, value.AsSpan(), 7, StringConverterOption.None); }
+    public override string OT_Name { get => StringConverter5.GetString(OT_Trash); set => StringConverter5.SetString(OT_Trash, value, 7, StringConverterOption.None); }
     public override int Egg_Year { get => Data[0x78]; set => Data[0x78] = (byte)value; }
     public override int Egg_Month { get => Data[0x79]; set => Data[0x79] = (byte)value; }
     public override int Egg_Day { get => Data[0x7A]; set => Data[0x7A] = (byte)value; }
@@ -270,25 +273,9 @@ public sealed class PK5 : PKM, ISanityChecksum,
     #endregion
 
     // Generated Attributes
-    public override int PSV => (int)(((PID >> 16) ^ (PID & 0xFFFF)) >> 3);
-    public override int TSV => (TID ^ SID) >> 3;
-
-    public override int Characteristic
-    {
-        get
-        {
-            int pm6 = (int)(PID % 6); // PID
-            int maxIV = MaximumIV;
-            int pm6stat = 0;
-            for (int i = 0; i < 6; i++)
-            {
-                pm6stat = (pm6 + i) % 6;
-                if (GetIV(pm6stat) == maxIV)
-                    break;
-            }
-            return (pm6stat * 5) + (maxIV % 5);
-        }
-    }
+    public override uint PSV => ((PID >> 16) ^ (PID & 0xFFFF)) >> 3;
+    public override uint TSV => (uint)(TID16 ^ SID16) >> 3;
+    public override int Characteristic => EntityCharacteristic.GetCharacteristic(PID, IV32);
 
     // Maximums
     public override ushort MaxMoveID => Legal.MaxMoveID_5;
@@ -298,9 +285,9 @@ public sealed class PK5 : PKM, ISanityChecksum,
     public override int MaxBallID => Legal.MaxBallID_5;
     public override int MaxGameID => Legal.MaxGameID_5; // B2
     public override int MaxIV => 31;
-    public override int MaxEV => 255;
-    public override int OTLength => 7;
-    public override int NickLength => 10;
+    public override int MaxEV => EffortValues.Max255;
+    public override int MaxStringLengthOT => 7;
+    public override int MaxStringLengthNickname => 10;
 
     // Methods
     protected override byte[] Encrypt()
@@ -310,9 +297,9 @@ public sealed class PK5 : PKM, ISanityChecksum,
     }
 
     // Synthetic Trading Logic
-    public bool Trade(string SAV_Trainer, int SAV_TID, int SAV_SID, int SAV_GENDER, int Day = 1, int Month = 1, int Year = 2013)
+    public bool Trade(string SAV_Trainer, uint savID32, int SAV_GENDER, int Day = 1, int Month = 1, int Year = 2013)
     {
-        if (IsEgg && !(SAV_Trainer == OT_Name && SAV_TID == TID && SAV_SID == SID && SAV_GENDER == OT_Gender))
+        if (IsEgg && !(SAV_Trainer == OT_Name && savID32 == ID32 && SAV_GENDER == OT_Gender))
         {
             SetLinkTradeEgg(Day, Month, Year, Locations.LinkTrade5);
             return true;
@@ -348,8 +335,8 @@ public sealed class PK5 : PKM, ISanityChecksum,
         {
             EncryptionConstant = PID,
             Species = Species,
-            TID = TID,
-            SID = SID,
+            TID16 = TID16,
+            SID16 = SID16,
             EXP = EXP,
             PID = PID,
             Ability = Ability,
@@ -364,13 +351,13 @@ public sealed class PK5 : PKM, ISanityChecksum,
             CNT_Tough = CNT_Tough,
             CNT_Sheen = CNT_Sheen,
 
-            // Cap EVs
-            EV_HP = Math.Min(EV_HP, 252),
-            EV_ATK = Math.Min(EV_ATK, 252),
-            EV_DEF = Math.Min(EV_DEF, 252),
-            EV_SPA = Math.Min(EV_SPA, 252),
-            EV_SPD = Math.Min(EV_SPD, 252),
-            EV_SPE = Math.Min(EV_SPE, 252),
+            // Cap EVs -- anything above 252 is dropped down to 252.
+            EV_HP  = Math.Min(EV_HP , EffortValues.Max252),
+            EV_ATK = Math.Min(EV_ATK, EffortValues.Max252),
+            EV_DEF = Math.Min(EV_DEF, EffortValues.Max252),
+            EV_SPA = Math.Min(EV_SPA, EffortValues.Max252),
+            EV_SPD = Math.Min(EV_SPD, EffortValues.Max252),
+            EV_SPE = Math.Min(EV_SPE, EffortValues.Max252),
 
             Move1 = Move1,
             Move2 = Move2,
@@ -539,9 +526,9 @@ public sealed class PK5 : PKM, ISanityChecksum,
 
     private int CalculateAbilityIndex()
     {
-        var pi = (PersonalInfo5B2W2) PersonalInfo;
         if (HiddenAbility)
             return 2;
+        var pi = PersonalInfo;
         if (pi.Ability1 == Ability)
             return 0;
         if (pi.Ability2 == Ability)
@@ -551,5 +538,23 @@ public sealed class PK5 : PKM, ISanityChecksum,
         if (Gen5)
             pid >>= 16;
         return (int)(pid & 1);
+    }
+
+    internal static int GetTransferMetLocation4(PKM pk)
+    {
+        // Everything except for crown beasts and Celebi get the default transfer location.
+        // Crown beasts and Celebi are 100% identifiable by the species ID and fateful encounter, originating from Gen4.
+        if (!pk.Gen4 || !pk.FatefulEncounter)
+            return Locations.Transfer4; // Pokétransfer
+
+        return pk.Species switch
+        {
+            // Crown Beast
+            (int)Core.Species.Raikou or (int)Core.Species.Entei or (int)Core.Species.Suicune => Locations.Transfer4_CrownUnused,
+            // Celebi
+            (int)Core.Species.Celebi => Locations.Transfer4_CelebiUnused,
+            // Default
+            _ => Locations.Transfer4,
+        };
     }
 }

@@ -8,6 +8,15 @@ namespace PKHeX.Core;
 /// </summary>>
 public sealed class Zukan7b : Zukan7
 {
+    private const int UNSET = 0x007F00FE;
+    private const int BaseOffset = 0x2A00;
+    private const int EntryStart = 0xF78; // 0x3978 - 0x2A00
+    private const int EntryCount = 186;
+    private const int EntrySize = 6;
+
+    public const byte DefaultEntryValueH = 0xFE;
+    public const byte DefaultEntryValueW = 0x7F;
+
     public Zukan7b(SAV7b sav, int dex, int langflag) : base(sav, dex, langflag)
     {
     }
@@ -29,26 +38,26 @@ public sealed class Zukan7b : Zukan7
 
     private static bool IsBuddy(ushort species, byte form) => (species == (int)Species.Pikachu && form == 8) || (species == (int)Species.Eevee && form == 1);
 
-    public const int DefaultEntryValue = 0x7F;
-
-    public bool GetSizeData(DexSizeType group, ushort species, byte form, out int height, out int weight)
+    public bool GetSizeData(DexSizeType group, ushort species, byte form, out byte height, out byte weight, out bool isFlagged)
     {
-        height = weight = DefaultEntryValue;
+        height = DefaultEntryValueH; weight = DefaultEntryValueW;
+        isFlagged = false;
         if (TryGetSizeEntryIndex(species, form, out var index))
-            return GetSizeData(group, index, out height, out weight);
+            return GetSizeData(group, index, out height, out weight, out isFlagged);
         return false;
     }
 
-    public bool GetSizeData(DexSizeType group, int index, out int height, out int weight)
+    public bool GetSizeData(DexSizeType group, int index, out byte height, out byte weight, out bool isFlagged)
     {
         var ofs = GetDexSizeOffset(group, index);
         var entry = SAV.Data.AsSpan(ofs);
-        height = ReadUInt16LittleEndian(entry) >> 1;
-        weight = ReadUInt16LittleEndian(entry[2..]);
+        height = entry[0];
+        isFlagged = entry[1] == 1;
+        weight = entry[2];
         return !IsEntryUnset(height, weight);
     }
 
-    private static bool IsEntryUnset(int height, int weight) => height == DefaultEntryValue && weight == DefaultEntryValue;
+    private static bool IsEntryUnset(byte height, byte weight) => height == DefaultEntryValueH && weight == DefaultEntryValueW;
 
     private void SetSizeData(PB7 pk)
     {
@@ -60,134 +69,149 @@ public sealed class Zukan7b : Zukan7
         if (Math.Round(pk.HeightAbsolute) < pk.PersonalInfo.Height) // possible minimum height
         {
             int ofs = GetDexSizeOffset(DexSizeType.MinHeight, index);
-            var entry = SAV.Data.AsSpan(ofs);
-            var minHeight = ReadUInt16LittleEndian(entry) >> 1;
-            var calcHeight = PB7.GetHeightAbsolute(pk.PersonalInfo, minHeight);
-            if (Math.Round(pk.HeightAbsolute) < Math.Round(calcHeight) || ReadUInt32LittleEndian(entry) == 0x007F00FE) // unset
+            var entry = SAV.Data.AsSpan(ofs, EntrySize);
+            var minHeight = entry[0];
+            if (pk.HeightScalar < minHeight || IsUnset(entry))
                 SetSizeData(pk, DexSizeType.MinHeight);
         }
         else if (Math.Round(pk.HeightAbsolute) > pk.PersonalInfo.Height) // possible maximum height
         {
             int ofs = GetDexSizeOffset(DexSizeType.MaxHeight, index);
-            var entry = SAV.Data.AsSpan(ofs);
-            var maxHeight = ReadUInt16LittleEndian(entry) >> 1;
-            var calcHeight = PB7.GetHeightAbsolute(pk.PersonalInfo, maxHeight);
-            if (Math.Round(pk.HeightAbsolute) > Math.Round(calcHeight) || ReadUInt32LittleEndian(entry) == 0x007F00FE) // unset
+            var entry = SAV.Data.AsSpan(ofs, EntrySize);
+            var maxHeight = entry[0];
+            if (pk.HeightScalar > maxHeight || IsUnset(entry))
                 SetSizeData(pk, DexSizeType.MaxHeight);
         }
 
+        var pi = PersonalTable.GG[species, form];
         if (Math.Round(pk.WeightAbsolute) < pk.PersonalInfo.Weight) // possible minimum weight
         {
             int ofs = GetDexSizeOffset(DexSizeType.MinWeight, index);
-            var entry = SAV.Data.AsSpan(ofs);
-            var minHeight = ReadUInt16LittleEndian(entry) >> 1;
-            var minWeight = ReadUInt16LittleEndian(entry[2..]);
-            var calcWeight = PB7.GetWeightAbsolute(pk.PersonalInfo, minHeight, minWeight);
-            if (Math.Round(pk.WeightAbsolute) < Math.Round(calcWeight) || ReadUInt32LittleEndian(entry) == 0x007F00FE) // unset
+            var entry = SAV.Data.AsSpan(ofs, EntrySize);
+            var minHeight = entry[0];
+            var minWeight = entry[2];
+            var calcWeight = PB7.GetWeightAbsolute(pi, minHeight, minWeight);
+            if (pk.WeightAbsolute < calcWeight || IsUnset(entry))
                 SetSizeData(pk, DexSizeType.MinWeight);
         }
         else if (Math.Round(pk.WeightAbsolute) > pk.PersonalInfo.Weight) // possible maximum weight
         {
             int ofs = GetDexSizeOffset(DexSizeType.MaxWeight, index);
-            var entry = SAV.Data.AsSpan(ofs);
-            var maxHeight = ReadUInt16LittleEndian(entry) >> 1;
-            var maxWeight = ReadUInt16LittleEndian(entry[2..]);
-            var calcWeight = PB7.GetWeightAbsolute(pk.PersonalInfo, maxHeight, maxWeight);
-            if (Math.Round(pk.WeightAbsolute) > Math.Round(calcWeight) || ReadUInt32LittleEndian(entry) == 0x007F00FE) // unset
+            var entry = SAV.Data.AsSpan(ofs, EntrySize);
+            var maxHeight = entry[0];
+            var maxWeight = entry[2];
+            var calcWeight = PB7.GetWeightAbsolute(pi, maxHeight, maxWeight);
+            if (pk.WeightAbsolute > calcWeight || IsUnset(entry))
                 SetSizeData(pk, DexSizeType.MaxWeight);
         }
     }
 
-    private static int GetDexSizeOffset(DexSizeType group, int index) => 0x3978 + (index * 6) + ((int)group * 0x45C); // blockofs + 0xF78 + ([186*6]*n) + x*6
+    private static bool IsUnset(Span<byte> entry) => ReadUInt32LittleEndian(entry) == UNSET;
 
-    private void SetSizeData(PB7 pk, DexSizeType group)
+    // blockofs + 0xF78 + ([186*6]*n) + x*6
+    private static int GetDexSizeOffset(DexSizeType group, int index) => BaseOffset + EntryStart + (EntrySize * (index + ((int)group * EntryCount)));
+
+    private void SetSizeData(PB7 pk, DexSizeType group, bool flag = false)
     {
         var tree = EvolutionTree.Evolves7b;
         ushort species = pk.Species;
         var form = pk.Form;
 
-        int height = pk.HeightScalar;
-        int weight = pk.WeightScalar;
+        byte height = pk.HeightScalar;
+        byte weight = pk.WeightScalar;
 
         // update for all species in potential lineage
         var allspec = tree.GetEvolutionsAndPreEvolutions(species, form);
         foreach (var (s, f) in allspec)
-            SetSizeData(group, s, f, height, weight);
+            SetSizeData(group, s, f, height, weight, flag);
     }
 
-    public void SetSizeData(DexSizeType group, ushort species, byte form, int height, int weight)
+    public void SetSizeData(DexSizeType group, ushort species, byte form, byte height, byte weight, bool flag = false)
     {
         if (TryGetSizeEntryIndex(species, form, out var index))
-            SetSizeData(group, index, height, weight);
+            SetSizeData(group, index, height, weight, flag);
     }
 
-    public void SetSizeData(DexSizeType group, int index, int height, int weight)
+    public void SetSizeData(DexSizeType group, int index, byte height, byte weight, bool flag = false)
     {
         var ofs = GetDexSizeOffset(group, index);
         var span = SAV.Data.AsSpan(ofs);
-        WriteUInt16LittleEndian(span, (ushort)(height << 1));
-        WriteUInt16LittleEndian(span[2..], (ushort)weight);
+        span[0] = height;
+        span[1] = flag ? (byte)1 : (byte)0;
+        span[2] = weight;
+        span[3] = 0;
     }
+
+    private const int EntryMeltan = 151; // Melmetal 152
+    private const int EntryForms = 153;
 
     public static bool TryGetSizeEntryIndex(ushort species, byte form, out int index)
     {
         index = -1;
-        if (form == 0 && species <= 151)
+        if (form == 0)
         {
-            index = species - 1;
-            return true;
+            if (species <= 151) // Mew
+            {
+                index = species - 1;
+                return true;
+            }
+            if (species is 808 or 809) // Meltan & Melmetal
+            {
+                index = EntryMeltan + (species - 808);
+                return true;
+            }
+            return false;
         }
-        for (int i = 0; i < SizeDexInfoTable.Length; i += 3)
+
+        // Forms
+        for (int i = 0; i < SizeDexInfoTable.Length; i += 2)
         {
             if (SizeDexInfoTable[i] != species)
                 continue;
             if (SizeDexInfoTable[i + 1] != form)
                 continue;
-            index = SizeDexInfoTable[i + 2];
+            index = EntryForms + (i >> 1);
             return true;
         }
         return false;
     }
 
-    private static readonly ushort[] SizeDexInfoTable =
+    private static ReadOnlySpan<byte> SizeDexInfoTable => new byte[]
     {
-        // species, form, index
-        808, 0, 151,
-        809, 0, 152,
-
-        003, 1, 153,
-        006, 1, 154,
-        006, 2, 155,
-        009, 1, 156,
-        015, 1, 157,
-        018, 1, 158,
-        019, 1, 159,
-        020, 1, 160,
-        026, 1, 161,
-        027, 1, 162,
-        028, 1, 163,
-        037, 1, 164,
-        038, 1, 165,
-        050, 1, 166,
-        051, 1, 167,
-        052, 1, 168,
-        053, 1, 169,
-        065, 1, 170,
-        074, 1, 171,
-        075, 1, 172,
-        076, 1, 173,
-        080, 1, 174,
-        088, 1, 175,
-        089, 1, 176,
-        094, 1, 177,
-        103, 1, 178,
-        105, 1, 179,
-        115, 1, 180,
-        127, 1, 181,
-        130, 1, 182,
-        142, 1, 183,
-        150, 1, 184,
-        150, 2, 185,
+        // species, form
+        003, 1,
+        006, 1,
+        006, 2,
+        009, 1,
+        015, 1,
+        018, 1,
+        019, 1,
+        020, 1,
+        026, 1,
+        027, 1,
+        028, 1,
+        037, 1,
+        038, 1,
+        050, 1,
+        051, 1,
+        052, 1,
+        053, 1,
+        065, 1,
+        074, 1,
+        075, 1,
+        076, 1,
+        080, 1,
+        088, 1,
+        089, 1,
+        094, 1,
+        103, 1,
+        105, 1,
+        115, 1,
+        127, 1,
+        130, 1,
+        142, 1,
+        150, 1,
+        150, 2,
     };
 
     protected override bool GetSaneFormsToIterate(ushort species, out int formStart, out int formEnd, int formIn)
@@ -205,6 +229,22 @@ public sealed class Zukan7b : Zukan7
                 formStart = formEnd = 0;
                 return count < formIn;
         }
+    }
+
+    public ushort GetSpecies(ushort species, byte form)
+    {
+        if (form <= 0)
+            return species;
+        var fc = SAV.Personal[species].FormCount;
+        if (fc <= 1)
+            return species;
+
+        // actually has forms
+        int f = DexFormIndexFetcher(species, fc, SAV.MaxSpeciesID - 1);
+        if (f >= 0) // bit index valid
+            return (ushort)(f + form + 1);
+
+        return species;
     }
 }
 

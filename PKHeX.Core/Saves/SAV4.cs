@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
@@ -16,17 +17,16 @@ public abstract class SAV4 : SaveFile, IEventFlag37
     public sealed override string Extension => ".sav";
 
     // Blocks & Offsets
-    private readonly int GeneralBlockPosition; // Small Block
-    private readonly int StorageBlockPosition; // Big Block
     private const int PartitionSize = 0x40000;
 
     // SaveData is chunked into two pieces.
-    protected readonly byte[] Storage;
-    public readonly byte[] General;
-    protected sealed override byte[] BoxBuffer => Storage;
-    protected sealed override byte[] PartyBuffer => General;
+    private readonly Memory<byte> StorageBuffer;
+    protected internal readonly Memory<byte> GeneralBuffer;
+    protected Span<byte> Storage => StorageBuffer.Span;
+    public Span<byte> General => GeneralBuffer.Span;
+    protected sealed override Span<byte> BoxBuffer => Storage;
+    protected sealed override Span<byte> PartyBuffer => General;
 
-    protected abstract int StorageStart { get; }
     public abstract Zukan4 Dex { get; }
 
     protected abstract int EventFlag { get; }
@@ -36,28 +36,28 @@ public abstract class SAV4 : SaveFile, IEventFlag37
 
     protected SAV4(int gSize, int sSize)
     {
-        General = new byte[gSize];
-        Storage = new byte[sSize];
+        GeneralBuffer = new byte[gSize];
+        StorageBuffer = new byte[sSize];
         ClearBoxes();
     }
 
     protected SAV4(byte[] data, int gSize, int sSize, int sStart) : base(data)
     {
-        GeneralBlockPosition = GetActiveBlock(data, 0, gSize);
-        StorageBlockPosition = GetActiveBlock(data, sStart, sSize);
+        var GeneralBlockPosition = GetActiveBlock(data, 0, gSize);
+        var StorageBlockPosition = GetActiveBlock(data, sStart, sSize);
 
         var gbo = (GeneralBlockPosition == 0 ? 0 : PartitionSize);
         var sbo = (StorageBlockPosition == 0 ? 0 : PartitionSize) + sStart;
-        General = GetData(gbo, gSize);
-        Storage = GetData(sbo, sSize);
+        GeneralBuffer = Data.AsMemory(gbo, gSize);
+        StorageBuffer = Data.AsMemory(sbo, sSize);
     }
 
     // Configuration
-    protected sealed override SaveFile CloneInternal()
+    protected sealed override SAV4 CloneInternal()
     {
         var sav = CloneInternal4();
-        SetData(sav.General, General, 0);
-        SetData(sav.Storage, Storage, 0);
+        SetData(sav.General, General);
+        SetData(sav.Storage, Storage);
         return sav;
     }
 
@@ -67,24 +67,24 @@ public abstract class SAV4 : SaveFile, IEventFlag37
     {
         SetData(sav.Data, 0);
         var s4 = (SAV4)sav;
-        SetData(General, s4.General, 0);
-        SetData(Storage, s4.Storage, 0);
+        SetData(General, s4.General);
+        SetData(Storage, s4.Storage);
     }
 
     protected sealed override int SIZE_STORED => PokeCrypto.SIZE_4STORED;
     protected sealed override int SIZE_PARTY => PokeCrypto.SIZE_4PARTY;
-    public sealed override PKM BlankPKM => new PK4();
+    public sealed override PK4 BlankPKM => new();
     public sealed override Type PKMType => typeof(PK4);
 
     public sealed override int BoxCount => 18;
-    public sealed override int MaxEV => 255;
+    public sealed override int MaxEV => EffortValues.Max255;
     public sealed override int Generation => 4;
     public override EntityContext Context => EntityContext.Gen4;
     public int EventFlagCount => 0xB60; // 2912
     public int EventWorkCount => (EventFlag - EventWork) >> 1;
     protected sealed override int GiftCountMax => 11;
-    public sealed override int OTLength => 7;
-    public sealed override int NickLength => 10;
+    public sealed override int MaxStringLengthOT => 7;
+    public sealed override int MaxStringLengthNickname => 10;
     public sealed override int MaxMoney => 999999;
     public sealed override int MaxCoins => 50_000;
 
@@ -103,12 +103,8 @@ public abstract class SAV4 : SaveFile, IEventFlag37
 
     protected sealed override void SetChecksums()
     {
-        WriteUInt16LittleEndian(General.AsSpan(General.Length - 2), CalcBlockChecksum(General));
-        WriteUInt16LittleEndian(Storage.AsSpan(Storage.Length - 2), CalcBlockChecksum(Storage));
-
-        // Write blocks back
-        General.CopyTo(Data, GeneralBlockPosition * PartitionSize);
-        Storage.CopyTo(Data, (StorageBlockPosition * PartitionSize) + StorageStart);
+        WriteUInt16LittleEndian(General[^2..], CalcBlockChecksum(General));
+        WriteUInt16LittleEndian(Storage[^2..], CalcBlockChecksum(Storage));
     }
 
     public sealed override bool ChecksumsValid
@@ -138,7 +134,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
         }
     }
 
-    private static int GetActiveBlock(ReadOnlySpan<byte> data, int begin, int length)
+    private static int GetActiveBlock(ReadOnlySpan<byte> data, [ConstantExpected(Min = 0)] int begin, [ConstantExpected(Min = 0)] int length)
     {
         int offset = begin + length - 0x14;
         return SAV4BlockDetection.CompareFooters(data, offset, offset + PartitionSize);
@@ -147,6 +143,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
     protected int WondercardFlags = int.MinValue;
     protected int AdventureInfo = int.MinValue;
     protected int Seal = int.MinValue;
+    public int Geonet = int.MinValue;
     protected int Trainer1;
     public int GTS { get; protected set; } = int.MinValue;
 
@@ -162,26 +159,32 @@ public abstract class SAV4 : SaveFile, IEventFlag37
     // Trainer Info
     public override string OT
     {
-        get => GetString(General.AsSpan(Trainer1, 16));
-        set => SetString(General.AsSpan(Trainer1, 16), value.AsSpan(), OTLength, StringConverterOption.ClearZero);
+        get => GetString(General.Slice(Trainer1, 16));
+        set => SetString(General.Slice(Trainer1, 16), value, MaxStringLengthOT, StringConverterOption.ClearZero);
     }
 
-    public override int TID
+    public override uint ID32
     {
-        get => ReadUInt16LittleEndian(General.AsSpan(Trainer1 + 0x10));
-        set => WriteUInt16LittleEndian(General.AsSpan(Trainer1 + 0x10), (ushort)value);
+        get => ReadUInt32LittleEndian(General[(Trainer1 + 0x10)..]);
+        set => WriteUInt32LittleEndian(General[(Trainer1 + 0x10)..], value);
     }
 
-    public override int SID
+    public override ushort TID16
     {
-        get => ReadUInt16LittleEndian(General.AsSpan(Trainer1 + 0x12));
-        set => WriteUInt16LittleEndian(General.AsSpan(Trainer1 + 0x12), (ushort)value);
+        get => ReadUInt16LittleEndian(General[(Trainer1 + 0x10)..]);
+        set => WriteUInt16LittleEndian(General[(Trainer1 + 0x10)..], value);
+    }
+
+    public override ushort SID16
+    {
+        get => ReadUInt16LittleEndian(General[(Trainer1 + 0x12)..]);
+        set => WriteUInt16LittleEndian(General[(Trainer1 + 0x12)..], value);
     }
 
     public override uint Money
     {
-        get => ReadUInt32LittleEndian(General.AsSpan(Trainer1 + 0x14));
-        set => WriteUInt32LittleEndian(General.AsSpan(Trainer1 + 0x14), value);
+        get => ReadUInt32LittleEndian(General[(Trainer1 + 0x14)..]);
+        set => WriteUInt32LittleEndian(General[(Trainer1 + 0x14)..], value);
     }
 
     public override int Gender
@@ -210,14 +213,14 @@ public abstract class SAV4 : SaveFile, IEventFlag37
 
     public uint Coin
     {
-        get => ReadUInt16LittleEndian(General.AsSpan(Trainer1 + 0x20));
-        set => WriteUInt16LittleEndian(General.AsSpan(Trainer1 + 0x20), (ushort)value);
+        get => ReadUInt16LittleEndian(General[(Trainer1 + 0x20)..]);
+        set => WriteUInt16LittleEndian(General[(Trainer1 + 0x20)..], (ushort)value);
     }
 
     public override int PlayedHours
     {
-        get => ReadUInt16LittleEndian(General.AsSpan(Trainer1 + 0x22));
-        set => WriteUInt16LittleEndian(General.AsSpan(Trainer1 + 0x22), (ushort)value);
+        get => ReadUInt16LittleEndian(General[(Trainer1 + 0x22)..]);
+        set => WriteUInt16LittleEndian(General[(Trainer1 + 0x22)..], (ushort)value);
     }
 
     public override int PlayedMinutes
@@ -239,7 +242,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
     public string Rival
     {
         get => GetString(Rival_Trash);
-        set => SetString(Rival_Trash, value.AsSpan(), OTLength, StringConverterOption.ClearZero);
+        set => SetString(Rival_Trash, value, MaxStringLengthOT, StringConverterOption.ClearZero);
     }
 
     public abstract Span<byte> Rival_Trash { get; set; }
@@ -248,18 +251,32 @@ public abstract class SAV4 : SaveFile, IEventFlag37
     public abstract int Y2 { get; set; }
     public abstract int Z { get; set; }
 
-    public override uint SecondsToStart { get => ReadUInt32LittleEndian(General.AsSpan(AdventureInfo + 0x34)); set => WriteUInt32LittleEndian(General.AsSpan(AdventureInfo + 0x34), value); }
-    public override uint SecondsToFame { get => ReadUInt32LittleEndian(General.AsSpan(AdventureInfo + 0x3C)); set => WriteUInt32LittleEndian(General.AsSpan(AdventureInfo + 0x3C), value); }
+    public override uint SecondsToStart { get => ReadUInt32LittleEndian(General[(AdventureInfo + 0x34)..]); set => WriteUInt32LittleEndian(General[(AdventureInfo + 0x34)..], value); }
+    public override uint SecondsToFame { get => ReadUInt32LittleEndian(General[(AdventureInfo + 0x3C)..]); set => WriteUInt32LittleEndian(General[(AdventureInfo + 0x3C)..], value); }
 
-    protected sealed override PKM GetPKM(byte[] data) => new PK4(data);
+    public bool GeonetGlobalFlag { get => General[Geonet] != 0; set => General[Geonet] = (byte)(value ? 1 : 0); }
+
+    public int Country
+    {
+        get => General[Geonet + 1];
+        set { if (value < 0) return; General[Geonet + 1] = (byte)value; }
+    }
+
+    public int Region
+    {
+        get => General[Geonet + 2];
+        set { if (value < 0) return; General[Geonet + 2] = (byte)value; }
+    }
+
+    protected sealed override PK4 GetPKM(byte[] data) => new(data);
     protected sealed override byte[] DecryptPKM(byte[] data) => PokeCrypto.DecryptArray45(data);
 
     protected sealed override void SetPKM(PKM pk, bool isParty = false)
     {
         var pk4 = (PK4)pk;
         // Apply to this Save File
-        DateTime Date = DateTime.Now;
-        if (pk4.Trade(OT, TID, SID, Gender, Date.Day, Date.Month, Date.Year))
+        var now = EncounterDate.GetDateNDS();
+        if (pk4.Trade(OT, ID32, Gender, now.Day, now.Month, now.Year))
             pk.RefreshChecksum();
     }
 
@@ -269,7 +286,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
     public override uint? GetDaycareEXP(int loc, int slot)
     {
         int ofs = DaycareOffset + ((slot+1)*SIZE_PARTY) - 4;
-        return ReadUInt32LittleEndian(General.AsSpan(ofs));
+        return ReadUInt32LittleEndian(General[ofs..]);
     }
 
     public override bool? IsDaycareOccupied(int loc, int slot) => null; // todo
@@ -277,7 +294,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
     public override void SetDaycareEXP(int loc, int slot, uint EXP)
     {
         int ofs = DaycareOffset + ((slot+1)*SIZE_PARTY) - 4;
-        WriteUInt32LittleEndian(General.AsSpan(ofs), EXP);
+        WriteUInt32LittleEndian(General[ofs..], EXP);
     }
 
     public override void SetDaycareOccupied(int loc, int slot, bool occupied)
@@ -379,7 +396,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
             if (GiftFlagMax != value.Length)
                 return;
 
-            Span<byte> data = General.AsSpan(WondercardFlags, value.Length / 8);
+            Span<byte> data = General.Slice(WondercardFlags, value.Length / 8);
             data.Clear();
             for (int i = 0; i < value.Length; i++)
             {
@@ -396,9 +413,9 @@ public abstract class SAV4 : SaveFile, IEventFlag37
             int pcd = this is SAV4HGSS ? 4 : 3;
             DataMysteryGift[] cards = new DataMysteryGift[8 + pcd];
             for (int i = 0; i < 8; i++) // 8 PGT
-                cards[i] = new PGT(General.Slice(WondercardData + (i * PGT.Size), PGT.Size));
+                cards[i] = new PGT(General.Slice(WondercardData + (i * PGT.Size), PGT.Size).ToArray());
             for (int i = 8; i < 11; i++) // 3 PCD
-                cards[i] = new PCD(General.Slice(WondercardData + (8 * PGT.Size) + ((i-8) * PCD.Size), PCD.Size));
+                cards[i] = new PCD(General.Slice(WondercardData + (8 * PGT.Size) + ((i-8) * PCD.Size), PCD.Size).ToArray());
             if (this is SAV4HGSS hgss)
                 cards[^1] = hgss.LockCapsuleSlot;
             return cards;
@@ -413,12 +430,18 @@ public abstract class SAV4 : SaveFile, IEventFlag37
             for (int i = 0; i < 8; i++) // 8 PGT
             {
                 if (value[i] is PGT)
-                    SetData(General, value[i].Data, WondercardData + (i *PGT.Size));
+                {
+                    var ofs = (WondercardData + (i * PGT.Size));
+                    SetData(General[ofs..], value[i].Data);
+                }
             }
             for (int i = 8; i < 11; i++) // 3 PCD
             {
                 if (value[i] is PCD)
-                    SetData(General, value[i].Data, WondercardData + (8 *PGT.Size) + ((i - 8)*PCD.Size));
+                {
+                    var ofs = (WondercardData + (8 * PGT.Size) + ((i - 8) * PCD.Size));
+                    SetData(General[ofs..], value[i].Data);
+                }
             }
             if (this is SAV4HGSS hgss && value.Length >= 11 && value[^1] is PCD capsule)
                 hgss.LockCapsuleSlot = capsule;
@@ -504,15 +527,15 @@ public abstract class SAV4 : SaveFile, IEventFlag37
         SetFlag(EventFlag + (flagNumber >> 3), flagNumber & 7, value);
     }
 
-    public ushort GetWork(int index) => ReadUInt16LittleEndian(General.AsSpan(EventWork + (index * 2)));
-    public void SetWork(int index, ushort value) => WriteUInt16LittleEndian(General.AsSpan(EventWork)[(index * 2)..], value);
+    public ushort GetWork(int index) => ReadUInt16LittleEndian(General[(EventWork + (index * 2))..]);
+    public void SetWork(int index, ushort value) => WriteUInt16LittleEndian(General[EventWork..][(index * 2)..], value);
     #endregion
 
     // Seals
     private const byte SealMaxCount = 99;
 
-    public byte[] GetSealCase() => General.Slice(Seal, (int)Seal4.MAX);
-    public void SetSealCase(byte[] value) => SetData(General, value, Seal);
+    public Span<byte> GetSealCase() => General.Slice(Seal, (int)Seal4.MAX);
+    public void SetSealCase(ReadOnlySpan<byte> value) => SetData(General.Slice(Seal, (int)Seal4.MAX), value);
 
     public byte GetSealCount(Seal4 id) => General[Seal + (int)id];
     public byte SetSealCount(Seal4 id, byte count) => General[Seal + (int)id] = Math.Min(SealMaxCount, count);
@@ -536,7 +559,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
         };
     }
 
-    public byte[] GetMailData(int ofs) => General.Slice(ofs, Mail4.SIZE);
+    public byte[] GetMailData(int ofs) => General.Slice(ofs, Mail4.SIZE).ToArray();
 
     public Mail4 GetMail(int mailIndex)
     {

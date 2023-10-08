@@ -7,10 +7,10 @@ namespace PKHeX.Core;
 /// </summary>
 public sealed class PersonalTable8SWSH : IPersonalTable, IPersonalTable<PersonalInfo8SWSH>
 {
-    internal readonly PersonalInfo8SWSH[] Table;
+    private readonly PersonalInfo8SWSH[] Table;
     private const int SIZE = PersonalInfo8SWSH.SIZE;
-    private const int MaxSpecies = Legal.MaxSpeciesID_8_R2;
-    public int MaxSpeciesID => MaxSpecies;
+    private const ushort MaxSpecies = Legal.MaxSpeciesID_8_R2;
+    public ushort MaxSpeciesID => MaxSpecies;
 
     public PersonalTable8SWSH(ReadOnlySpan<byte> data)
     {
@@ -29,14 +29,14 @@ public sealed class PersonalTable8SWSH : IPersonalTable, IPersonalTable<Personal
 
     public int GetFormIndex(ushort species, byte form)
     {
-        if ((uint)species <= MaxSpeciesID)
+        if (species <= MaxSpeciesID)
             return Table[species].FormIndex(species, form);
         return 0;
     }
 
     public bool IsSpeciesInGame(ushort species)
     {
-        if ((uint)species > MaxSpeciesID)
+        if (species > MaxSpeciesID)
             return false;
 
         var form0 = Table[species];
@@ -55,7 +55,7 @@ public sealed class PersonalTable8SWSH : IPersonalTable, IPersonalTable<Personal
 
     public bool IsPresentInGame(ushort species, byte form)
     {
-        if ((uint)species > MaxSpeciesID)
+        if (species > MaxSpeciesID)
             return false;
 
         var form0 = Table[species];

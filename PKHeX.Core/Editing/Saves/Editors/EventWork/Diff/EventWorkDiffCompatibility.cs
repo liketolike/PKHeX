@@ -5,6 +5,9 @@ using static PKHeX.Core.EventWorkDiffCompatibility;
 
 namespace PKHeX.Core;
 
+/// <summary>
+/// Indicates if the compared data is incompatible in any way.
+/// </summary>
 public enum EventWorkDiffCompatibility
 {
     Valid,
@@ -16,6 +19,9 @@ public enum EventWorkDiffCompatibility
     FileMissing2,
 }
 
+/// <summary>
+/// Extension methods and utility logic for <see cref="EventWorkDiffCompatibility"></see>.
+/// </summary>
 public static class EventWorkDiffCompatibilityExtensions
 {
     public static string GetMessage(this EventWorkDiffCompatibility value) => value switch

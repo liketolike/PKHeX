@@ -43,7 +43,7 @@ public partial class SAV_PokedexLA : Form
         CHK_Obtained = new[] { CHK_O0, CHK_O1, CHK_O2, CHK_O3, CHK_O4, CHK_O5, CHK_O6, CHK_O7 };
         CHK_CaughtWild = new[] { CHK_C0, CHK_C1, CHK_C2, CHK_C3, CHK_C4, CHK_C5, CHK_C6, CHK_C7 };
 
-        TaskControls = new []
+        TaskControls = new[]
         {
             PRT_1,
             PRT_2,
@@ -235,9 +235,13 @@ public partial class SAV_PokedexLA : Form
         {
             var selectedForm = Dex.GetSelectedForm(species);
             CB_DisplayForm.SelectedIndex = 0;
-            for (var i = 0; i < CB_DisplayForm.Items.Count; ++i)
+            var items = CB_DisplayForm.Items;
+            for (var i = 0; i < items.Count; ++i)
             {
-                if (((ComboItem)CB_DisplayForm.Items[i]).Value != selectedForm)
+                var item = items[i];
+                if (item is not ComboItem cb)
+                    throw new Exception("Invalid item type");
+                if (cb.Value != selectedForm)
                     continue;
 
                 CB_DisplayForm.SelectedIndex = i;

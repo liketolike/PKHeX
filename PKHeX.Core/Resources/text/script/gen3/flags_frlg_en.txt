@@ -278,7 +278,7 @@
 490	i	Max Ether in Berry Forest found
 491	i	Full Heal in Berry Forest found
 492	i	Max Elixir in Berry Forest found
-493	i	Utlra Ball on Mt. Ember found
+493	i	Ultra Ball on Mt. Ember found
 494	i	Fire Stone on Mt. Ember found
 495	i	Dire Hit on Mt. Ember found
 496	i	Ultra Ball in Icefall Cave found
@@ -470,7 +470,7 @@
 760	m   Change text of old woman in Celadon Mansion (after HoF)
 761	s	Spoke to Prof. Oak's Aide in Vermilion City
 762	*	Received Everstone (Oak's Aide, Rock Tunnel Pokemon Center)
-763	s	Gave Meteroite and received Moon Stone from Lostelle's daddy
+763	s	Gave Meteorite and received Moon Stone from Lostelle's daddy
 764	*	Full Restore from man for driving off bikers on Three Island received
 765	*	Received Amulet Coin (Oak's Aide, Route 16)
 
@@ -635,14 +635,14 @@
 1159	h	Soothe Bell (hidden) in Pokémon Tower found
 1160	h   Sacred Ash (hidden) on Navel Rock found
 1161	h	PP Max (hidden) on Cape Brink found
-1162	h	Utlra Ball (hidden) on Mt. Ember found
+1162	h	Ultra Ball (hidden) on Mt. Ember found
 1163	h	Nugget (hidden) in Three Isle Path found
 1164	h	PP Up (hidden) on Three Island found
 1165	h	Max Repel (hidden) on Bond Bridge found
 1166	h	Pearl (hidden, recurring) on Bond Bridge found
 1167	h	Stardust (hidden, recurring) on Bond Bridge found
 1168	h	Pearl (hidden, recurring) on Four Island found
-1169	h	Ulra Ball (hidden, recurring) on Four Island found
+1169	h	Ultra Ball (hidden, recurring) on Four Island found
 1170	h	Big Pearl (hidden, recurring) on Memorial Pillar found
 1171	h	Razz Berry (hidden) on Memorial Pillar found
 1172	h	Sitrus Berry (hidden) on Memorial Pillar found
@@ -661,7 +661,7 @@
 1185	h	Big Pearl (hidden, recurring) outside of Trainer Tower found
 1186	h	Pearl (hidden, recurring) outside of Trainer Tower found
 1187	h	Nanab Berry (hidden) outside of Trainer Tower found
-1188	h	Raws Berry (hidden) in Canyon Entrance found
+1188	h	Rawst Berry (hidden) in Canyon Entrance found
 1189	h   Macho Brace (hidden) in Viridian Gym found
 1190	h	Lava Cookie (hidden) at S.S. Anne Port found
 

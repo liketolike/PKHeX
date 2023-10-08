@@ -19,7 +19,7 @@ public abstract class BulkStorage : SaveFile
 
     protected readonly int SlotsPerBox;
 
-    protected internal override string ShortSummary => $"{Checksums.CRC16Invert(new ReadOnlySpan<byte>(Data, Box, Data.Length - Box)):X4}";
+    protected internal override string ShortSummary => $"{Checksums.CRC16Invert(Data.AsSpan(Box)):X4}";
     public override string Extension => ".bin";
     public sealed override bool ChecksumsValid => true;
     public sealed override string ChecksumInfo => "No Info.";
@@ -42,8 +42,8 @@ public abstract class BulkStorage : SaveFile
     public sealed override int MaxItemID => blank.MaxItemID;
     public sealed override int MaxBallID => blank.MaxBallID;
     public sealed override int MaxGameID => blank.MaxGameID;
-    public sealed override int OTLength => blank.OTLength;
-    public sealed override int NickLength => blank.NickLength;
+    public sealed override int MaxStringLengthOT => blank.MaxStringLengthOT;
+    public sealed override int MaxStringLengthNickname => blank.MaxStringLengthNickname;
     public bool IsBigEndian => blank is BK4 or XK3 or CK3;
 
     public override int BoxCount { get; }
@@ -51,7 +51,7 @@ public abstract class BulkStorage : SaveFile
 
     public override int GetBoxOffset(int box) => Box + (box * (SlotsPerBox * SIZE_STORED));
     public override string GetBoxName(int box) => $"Box {box + 1:d2}";
-    public sealed override void SetBoxName(int box, string value) { }
+    public sealed override void SetBoxName(int box, ReadOnlySpan<char> value) { }
     public sealed override int GetPartyOffset(int slot) => int.MinValue;
 
     public override string GetString(ReadOnlySpan<byte> data)

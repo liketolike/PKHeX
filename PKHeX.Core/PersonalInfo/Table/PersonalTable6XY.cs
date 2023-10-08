@@ -10,8 +10,8 @@ public sealed class PersonalTable6XY : IPersonalTable, IPersonalTable<PersonalIn
 {
     private readonly PersonalInfo6XY[] Table;
     private const int SIZE = PersonalInfo6XY.SIZE;
-    private const int MaxSpecies = Legal.MaxSpeciesID_6;
-    public int MaxSpeciesID => MaxSpecies;
+    private const ushort MaxSpecies = Legal.MaxSpeciesID_6;
+    public ushort MaxSpeciesID => MaxSpecies;
 
     public PersonalTable6XY(ReadOnlySpan<byte> data)
     {
@@ -30,12 +30,12 @@ public sealed class PersonalTable6XY : IPersonalTable, IPersonalTable<PersonalIn
 
     public int GetFormIndex(ushort species, byte form)
     {
-        if ((uint)species <= MaxSpecies)
+        if (species <= MaxSpecies)
             return Table[species].FormIndex(species, form);
         return 0;
     }
 
-    public bool IsSpeciesInGame(ushort species) => (uint)species <= MaxSpecies;
+    public bool IsSpeciesInGame(ushort species) => species <= MaxSpecies;
     public bool IsPresentInGame(ushort species, byte form)
     {
         if (!IsSpeciesInGame(species))

@@ -4,8 +4,8 @@ namespace PKHeX.Core;
 
 public abstract class MemoryContext
 {
+    public abstract EntityContext Context { get; }
     public abstract IEnumerable<ushort> GetMemoryItemParams();
-    public abstract IEnumerable<ushort> GetKeyItemParams();
 
     public abstract bool CanUseItemGeneric(int item);
     public abstract bool IsUsedKeyItemUnspecific(int item);

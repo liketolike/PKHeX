@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -18,10 +18,10 @@ public partial class SettingsEditor : Form
 
         if (obj is PKHeXSettings s)
         {
-            var noSelectVersions = new[] {GameVersion.GO};
+            var noSelectVersions = new[] { GameVersion.GO, (GameVersion)0 };
             CB_Blank.InitializeBinding();
             CB_Blank.DataSource = GameInfo.VersionDataSource.Where(z => !noSelectVersions.Contains((GameVersion)z.Value)).ToList();
-            CB_Blank.SelectedValue = (int) s.Startup.DefaultSaveVersion;
+            CB_Blank.SelectedValue = (int)s.Startup.DefaultSaveVersion;
             CB_Blank.SelectedValueChanged += (_, _) => s.Startup.DefaultSaveVersion = (GameVersion)WinFormsUtil.GetIndex(CB_Blank);
             CB_Blank.SelectedIndexChanged += (_, _) => BlankChanged = true;
             B_Reset.Click += (x, e) => DeleteSettings();
@@ -38,7 +38,8 @@ public partial class SettingsEditor : Form
     private void LoadSettings(object obj)
     {
         var type = obj.GetType();
-        var props = ReflectUtil.GetPropertiesCanWritePublicDeclared(type);
+        var props = ReflectUtil.GetPropertiesCanWritePublicDeclared(type)
+            .OrderBy(z => z);
         foreach (var p in props)
         {
             var state = ReflectUtil.GetValue(obj, p);

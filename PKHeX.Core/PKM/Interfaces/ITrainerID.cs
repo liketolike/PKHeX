@@ -1,33 +1,81 @@
-﻿namespace PKHeX.Core;
+using static PKHeX.Core.TrainerIDFormat;
+
+namespace PKHeX.Core;
 
 /// <summary>
-/// Object has Trainer ownership
+/// Object has Trainer ownership with a way to show the Trainer ID.
 /// </summary>
 public interface ITrainerID
 {
-    int TID { get; set; }
-    int SID { get; set; }
+    /// <summary>
+    /// Format the stored Trainer ID is shown to the player.
+    /// </summary>
+    TrainerIDFormat TrainerIDDisplayFormat { get; }
 }
 
-public static partial class Extensions
+public enum TrainerIDFormat
 {
-    public static int GetTrainerIDFormat(this ITrainerID tr)
-    {
-        if (tr is PKM p)
-        {
-            var format = p.Generation;
-            if ((format < 3 && p.Format >= 7) || format <= 0) // VC or bad gen
-                return 4; // use TID/SID 16bit style
-            return format;
-        }
-        if (tr is SaveFile s)
-            return s.Generation;
-        return -1;
-    }
+    /// <summary>
+    /// Don't use me.
+    /// </summary>
+    None,
 
-    public static bool IsShiny(this ITrainerID tr, uint pid, int gen = 7)
+    /// <summary>
+    /// 16-bit Trainer ID
+    /// </summary>
+    /// <remarks>Generations 1-2 only. Secret ID did not exist.</remarks>
+    SixteenBitSingle,
+
+    /// <summary>
+    /// 16-bit Trainer ID, 16-bit Secret ID
+    /// </summary>
+    /// <remarks>Generations 3-6, and Generation 1-2 transferred 7+.</remarks>
+    SixteenBit,
+
+    /// <summary>
+    /// 32-bit Trainer ID, showing the lowest 6 digits.
+    /// </summary>
+    /// <remarks>Generation 7 origin onward.</remarks>
+    SixDigit,
+}
+
+public static class TrainerIDExtensions
+{
+    /// <summary>
+    /// Detects the correct <see cref="TrainerIDFormat"/> to use for the input <see cref="tr"/>.
+    /// </summary>
+    public static TrainerIDFormat GetTrainerIDFormat(this ITrainerID tr) => tr switch
     {
-        var xor = tr.SID ^ tr.TID ^ (pid >> 16) ^ (pid & 0xFFFF);
-        return xor < (gen >= 7 ? 16 : 8);
-    }
+        PKM { Format: <= 2 }  => SixteenBitSingle,
+        PKM { Version: 0 } pk => pk.Format     >= 7 ? SixDigit : SixteenBit,
+        IGeneration sv        => sv.Generation >= 7 ? SixDigit : SixteenBit,
+        _ => SixteenBit,
+    };
+
+    /// <summary> String format specifier for <see cref="SixDigit"/> TID. </summary>
+    public const string TID7 = "D6";
+    /// <summary> String format specifier for <see cref="SixDigit"/> SID. </summary>
+    public const string SID7 = "D4";
+    /// <summary> String format specifier for <see cref="SixteenBit"/> TID. </summary>
+    public const string TID16 = "D5";
+    /// <summary> String format specifier for <see cref="SixteenBit"/> SID. </summary>
+    public const string SID16 = "D5";
+
+    /// <summary>
+    /// Gets the string format specifier to use for the requested format TID.
+    /// </summary>
+    public static string GetTrainerIDFormatStringTID(this TrainerIDFormat format) => format switch
+    {
+        SixDigit => TID7,
+        _ => TID16,
+    };
+
+    /// <summary>
+    /// Gets the string format specifier to use for the requested format SID.
+    /// </summary>
+    public static string GetTrainerIDFormatStringSID(this TrainerIDFormat format) => format switch
+    {
+        SixDigit => SID7,
+        _ => SID16,
+    };
 }

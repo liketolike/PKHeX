@@ -37,7 +37,7 @@ public static class LocalizationUtil
         {
             var p = props[i];
             var value = p.GetValue(null);
-            result[i] = $"{p}{TranslationSplitter}{value}";
+            result[i] = $"{p.Name}{TranslationSplitter}{value}";
         }
         return result;
     }
@@ -78,23 +78,27 @@ public static class LocalizationUtil
         if (lines.Length == 0)
             return;
 
-        var translatable = new Dictionary<string, string>(lines.Length);
+        var dict = GetTranslationDict(lines);
+        var ti = t.GetTypeInfo();
+        foreach (var p in ti.DeclaredProperties)
+        {
+            if (dict.TryGetValue(p.Name, out var value))
+                p.SetValue(null, value);
+        }
+    }
+
+    private static Dictionary<string, string> GetTranslationDict(ReadOnlySpan<string> lines)
+    {
+        var result = new Dictionary<string, string>(lines.Length);
         foreach (var line in lines)
         {
             var index = line.IndexOf(TranslationFirst);
             if (index < 0)
                 continue;
             var prop = line[..index];
-            translatable[prop] = line[(index + TranslationSplitter.Length)..];
+            result[prop] = line[(index + TranslationSplitter.Length)..];
         }
-
-        var ti = t.GetTypeInfo();
-        var props = (PropertyInfo[])ti.DeclaredProperties;
-        foreach (var p in props)
-        {
-            if (translatable.TryGetValue(p.Name, out var value))
-                p.SetValue(null, value);
-        }
+        return result;
     }
 
     /// <summary>

@@ -22,11 +22,8 @@ public static class MoveBreed6
         if (count == -1)
             count = moves.Length;
 
-        var learn = GameData.GetLearnsets(version);
-        var table = GameData.GetPersonal(version);
-        var index = table.GetFormIndex(species, form);
-        var learnset = learn[index];
-        var egg = MoveEgg.GetEggMoves(generation, species, form, version);
+        var learn = GameData.GetLearnSource(version);
+        var learnset = learn.GetLearnset(species, form);
 
         var actual = MemoryMarshal.Cast<byte, EggSource6>(origins);
         Span<byte> possible = stackalloc byte[count];
@@ -41,6 +38,7 @@ public static class MoveBreed6
         }
         else
         {
+            var egg = learn.GetEggMoves(species, form);
             bool inherit = Breeding.GetCanInheritMoves(species);
             MarkMovesForOrigin(value, egg, count, inherit);
             valid = RecurseMovesForOrigin(value, count - 1);
@@ -154,7 +152,7 @@ public static class MoveBreed6
             if (baseEgg.IndexOf(move) != -1)
                 possible[i] |= 1 << (int)Base;
 
-            if (inheritLevelUp && learn.GetLevelLearnMove(move) != -1)
+            if (inheritLevelUp && learn.GetIsLearn(move))
                 possible[i] |= 1 << (int)ParentLevelUp;
 
             if (eggMoves.Contains(move))

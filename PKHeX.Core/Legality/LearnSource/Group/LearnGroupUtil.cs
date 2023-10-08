@@ -8,8 +8,16 @@ namespace PKHeX.Core;
 /// </summary>
 public static class LearnGroupUtil
 {
+    /// <summary>
+    /// Get the <see cref="ILearnGroup"/> for the given <see cref="PKM"/>.
+    /// </summary>
     public static ILearnGroup GetCurrentGroup(PKM pk) => GetCurrentGroup(pk.Context);
 
+    /// <summary>
+    /// Get the <see cref="ILearnGroup"/> for the given <see cref="EntityContext"/>.
+    /// </summary>
+    /// <param name="context">Context to get the <see cref="ILearnGroup"/> for.</param>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
     public static ILearnGroup GetCurrentGroup(EntityContext context) => context switch
     {
         Gen1 => LearnGroup1.Instance,
@@ -20,6 +28,7 @@ public static class LearnGroupUtil
         Gen6 => LearnGroup6.Instance,
         Gen7 => LearnGroup7.Instance,
         Gen8 => LearnGroup8.Instance,
+        Gen9 => LearnGroup9.Instance,
 
         Gen7b => LearnGroup7b.Instance,
         Gen8a => LearnGroup8a.Instance,

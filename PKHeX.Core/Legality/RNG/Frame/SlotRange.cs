@@ -72,11 +72,11 @@ public static class SlotRange
         };
     }
 
-    public static int GetLevel(EncounterSlot slot, LeadRequired lead, uint lvlrand)
+    public static int GetLevel<T>(T slot, LeadRequired lead, uint lvlrand) where T : ILevelRange
     {
         if ((lead & LeadRequired.PressureHustleSpiritFail) == LeadRequired.PressureHustleSpirit)
             return slot.LevelMax;
-        if (slot.IsFixedLevel)
+        if (slot.IsFixedLevel())
             return slot.LevelMin;
         int delta = slot.LevelMax - slot.LevelMin + 1;
         var adjust = (int)(lvlrand % delta);
@@ -135,15 +135,15 @@ public static class SlotRange
     /// <param name="slot">Slot Data</param>
     /// <param name="esv">Rand16 value for the call</param>
     /// <returns>Slot number from the slot data if the slot is selected on this frame, else an invalid slot value.</returns>
-    internal static int GetSlotStaticMagnet<T>(T slot, uint esv) where T : EncounterSlot, IMagnetStatic, INumberedSlot
+    internal static int GetSlotStaticMagnet<T>(T slot, uint esv) where T : IMagnetStatic, INumberedSlot
     {
-        if (slot.IsStaticSlot())
+        if (slot.IsStaticSlot)
         {
             var index = esv % slot.StaticCount;
             if (index == slot.StaticIndex)
                 return slot.SlotNumber;
         }
-        if (slot.IsMagnetSlot())
+        if (slot.IsMagnetSlot)
         {
             var index = esv % slot.MagnetPullCount;
             if (index == slot.MagnetPullIndex)

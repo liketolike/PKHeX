@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace PKHeX.Core;
 
@@ -27,6 +27,32 @@ public static class StringConverter
         6 => StringConverter6.GetString(data),
         7 => StringConverter7.GetString(data),
         8 => StringConverter8.GetString(data),
+        9 => StringConverter8.GetString(data),
+        _ => throw new ArgumentOutOfRangeException(nameof(generation)),
+    };
+
+    /// <summary>
+    /// Converts bytes to a string according to the input parameters.
+    /// </summary>
+    /// <param name="data">Encoded data</param>
+    /// <param name="result">Decoded character result buffer</param>
+    /// <param name="generation">Generation string format</param>
+    /// <param name="jp">Encoding is Japanese</param>
+    /// <param name="isBigEndian">Encoding is Big Endian</param>
+    /// <returns>Decoded string.</returns>
+    public static int LoadString(ReadOnlySpan<byte> data, Span<char> result, int generation, bool jp, bool isBigEndian = false) => generation switch
+    {
+        3 when isBigEndian => StringConverter3GC.LoadString(data, result),
+        4 when isBigEndian => StringConverter4GC.LoadString(data, result),
+
+        1 or 2 => StringConverter12.LoadString(data, result, jp),
+        3 => StringConverter3.LoadString(data, result, jp),
+        4 => StringConverter4.LoadString(data, result),
+        5 => StringConverter5.LoadString(data, result),
+        6 => StringConverter6.LoadString(data, result),
+        7 => StringConverter7.LoadString(data, result),
+        8 => StringConverter8.LoadString(data, result),
+        9 => StringConverter8.LoadString(data, result),
         _ => throw new ArgumentOutOfRangeException(nameof(generation)),
     };
 
@@ -55,6 +81,7 @@ public static class StringConverter
         6 => StringConverter6.SetString(destBuffer, value, maxLength, option),
         7 => StringConverter7.SetString(destBuffer, value, maxLength, language, option),
         8 => StringConverter8.SetString(destBuffer, value, maxLength, option),
+        9 => StringConverter8.SetString(destBuffer, value, maxLength, option),
         _ => throw new ArgumentOutOfRangeException(nameof(generation)),
     };
 
@@ -100,6 +127,11 @@ public static class StringConverter
         _ => chr,
     };
 
+    /// <summary>
+    /// Determines if a string contains full-width characters.
+    /// </summary>
+    /// <param name="str">The input string to check for full-width characters.</param>
+    /// <returns>True if the input string contains full-width characters; otherwise, false.</returns>
     internal static bool GetIsFullWidthString(ReadOnlySpan<char> str)
     {
         foreach (var c in str)
@@ -113,6 +145,11 @@ public static class StringConverter
         return false;
     }
 
+    /// <summary>
+    /// Determines if a string contains East Asian script characters.
+    /// </summary>
+    /// <param name="str">The input string to check for East Asian script characters.</param>
+    /// <returns>True if the input string contains East Asian script characters; otherwise, false.</returns>
     public static bool HasEastAsianScriptCharacters(ReadOnlySpan<char> str)
     {
         foreach (var c in str)

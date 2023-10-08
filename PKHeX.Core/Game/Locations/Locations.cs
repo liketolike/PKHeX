@@ -12,6 +12,8 @@ public static class Locations
     public const ushort Daycare4 = 2000;
     public const ushort Daycare5 = 60002;
     public const ushort Daycare8b = 60010;
+    public const ushort Picnic9 = 30023;
+    public const ushort TeraCavern9 = 30024;
 
     public const ushort LinkTrade2NPC = 126;
     public const ushort LinkTrade3NPC = 254;
@@ -59,6 +61,9 @@ public static class Locations
     /// <summary> Solaceon Town in <see cref="GameVersion.BDSP"/> </summary>
     public const ushort HatchLocation8b = 446;
 
+    /// <summary> South Province (Area One) in <see cref="GameVersion.SV"/> </summary>
+    public const ushort HatchLocation9 = 6;
+
     /// <summary> Generation 1 -> Generation 7 Transfer Location (Kanto) </summary>
     public const ushort Transfer1 = 30013;
 
@@ -98,45 +103,16 @@ public static class Locations
     /// <summary> Generation 8 Gift from Pokémon HOME </summary>
     public const ushort HOME8 = 30018;
 
-    public const ushort HOME_SHSP = 59998; // SP traded to (SW)SH
-    public const ushort HOME_SWBD = 59999; // BD traded to SW(SH)
-    public const ushort HOME_SWLA = 60000; // PLA traded to SW(SH)
-    public const ushort HOME_SWSHBDSPEgg = 65534; // -2 = 8bNone-1..
+    /// <summary> Generation 8 BD/SP Magic location for "None" since 0 is an actual met location. </summary>
     public const ushort Default8bNone = 65535;
 
-    public static int GetVersionSWSH(int ver) => (GameVersion)ver switch
-    {
-        GameVersion.PLA => (int)GameVersion.SW,
-        GameVersion.BD => (int)GameVersion.SW,
-        GameVersion.SP => (int)GameVersion.SH,
-        _ => ver,
-    };
-
-    public static ushort GetMetSWSH(ushort loc, int ver) => (GameVersion)ver switch
-    {
-        GameVersion.PLA => HOME_SWLA,
-        GameVersion.BD => HOME_SWBD,
-        GameVersion.SP => HOME_SHSP,
-        _ => loc,
-    };
-
-    public static bool IsValidMetBDSP(ushort loc, int ver) => loc switch
-    {
-        HOME_SHSP when ver == (int)GameVersion.SH => true,
-        HOME_SWBD when ver == (int)GameVersion.SW => true,
-        _ => false,
-    };
-
-    public static int TradedEggLocationNPC(int generation) => generation switch
-    {
-        1 => LinkTrade2NPC,
-        2 => LinkTrade2NPC,
-        3 => LinkTrade3NPC,
-        4 => LinkTrade4NPC,
-        5 => LinkTrade5NPC,
-        _ => LinkTrade6NPC,
-    };
-
+    /// <summary>
+    /// Gets the egg location value for a traded unhatched egg.
+    /// </summary>
+    /// <param name="generation">Generation of the egg</param>
+    /// <param name="ver">Game version of the egg</param>
+    /// <returns>Egg Location value</returns>
+    /// <remarks>Location will be set to the Met Location until it hatches, then moves to Egg Location.</remarks>
     public static int TradedEggLocation(int generation, GameVersion ver) => generation switch
     {
         4 => LinkTrade4,
@@ -169,6 +145,7 @@ public static class Locations
     public static bool IsEggLocationBred5(int loc) => loc is Daycare5 or LinkTrade5;
     public static bool IsEggLocationBred6(int loc) => loc is Daycare5 or LinkTrade6;
     public static bool IsEggLocationBred8b(int loc) => loc is Daycare8b or LinkTrade6NPC;
+    public static bool IsEggLocationBred9(int loc) => loc is Picnic9 or LinkTrade6;
 
     public static int GetDaycareLocation(int generation, GameVersion version) => generation switch
     {
@@ -176,6 +153,7 @@ public static class Locations
         4 => Daycare4,
         5 => Daycare5,
         8 when version is GameVersion.BD or GameVersion.SP => Daycare8b,
+        9 => Picnic9,
         _ => Daycare5,
     };
 
@@ -194,4 +172,5 @@ public static class Locations
     public static bool IsMetLocation8SWSH(ushort z) => z <= 246; // at the Crown Tundra Station
     public static bool IsMetLocation8BDSP(ushort z) => z <= 657; // Ramanas Park (Genome Room)
     public static bool IsMetLocation8LA(ushort z) => z <= 155; // Training Grounds
+    public static bool IsMetLocation9SV(ushort z) => z <= 131; // Uva Academy
 }

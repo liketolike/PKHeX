@@ -3,7 +3,7 @@ using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
 
-public sealed class Roamer3 : IContestStats, IContestStatsMutable
+public sealed class Roamer3 : IContestStats
 {
     private readonly int Offset;
     public bool IsGlitched { get; }
@@ -36,8 +36,8 @@ public sealed class Roamer3 : IContestStats, IContestStatsMutable
 
     public ushort Species
     {
-        get => SpeciesConverter.GetG4Species(ReadUInt16LittleEndian(Data.AsSpan(Offset + 8)));
-        set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 8), SpeciesConverter.GetG3Species(value));
+        get => SpeciesConverter.GetNational3(ReadUInt16LittleEndian(Data.AsSpan(Offset + 8)));
+        set => WriteUInt16LittleEndian(Data.AsSpan(Offset + 8), SpeciesConverter.GetInternal3(value));
     }
 
     public int HP_Current
@@ -63,12 +63,12 @@ public sealed class Roamer3 : IContestStats, IContestStatsMutable
     public bool Active    { get => Data[Offset + 0x13] == 1; set => Data[Offset + 0x13] = value ? (byte)1 : (byte)0; }
 
     // Derived Properties
-    private int IV_HP { get => (int)(IV32 >> 00) & 0x1F; set => IV32 = (uint)((IV32 & ~(0x1F << 00)) | (uint)((value > 31 ? 31 : value) << 00)); }
-    private int IV_ATK { get => (int)(IV32 >> 05) & 0x1F; set => IV32 = (uint)((IV32 & ~(0x1F << 05)) | (uint)((value > 31 ? 31 : value) << 05)); }
-    private int IV_DEF { get => (int)(IV32 >> 10) & 0x1F; set => IV32 = (uint)((IV32 & ~(0x1F << 10)) | (uint)((value > 31 ? 31 : value) << 10)); }
-    private int IV_SPE { get => (int)(IV32 >> 15) & 0x1F; set => IV32 = (uint)((IV32 & ~(0x1F << 15)) | (uint)((value > 31 ? 31 : value) << 15)); }
-    private int IV_SPA { get => (int)(IV32 >> 20) & 0x1F; set => IV32 = (uint)((IV32 & ~(0x1F << 20)) | (uint)((value > 31 ? 31 : value) << 20)); }
-    private int IV_SPD { get => (int)(IV32 >> 25) & 0x1F; set => IV32 = (uint)((IV32 & ~(0x1F << 25)) | (uint)((value > 31 ? 31 : value) << 25)); }
+    private int IV_HP  { get => (int)(IV32 >> 00) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 00)) | (uint)((value > 31 ? 31 : value) << 00); }
+    private int IV_ATK { get => (int)(IV32 >> 05) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 05)) | (uint)((value > 31 ? 31 : value) << 05); }
+    private int IV_DEF { get => (int)(IV32 >> 10) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 10)) | (uint)((value > 31 ? 31 : value) << 10); }
+    private int IV_SPE { get => (int)(IV32 >> 15) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 15)) | (uint)((value > 31 ? 31 : value) << 15); }
+    private int IV_SPA { get => (int)(IV32 >> 20) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 20)) | (uint)((value > 31 ? 31 : value) << 20); }
+    private int IV_SPD { get => (int)(IV32 >> 25) & 0x1F; set => IV32 = (IV32 & ~(0x1Fu << 25)) | (uint)((value > 31 ? 31 : value) << 25); }
 
     /// <summary>
     /// Roamer's IVs.
@@ -98,7 +98,8 @@ public sealed class Roamer3 : IContestStats, IContestStatsMutable
     /// <returns>Indication if the PID is shiny for the trainer.</returns>
     public bool IsShiny(uint pid)
     {
-        var xor = (ushort)(SAV.SID ^ SAV.TID ^ (pid >> 16) ^ pid);
+        var tmp = SAV.ID32 ^ pid;
+        var xor = (tmp >> 16) ^ (tmp & 0xFFFF);
         return xor < 8;
     }
 

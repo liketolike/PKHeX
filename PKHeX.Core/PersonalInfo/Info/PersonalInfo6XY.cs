@@ -6,26 +6,13 @@ namespace PKHeX.Core;
 /// <summary>
 /// <see cref="PersonalInfo"/> class with values from the X &amp; Y games.
 /// </summary>
-public sealed class PersonalInfo6XY : PersonalInfo, IPersonalAbility12H
+public sealed class PersonalInfo6XY : PersonalInfo, IPersonalAbility12H, IPersonalInfoTM, IPersonalInfoTutorType
 {
     public const int SIZE = 0x40;
     private readonly byte[] Data;
 
-    public PersonalInfo6XY(byte[] data)
-    {
-        Data = data;
-        // Unpack TMHM & Tutors
-        TMHM = GetBits(Data.AsSpan(0x28, 0x10));
-        TypeTutors = GetBits(Data.AsSpan(0x38, 0x4));
-        // 0x3C-0x40 unknown
-    }
-
-    public override byte[] Write()
-    {
-        SetBits(TMHM, Data.AsSpan(0x28));
-        SetBits(TypeTutors, Data.AsSpan(0x38));
-        return Data;
-    }
+    public PersonalInfo6XY(byte[] data) => Data = data;
+    public override byte[] Write() => Data;
 
     public override int HP { get => Data[0x00]; set => Data[0x00] = (byte)value; }
     public override int ATK { get => Data[0x01]; set => Data[0x01] = (byte)value; }
@@ -33,8 +20,8 @@ public sealed class PersonalInfo6XY : PersonalInfo, IPersonalAbility12H
     public override int SPE { get => Data[0x03]; set => Data[0x03] = (byte)value; }
     public override int SPA { get => Data[0x04]; set => Data[0x04] = (byte)value; }
     public override int SPD { get => Data[0x05]; set => Data[0x05] = (byte)value; }
-    public override int Type1 { get => Data[0x06]; set => Data[0x06] = (byte)value; }
-    public override int Type2 { get => Data[0x07]; set => Data[0x07] = (byte)value; }
+    public override byte Type1 { get => Data[0x06]; set => Data[0x06] = value; }
+    public override byte Type2 { get => Data[0x07]; set => Data[0x07] = value; }
     public override int CatchRate { get => Data[0x08]; set => Data[0x08] = (byte)value; }
     public override int EvoStage { get => Data[0x09]; set => Data[0x09] = (byte)value; }
     private int EVYield { get => ReadUInt16LittleEndian(Data.AsSpan(0x0A)); set => WriteUInt16LittleEndian(Data.AsSpan(0x0A), (ushort)value); }
@@ -48,10 +35,10 @@ public sealed class PersonalInfo6XY : PersonalInfo, IPersonalAbility12H
     public int Item1 { get => ReadInt16LittleEndian(Data.AsSpan(0x0C)); set => WriteInt16LittleEndian(Data.AsSpan(0x0C), (short)value); }
     public int Item2 { get => ReadInt16LittleEndian(Data.AsSpan(0x0E)); set => WriteInt16LittleEndian(Data.AsSpan(0x0E), (short)value); }
     public int Item3 { get => ReadInt16LittleEndian(Data.AsSpan(0x10)); set => WriteInt16LittleEndian(Data.AsSpan(0x10), (short)value); }
-    public override int Gender { get => Data[0x12]; set => Data[0x12] = (byte)value; }
+    public override byte Gender { get => Data[0x12]; set => Data[0x12] = value; }
     public override int HatchCycles { get => Data[0x13]; set => Data[0x13] = (byte)value; }
     public override int BaseFriendship { get => Data[0x14]; set => Data[0x14] = (byte)value; }
-    public override int EXPGrowth { get => Data[0x15]; set => Data[0x15] = (byte)value; }
+    public override byte EXPGrowth { get => Data[0x15]; set => Data[0x15] = value; }
     public override int EggGroup1 { get => Data[0x16]; set => Data[0x16] = (byte)value; }
     public override int EggGroup2 { get => Data[0x17]; set => Data[0x17] = (byte)value; }
     public int Ability1 { get => Data[0x18]; set => Data[0x18] = (byte)value; }
@@ -79,4 +66,66 @@ public sealed class PersonalInfo6XY : PersonalInfo, IPersonalAbility12H
         2 => AbilityH,
         _ => throw new ArgumentOutOfRangeException(nameof(abilityIndex), abilityIndex, null),
     };
+
+    private const int TMHM = 0x28;
+    private const int CountTM = 100;
+    private const int CountHM = 5;
+    private const int CountTMHM = CountTM + CountHM;
+    private const int ByteCountTM = (CountTMHM + 7) / 8;
+    private const int TypeTutor = 0x38;
+    private const int TypeTutorCount = 7;
+
+    public bool GetIsLearnTM(int index)
+    {
+        if ((uint)index >= CountTMHM)
+            return false;
+        return (Data[TMHM + (index >> 3)] & (1 << (index & 7))) != 0;
+    }
+
+    public void SetIsLearnTM(int index, bool value)
+    {
+        if ((uint)index >= CountTMHM)
+            return;
+        if (value)
+            Data[TMHM + (index >> 3)] |= (byte)(1 << (index & 7));
+        else
+            Data[TMHM + (index >> 3)] &= (byte)~(1 << (index & 7));
+    }
+
+    public void SetAllLearnTM(Span<bool> result, ReadOnlySpan<ushort> moves)
+    {
+        var span = Data.AsSpan(TMHM, ByteCountTM);
+        for (int index = CountTMHM - 1; index >= 0; index--)
+        {
+            if ((span[index >> 3] & (1 << (index & 7))) != 0)
+                result[moves[index]] = true;
+        }
+    }
+
+    public bool GetIsLearnTutorType(int index)
+    {
+        if ((uint)index >= 8)
+            return false;
+        return (Data[TypeTutor + (index >> 3)] & (1 << (index & 7))) != 0;
+    }
+
+    public void SetIsLearnTutorType(int index, bool value)
+    {
+        if ((uint)index >= TypeTutorCount)
+            throw new ArgumentOutOfRangeException(nameof(index), index, null);
+        if (value)
+            Data[TypeTutor + (index >> 3)] |= (byte)(1 << (index & 7));
+        else
+            Data[TypeTutor + (index >> 3)] &= (byte)~(1 << (index & 7));
+    }
+
+    public void SetAllLearnTutorType(Span<bool> result, ReadOnlySpan<ushort> moves)
+    {
+        var tutor = Data[TypeTutor];
+        for (int index = TypeTutorCount - 1; index >= 0; index--)
+        {
+            if ((tutor & (1 << (index & 7))) != 0)
+                result[moves[index]] = true;
+        }
+    }
 }

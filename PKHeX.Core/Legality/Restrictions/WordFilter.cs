@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
 namespace PKHeX.Core;
@@ -12,25 +14,20 @@ public static class WordFilter
     /// Regex patterns to check against
     /// </summary>
     /// <remarks>No need to keep the original pattern strings around; the <see cref="Regex"/> object retrieves this via <see cref="Regex.ToString()"/></remarks>
-    private static readonly Regex[] Regexes = LoadPatterns(Util.GetStringList("badwords"));
+    private static readonly Regex[] Regexes = LoadPatterns(Util.GetStringResource("badwords")!);
 
     // if you're running this as a server and don't mind a few extra seconds of startup, add RegexOptions.Compiled for slightly better checking.
     private const RegexOptions Options = RegexOptions.CultureInvariant;
 
-    private static Regex[] LoadPatterns(IReadOnlyList<string> patterns)
+    private static Regex[] LoadPatterns(ReadOnlySpan<char> patterns)
     {
-        var result = new Regex[patterns.Count];
-        for (int i = 0; i < patterns.Count; i++)
-            result[i] = new Regex(patterns[i], Options);
+        var lineCount = 1 + patterns.Count('\n');
+        var result = new Regex[lineCount];
+        int i = 0;
+        foreach (var line in patterns.EnumerateLines())
+            result[i++] = new Regex(line.ToString(), Options);
         return result;
     }
-
-    /// <summary>
-    /// Due to some messages repeating (Trainer names), keep a list of repeated values for faster lookup.
-    /// </summary>
-    private static readonly Dictionary<string, string> Lookup = new(INIT_COUNT);
-
-    private const string NoMatch = "";
 
     /// <summary>
     /// Checks to see if a phrase contains filtered content.
@@ -38,32 +35,56 @@ public static class WordFilter
     /// <param name="message">Phrase to check for</param>
     /// <param name="regMatch">Matching regex that filters the phrase.</param>
     /// <returns>Boolean result if the message is filtered or not.</returns>
-    public static bool IsFiltered(string message, out string regMatch)
+    public static bool TryMatch(ReadOnlySpan<char> message, [NotNullWhen(true)] out string? regMatch)
+    {
+        foreach (var regex in Regexes)
+        {
+            foreach (var _ in regex.EnumerateMatches(message))
+            {
+                regMatch = regex.ToString();
+                return true;
+            }
+        }
+        regMatch = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Due to some messages repeating (Trainer names), keep a list of repeated values for faster lookup.
+    /// </summary>
+    private static readonly Dictionary<string, string?> Lookup = new(INIT_COUNT);
+
+    /// <summary>
+    /// Checks to see if a phrase contains filtered content.
+    /// </summary>
+    /// <param name="message">Phrase to check for</param>
+    /// <param name="regMatch">Matching regex that filters the phrase.</param>
+    /// <returns>Boolean result if the message is filtered or not.</returns>
+    public static bool IsFiltered(string message, [NotNullWhen(true)] out string? regMatch)
     {
         if (string.IsNullOrWhiteSpace(message) || message.Length <= 1)
         {
-            regMatch = NoMatch;
+            regMatch = null;
             return false;
         }
 
-        var msg = message.ToLowerInvariant();
         // Check dictionary
         lock (dictLock)
         {
-            if (Lookup.TryGetValue(msg, out regMatch))
-                return !ReferenceEquals(regMatch, NoMatch);
+            if (Lookup.TryGetValue(message, out regMatch))
+                return regMatch != null;
         }
 
-        // not in dictionary, check patterns
-        foreach (var regex in Regexes)
-        {
-            if (!regex.IsMatch(msg))
-                continue;
+        // Make the string lowercase invariant
+        Span<char> lowercase = stackalloc char[message.Length];
+        for (int i = 0; i < lowercase.Length; i++)
+            lowercase[i] = char.ToLowerInvariant(message[i]);
 
-            // match found, cache result
-            regMatch = regex.ToString(); // fetches from regex field
+        // not in dictionary, check patterns
+        if (TryMatch(lowercase, out regMatch))
+        {
             lock (dictLock)
-                Lookup[msg] = regMatch;
+                Lookup[message] = regMatch;
             return true;
         }
 
@@ -72,7 +93,7 @@ public static class WordFilter
         {
             if ((Lookup.Count & ~MAX_COUNT) != 0)
                 Lookup.Clear(); // reset
-            Lookup[msg] = regMatch = NoMatch;
+            Lookup[message] = regMatch = null;
         }
         return false;
     }

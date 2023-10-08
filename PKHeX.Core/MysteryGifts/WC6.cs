@@ -6,12 +6,13 @@ namespace PKHeX.Core;
 /// <summary>
 /// Generation 6 Mystery Gift Template File
 /// </summary>
-public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, ILangNick, IContestStats, IContestStatsMutable, INature, IMemoryOT
+public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, ILangNick, IContestStats, INature, IMemoryOT, IRestrictVersion
 {
     public const int Size = 0x108;
     public const uint EonTicketConst = 0x225D73C2;
     public override int Generation => 6;
     public override EntityContext Context => EntityContext.Gen6;
+    public override bool FatefulEncounter => !IsLinkGift; // Link gifts do not set fateful encounter;
 
     public WC6() : this(new byte[Size]) { }
     public WC6(byte[] data) : base(data) { }
@@ -41,7 +42,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
     {
         // Max len 36 char, followed by null terminator
         get => StringConverter6.GetString(Data.AsSpan(2, 0x4A));
-        set => StringConverter6.SetString(Data.AsSpan(2, 0x4A), value.AsSpan(), 36, StringConverterOption.ClearZero);
+        set => StringConverter6.SetString(Data.AsSpan(2, 0x4A), value, 36, StringConverterOption.ClearZero);
     }
 
     internal uint RawDate
@@ -73,7 +74,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
     /// <summary>
     /// Gets or sets the date of the card.
     /// </summary>
-    public DateTime? Date
+    public DateOnly? Date
     {
         get
         {
@@ -81,7 +82,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
             if (!DateUtil.IsDateValid(Year, Month, Day))
                 return null;
 
-            return new DateTime((int)Year, (int)Month, (int)Day);
+            return new DateOnly((int)Year, (int)Month, (int)Day);
         }
         set
         {
@@ -138,20 +139,19 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         _ => throw new ArgumentOutOfRangeException(),
     };
 
-    private int GetShinyXor()
+    private uint GetShinyXor()
     {
         // Player owned anti-shiny fixed PID
-        if (TID == 0 && SID == 0)
-            return int.MaxValue;
+        if (ID32 == 0)
+            return uint.MaxValue;
 
-        var pid = PID;
-        var psv = (int)((pid >> 16) ^ (pid & 0xFFFF));
-        var tsv = TID ^ SID;
-        return psv ^ tsv;
+        var xor = PID ^ ID32;
+        return (xor >> 16) ^ (xor & 0xFFFF);
     }
 
-    public override int TID { get => ReadUInt16LittleEndian(Data.AsSpan(0x68)); set => WriteUInt16LittleEndian(Data.AsSpan(0x68), (ushort)value); }
-    public override int SID { get => ReadUInt16LittleEndian(Data.AsSpan(0x6A)); set => WriteUInt16LittleEndian(Data.AsSpan(0x6A), (ushort)value); }
+    public override uint ID32 { get => ReadUInt32LittleEndian(Data.AsSpan(0x68)); set => WriteUInt32LittleEndian(Data.AsSpan(0x68), value); }
+    public override ushort TID16 { get => ReadUInt16LittleEndian(Data.AsSpan(0x68)); set => WriteUInt16LittleEndian(Data.AsSpan(0x68), value); }
+    public override ushort SID16 { get => ReadUInt16LittleEndian(Data.AsSpan(0x6A)); set => WriteUInt16LittleEndian(Data.AsSpan(0x6A), value); }
     public int OriginGame { get => Data[0x6C]; set => Data[0x6C] = (byte)value; }
     public uint EncryptionConstant { get => ReadUInt32LittleEndian(Data.AsSpan(0x70)); set => WriteUInt32LittleEndian(Data.AsSpan(0x70), value); }
     public override int Ball { get => Data[0x76]; set => Data[0x76] = (byte)value; }
@@ -169,7 +169,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
     public string Nickname
     {
         get => StringConverter6.GetString(Data.AsSpan(0x86, 0x1A));
-        set => StringConverter6.SetString(Data.AsSpan(0x86, 0x1A), value.AsSpan(), 12, StringConverterOption.ClearZero);
+        set => StringConverter6.SetString(Data.AsSpan(0x86, 0x1A), value, 12, StringConverterOption.ClearZero);
     }
 
     public int Nature { get => (sbyte)Data[0xA0]; set => Data[0xA0] = (byte)value; }
@@ -198,7 +198,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
     public override string OT_Name
     {
         get => StringConverter6.GetString(Data.AsSpan(0xB6, 0x1A));
-        set => StringConverter6.SetString(Data.AsSpan(0xB6, 0x1A), value.AsSpan(), 12, StringConverterOption.ClearZero);
+        set => StringConverter6.SetString(Data.AsSpan(0xB6, 0x1A), value, 12, StringConverterOption.ClearZero);
     }
 
     public override byte Level { get => Data[0xD0]; set => Data[0xD0] = value; }
@@ -293,21 +293,21 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
 
     public bool IsLinkGift => MetLocation == Locations.LinkGift6;
 
-    public override PKM ConvertToPKM(ITrainerInfo tr, EncounterCriteria criteria)
+    public override PK6 ConvertToPKM(ITrainerInfo tr, EncounterCriteria criteria)
     {
         if (!IsEntity)
             throw new ArgumentException(nameof(IsEntity));
 
         var rnd = Util.Rand;
 
-        int currentLevel = Level > 0 ? Level : rnd.Next(1, 101);
+        int currentLevel = Level > 0 ? Level : (1 + rnd.Next(100));
         var pi = PersonalTable.AO.GetFormEntry(Species, Form);
         PK6 pk = new()
         {
             Species = Species,
             HeldItem = HeldItem,
-            TID = TID,
-            SID = SID,
+            TID16 = TID16,
+            SID16 = SID16,
             Met_Level = currentLevel,
             Form = Form,
             EncryptionConstant = EncryptionConstant != 0 ? EncryptionConstant : Util.Rand32(),
@@ -358,7 +358,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
             OT_Memory = OT_Memory,
             OT_TextVar = OT_TextVar,
             OT_Feeling = OT_Feeling,
-            FatefulEncounter = !IsLinkGift, // Link gifts do not set fateful encounter
+            FatefulEncounter = FatefulEncounter,
 
             EV_HP = EV_HP,
             EV_ATK = EV_ATK,
@@ -376,12 +376,12 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         }
         else
         {
-            pk.SetDefaultRegionOrigins();
+            pk.SetDefaultRegionOrigins(pk.Language);
         }
 
         pk.SetMaximumPPCurrent();
 
-        pk.MetDate = Date ?? DateTime.Now;
+        pk.MetDate = Date ?? EncounterDate.GetDate3DS();
 
         if ((tr.Generation > Generation && OriginGame == 0) || !CanBeReceivedByVersion(pk.Version))
         {
@@ -422,7 +422,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         return pk;
     }
 
-    private void SetEggMetData(PKM pk)
+    private void SetEggMetData(PK6 pk)
     {
         pk.IsEgg = true;
         pk.EggMetDate = Date;
@@ -430,9 +430,9 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         pk.IsNicknamed = true;
     }
 
-    private void SetPINGA(PKM pk, EncounterCriteria criteria)
+    private void SetPINGA(PK6 pk, EncounterCriteria criteria)
     {
-        var pi = PersonalTable.AO.GetFormEntry(Species, Form);
+        var pi = pk.PersonalInfo;
         pk.Nature = (int)criteria.GetNature((Nature)Nature);
         pk.Gender = criteria.GetGender(Gender, pi);
         var av = GetAbilityIndex(criteria);
@@ -457,7 +457,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         _ => AbilityPermission.Any12H,
     };
 
-    private void SetPID(PKM pk)
+    private void SetPID(PK6 pk)
     {
         switch (PIDType)
         {
@@ -468,8 +468,8 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
                 pk.PID = Util.Rand32();
                 break;
             case ShinyType6.Always: // Random Shiny
-                pk.PID = Util.Rand32();
-                pk.PID = (uint)(((pk.TID ^ pk.SID ^ (pk.PID & 0xFFFF)) << 16) | (pk.PID & 0xFFFF));
+                var low = Util.Rand32() & 0xFFFF;
+                pk.PID = (low ^ pk.TID16 ^ pk.SID16) << 16 | low;
                 break;
             case ShinyType6.Never: // Random Nonshiny
                 pk.PID = Util.Rand32();
@@ -490,7 +490,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         value[5] = IV_SPD;
     }
 
-    private void SetIVs(PKM pk)
+    private void SetIVs(PK6 pk)
     {
         Span<int> finalIVs = stackalloc int[6];
         GetIVs(finalIVs);
@@ -527,8 +527,8 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
                 // Skip ID check if ORASDEMO Simulated wc6
                 if (CardID != 0)
                 {
-                    if (SID != pk.SID) return false;
-                    if (TID != pk.TID) return false;
+                    if (SID16 != pk.SID16) return false;
+                    if (TID16 != pk.TID16) return false;
                 }
                 if (OTGender != pk.OT_Gender) return false;
             }
@@ -539,7 +539,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
             if (EncryptionConstant != 0 && EncryptionConstant != pk.EncryptionConstant) return false;
             if (Language != 0 && Language != pk.Language) return false;
         }
-        if (Form != evo.Form && !FormInfo.IsFormChangeable(Species, Form, pk.Form, pk.Format))
+        if (Form != evo.Form && !FormInfo.IsFormChangeable(Species, Form, pk.Form, Context, pk.Context))
             return false;
 
         if (IsEgg)
@@ -554,7 +554,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
                 return false; // can't be traded away for unshiny
             }
 
-            if (pk.IsEgg && !pk.IsNative)
+            if (pk is { IsEgg: true, IsNative: false })
                 return false;
         }
         else
@@ -569,7 +569,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         if (Nature != -1 && pk.Nature != Nature) return false;
         if (Gender != 3 && Gender != pk.Gender) return false;
 
-        if (pk is IContestStats s && s.IsContestBelow(this))
+        if (pk is IContestStatsReadOnly s && s.IsContestBelow(this))
             return false;
 
         return true;
@@ -586,12 +586,32 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         return Species != pk.Species;
     }
 
+    public override GameVersion Version
+    {
+        get => RestrictVersion switch
+        {
+            1 => GameVersion.X,
+            2 => GameVersion.Y,
+            3 => GameVersion.XY,
+            4 => GameVersion.AS,
+            8 => GameVersion.OR,
+            12 => GameVersion.ORAS,
+            _ => GameVersion.Gen6,
+        };
+        set { }
+    }
+
     protected override bool IsMatchPartial(PKM pk)
     {
         if (RestrictLanguage != 0 && RestrictLanguage != pk.Language)
             return true;
         if (!CanBeReceivedByVersion(pk.Version))
-            return true;
+        {
+            if (!IsEgg || pk.IsEgg)
+                return true;
+            if (pk.Egg_Location != Locations.LinkTrade6)
+                return true;
+        }
         return false;
     }
 }

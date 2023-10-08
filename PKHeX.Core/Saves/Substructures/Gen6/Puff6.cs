@@ -1,17 +1,17 @@
-﻿using System;
+using System;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
 
 public sealed class Puff6 : SaveBlock<SAV6>
 {
-    private const int MaxPuffID = 26; // Supreme Winter Poké Puff
+    private const byte MaxPuffID = 26; // Supreme Winter Poké Puff
     private const int PuffSlots = 100;
 
     public Puff6(SAV6 SAV, int offset) : base(SAV) => Offset = offset;
 
-    public byte[] GetPuffs() => SAV.GetData(Offset, PuffSlots);
-    public void SetPuffs(byte[] value) => SAV.SetData(value, Offset);
+    public Span<byte> GetPuffs() => SAV.Data.AsSpan(Offset, PuffSlots);
+    public void SetPuffs(ReadOnlySpan<byte> value) => SAV.SetData(value, Offset);
 
     public int PuffCount
     {
@@ -21,37 +21,41 @@ public sealed class Puff6 : SaveBlock<SAV6>
 
     public void Reset()
     {
-        Array.Clear(Data, Offset, PuffSlots);
+        var puffs = GetPuffs();
+        puffs.Clear();
         // Set the first few default Puffs
-        Data[Offset + 0] = 1;
-        Data[Offset + 1] = 2;
-        Data[Offset + 2] = 3;
-        Data[Offset + 3] = 4;
-        Data[Offset + 4] = 5;
+        puffs[0] = 1;
+        puffs[1] = 2;
+        puffs[2] = 3;
+        puffs[3] = 4;
+        puffs[4] = 5;
         PuffCount = 5;
     }
 
     public void MaxCheat(bool special = false)
     {
         var rnd = Util.Rand;
+        var puffs = GetPuffs();
         if (special)
         {
-            for (int i = 0; i < PuffSlots; i++)
-                Data[Offset + i] = (byte)(21 + rnd.Next(2)); // Supreme Wish or Honor
+            foreach (ref var puff in puffs)
+                puff = (byte)(21 + rnd.Next(2)); // Supreme Wish or Honor
         }
         else
         {
-            for (int i = 0; i < PuffSlots; i++)
-                Data[Offset + i] = (byte)((i % MaxPuffID) + 1);
-            Util.Shuffle(Data.AsSpan(), Offset, Offset + PuffSlots, rnd);
+            int i = 0;
+            foreach (ref var puff in puffs)
+                puff = (byte)((i++ % MaxPuffID) + 1);
+            rnd.Shuffle(puffs);
         }
         PuffCount = PuffSlots;
     }
 
     public void Sort(bool reverse = false)
     {
-        Array.Sort(Data, Offset, PuffCount);
+        var puffs = GetPuffs();
+        puffs.Sort();
         if (reverse)
-            Array.Reverse(Data, Offset, PuffCount);
+            puffs.Reverse();
     }
 }

@@ -1,171 +1,135 @@
-﻿using System.Collections.Generic;
-
-using static PKHeX.Core.MysteryGiftGenerator;
-using static PKHeX.Core.EncounterTradeGenerator;
-using static PKHeX.Core.EncounterSlotGenerator;
-using static PKHeX.Core.EncounterStaticGenerator;
-using static PKHeX.Core.EncounterEggGenerator;
-using static PKHeX.Core.EncounterMatchRating;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PKHeX.Core;
 
-internal static class EncounterGenerator7
+public sealed class EncounterGenerator7 : IEncounterGenerator
 {
-    public static IEnumerable<IEncounterable> GetEncounters(PKM pk)
+    public static readonly EncounterGenerator7 Instance = new();
+
+    public IEnumerable<IEncounterable> GetPossible(PKM _, EvoCriteria[] chain, GameVersion game, EncounterTypeGroup groups)
     {
-        var chain = EncounterOrigin.GetOriginChain(pk);
-        return pk.Version switch
-        {
-            (int)GameVersion.GO => GetEncountersGO(pk, chain),
-            > (int)GameVersion.GO => GetEncountersGG(pk, chain),
-            _ => GetEncountersMainline(pk, chain),
-        };
+        var iterator = new EncounterPossible7(chain, groups, game);
+        foreach (var enc in iterator)
+            yield return enc;
     }
 
-    internal static IEnumerable<IEncounterable> GetEncountersGO(PKM pk, EvoCriteria[] chain)
+    public IEnumerable<IEncounterable> GetEncounters(PKM pk, EvoCriteria[] chain, LegalInfo info)
     {
-        IEncounterable? deferred = null;
-        IEncounterable? partial = null;
-
-        int ctr = 0;
-        foreach (var z in GetValidWildEncounters(pk, chain, GameVersion.GO))
-        {
-            var match = z.GetMatchRating(pk);
-            switch (match)
-            {
-                case Match: yield return z; ++ctr; break;
-                case Deferred: deferred ??= z; break;
-                case PartialMatch: partial ??= z; break;
-            }
-        }
-        if (ctr != 0) yield break;
-
-        if (deferred != null)
-            yield return deferred;
-
-        if (partial != null)
-            yield return partial;
+        var iterator = new EncounterEnumerator7(pk, chain, (GameVersion)pk.Version);
+        foreach (var enc in iterator)
+            yield return enc.Encounter;
     }
 
-    private static IEnumerable<IEncounterable> GetEncountersGG(PKM pk, EvoCriteria[] chain)
+    internal static EncounterTransfer7 GetVCStaticTransferEncounter(PKM pk, ushort encSpecies, ReadOnlySpan<EvoCriteria> chain)
     {
-        int ctr = 0;
-        var game = (GameVersion)pk.Version;
-
-        if (pk.FatefulEncounter)
+        // Obtain the lowest evolution species with matching OT friendship. Not all species chains have the same base friendship.
+        var met = (byte)pk.Met_Level;
+        if (pk.VC1)
         {
-            foreach (var z in GetValidGifts(pk, chain, game))
-            { yield return z; ++ctr; }
-            if (ctr != 0) yield break;
+            // Only yield a VC1 template if it could originate in VC1.
+            // Catch anything that can only exist in VC2 (Entei) even if it was "transferred" from VC1.
+            var species = GetVCSpecies(chain, pk, Legal.MaxSpeciesID_1);
+            var vc1Species = species > Legal.MaxSpeciesID_1 ? encSpecies : species;
+            if (vc1Species <= Legal.MaxSpeciesID_1)
+                return EncounterTransfer7.GetVC1(vc1Species, met);
         }
-
-        IEncounterable? deferred = null;
-        IEncounterable? partial = null;
-
-        foreach (var z in GetValidStaticEncounter(pk, chain, game))
+        // fall through else
         {
-            var match = z.GetMatchRating(pk);
-            switch (match)
-            {
-                case Match: yield return z; ++ctr; break;
-                case Deferred: deferred ??= z; break;
-                case PartialMatch: partial ??= z; break;
-            }
+            var species = GetVCSpecies(chain, pk, Legal.MaxSpeciesID_2);
+            return EncounterTransfer7.GetVC2(species > Legal.MaxSpeciesID_2 ? encSpecies : species, met);
         }
-        if (ctr != 0) yield break;
-
-        foreach (var z in GetValidWildEncounters(pk, chain, game))
-        {
-            var match = z.GetMatchRating(pk);
-            switch (match)
-            {
-                case Match: yield return z; ++ctr; break;
-                case Deferred: deferred ??= z; break;
-                case PartialMatch: partial ??= z; break;
-            }
-        }
-        if (ctr != 0) yield break;
-
-        foreach (var z in GetValidEncounterTrades(pk, chain, game))
-        {
-            var match = z.GetMatchRating(pk);
-            switch (match)
-            {
-                case Match: yield return z; /*++ctr*/ break;
-                case Deferred: deferred ??= z; break;
-                case PartialMatch: partial ??= z; break;
-            }
-        }
-
-        if (deferred != null)
-            yield return deferred;
-
-        if (partial != null)
-            yield return partial;
     }
 
-    private static IEnumerable<IEncounterable> GetEncountersMainline(PKM pk, EvoCriteria[] chain)
+    /// <summary>
+    /// Get the most devolved species that matches the <see cref="pk"/> <see cref="PKM.OT_Friendship"/>.
+    /// </summary>
+    private static ushort GetVCSpecies(ReadOnlySpan<EvoCriteria> chain, PKM pk, ushort maxSpecies)
     {
-        int ctr = 0;
-        var game = (GameVersion)pk.Version;
-
-        if (pk.FatefulEncounter)
+        for (var i = chain.Length - 1; i >= 0; i--)
         {
-            foreach (var z in GetValidGifts(pk, chain, game))
-            { yield return z; ++ctr; }
-            if (ctr != 0) yield break;
+            var evo = chain[i];
+            if (evo.Species > maxSpecies)
+                continue;
+            if (evo.Form != 0)
+                continue;
+            if (PersonalTable.SM.GetFormEntry(evo.Species, evo.Form).BaseFriendship != pk.OT_Friendship)
+                continue;
+            return evo.Species;
         }
+        return pk.Species;
+    }
 
-        if (Locations.IsEggLocationBred6(pk.Egg_Location))
+    private const int Generation = 7;
+    private const EntityContext Context = EntityContext.Gen7;
+    private const byte EggLevel = EggStateLegality.EggMetLevel;
+
+    public static bool TryGetEgg(ReadOnlySpan<EvoCriteria> chain, GameVersion version, [NotNullWhen(true)] out EncounterEgg? result)
+    {
+        result = null;
+        var devolved = chain[^1];
+        if (!devolved.InsideLevelRange(EggLevel))
+            return false;
+
+        // Ensure most devolved species is the same as the egg species.
+        var (species, form) = GetBaby(devolved);
+        if (species != devolved.Species && !Breeding.IsSplitBreedNotBabySpecies4(devolved.Species))
+            return false; // not a split-breed.
+
+        // Sanity Check 1
+        if (!Breeding.CanHatchAsEgg(species))
+            return false;
+        // Sanity Check 2
+        if (!Breeding.CanHatchAsEgg(species, form, Context))
+            return false;
+        // Sanity Check 3
+        if (!PersonalTable.USUM.IsPresentInGame(species, form))
+            return false;
+
+        result = CreateEggEncounter(species, form, version);
+        return true;
+    }
+
+    public static EncounterEgg MutateEggTrade(EncounterEgg egg) => egg with { Version = GetOtherGamePair(egg.Version) };
+
+    public static bool TryGetSplit(EncounterEgg other, ReadOnlySpan<EvoCriteria> chain, [NotNullWhen(true)] out EncounterEgg? result)
+    {
+        result = null;
+        // Check for split-breed
+        var devolved = chain[^1];
+        if (other.Species == devolved.Species)
         {
-            foreach (var z in GenerateEggs(pk, 7))
-            { yield return z; ++ctr; }
-            if (ctr == 0) yield break;
+            if (chain.Length < 2)
+                return false; // no split-breed
+            devolved = chain[^2];
         }
+        if (!Breeding.IsSplitBreedNotBabySpecies4(devolved.Species))
+            return false;
 
-        IEncounterable? deferred = null;
-        IEncounterable? partial = null;
+        result = other with { Species = devolved.Species, Form = devolved.Form };
+        return true;
+    }
 
-        foreach (var z in GetValidStaticEncounter(pk, chain, game))
-        {
-            var match = z.GetMatchRating(pk);
-            switch (match)
-            {
-                case Match: yield return z; ++ctr; break;
-                case Deferred: deferred ??= z; break;
-                case PartialMatch: partial ??= z; break;
-            }
-        }
-        if (ctr != 0) yield break;
+    private static GameVersion GetOtherGamePair(GameVersion version)
+    {
+        // 30 -> 32 (SN -> US)
+        // 31 -> 33 (MN -> UM)
+        // 32 -> 30 (US -> SN)
+        // 33 -> 31 (UM -> MN)
+        // ReSharper disable once BitwiseOperatorOnEnumWithoutFlags
+        return version ^ (GameVersion)0b111110;
+    }
 
-        foreach (var z in GetValidWildEncounters(pk, chain, game))
-        {
-            var match = z.GetMatchRating(pk);
-            switch (match)
-            {
-                case Match: yield return z; ++ctr; break;
-                case Deferred: deferred ??= z; break;
-                case PartialMatch: partial ??= z; break;
-            }
-        }
-        if (ctr != 0) yield break;
+    private static EncounterEgg CreateEggEncounter(ushort species, byte form, GameVersion version)
+    {
+        if (FormInfo.IsBattleOnlyForm(species, form, Generation) || species is (int)Species.Rotom or (int)Species.Castform)
+            form = FormInfo.GetOutOfBattleForm(species, form, Generation);
+        return new EncounterEgg(species, form, EggLevel, Generation, version, Context);
+    }
 
-        foreach (var z in GetValidEncounterTrades(pk, chain, game))
-        {
-            var match = z.GetMatchRating(pk);
-            switch (match)
-            {
-                case Match: yield return z; break;
-                case Deferred: deferred ??= z; break;
-                case PartialMatch: partial ??= z; break;
-            }
-            //++ctr;
-        }
-
-        if (deferred != null)
-            yield return deferred;
-
-        if (partial != null)
-            yield return partial;
+    private static (ushort Species, byte Form) GetBaby(EvoCriteria lowest)
+    {
+        return EvolutionTree.Evolves7.GetBaseSpeciesForm(lowest.Species, lowest.Form);
     }
 }

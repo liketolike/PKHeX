@@ -1,63 +1,22 @@
 using System.Collections.Generic;
 
-using static PKHeX.Core.MysteryGiftGenerator;
-using static PKHeX.Core.EncounterSlotGenerator;
-using static PKHeX.Core.EncounterStaticGenerator;
-using static PKHeX.Core.EncounterMatchRating;
-
 namespace PKHeX.Core;
 
-internal static class EncounterGenerator8a
+public sealed class EncounterGenerator8a : IEncounterGenerator
 {
-    public static IEnumerable<IEncounterable> GetEncounters(PKM pk, EvoCriteria[] chain)
+    public static readonly EncounterGenerator8a Instance = new();
+
+    public IEnumerable<IEncounterable> GetPossible(PKM _, EvoCriteria[] chain, GameVersion __, EncounterTypeGroup groups)
     {
-        if (pk is PK8 { SWSH: false })
-            yield break;
-        if (pk.IsEgg)
-            yield break;
+        var iterator = new EncounterPossible8a(chain, groups);
+        foreach (var enc in iterator)
+            yield return enc;
+    }
 
-        int ctr = 0;
-        if (pk.FatefulEncounter)
-        {
-            foreach (var z in GetValidGifts(pk, chain, GameVersion.PLA))
-            { yield return z; ++ctr; }
-            if (ctr != 0) yield break;
-        }
-
-        IEncounterable? cache = null;
-        EncounterMatchRating rating = MaxNotMatch;
-
-        // Static Encounters can collide with wild encounters (close match); don't break if a Static Encounter is yielded.
-        var encs = GetValidStaticEncounter(pk, chain, GameVersion.PLA);
-        foreach (var z in encs)
-        {
-            var match = z.GetMatchRating(pk);
-            if (match == Match)
-            {
-                yield return z;
-            }
-            else if (match < rating)
-            {
-                cache = z;
-                rating = match;
-            }
-        }
-
-        foreach (var z in GetValidWildEncounters(pk, chain, GameVersion.PLA))
-        {
-            var match = z.GetMatchRating(pk);
-            if (match == Match)
-            {
-                yield return z;
-            }
-            else if (match < rating)
-            {
-                cache = z;
-                rating = match;
-            }
-        }
-
-        if (cache != null)
-            yield return cache;
+    public IEnumerable<IEncounterable> GetEncounters(PKM pk, EvoCriteria[] chain, LegalInfo info)
+    {
+        var iterator = new EncounterEnumerator8a(pk, chain);
+        foreach (var enc in iterator)
+            yield return enc.Encounter;
     }
 }

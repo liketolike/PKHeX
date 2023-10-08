@@ -19,7 +19,7 @@ public static class ShowdownParsing
     /// <param name="species">Species ID the form belongs to</param>
     /// <param name="context">Format the form name should appear in</param>
     /// <returns>Zero (base form) if no form matches the input string.</returns>
-    public static byte GetFormFromString(string name, GameStrings strings, ushort species, EntityContext context)
+    public static byte GetFormFromString(ReadOnlySpan<char> name, GameStrings strings, ushort species, EntityContext context)
     {
         if (name.Length == 0)
             return 0;
@@ -28,17 +28,34 @@ public static class ShowdownParsing
         if (forms.Length < 1)
             return 0;
 
-        // Find first matching index that matches any case.
+        // Find first matching index that matches any case, ignoring dashes interchanged with spaces.
         for (byte i = 0; i < forms.Length; i++)
         {
-            var form = forms[i];
-            var index = form.IndexOf(name, StringComparison.OrdinalIgnoreCase);
-            if (index != -1)
+            if (IsFormEquivalent(forms[i], name))
                 return i;
         }
 
         // No match, assume default 0 form.
         return 0;
+    }
+
+    private static bool IsFormEquivalent(ReadOnlySpan<char> reference, ReadOnlySpan<char> input)
+    {
+        if (input.Length != reference.Length)
+            return false;
+
+        for (int i = 0; i < input.Length; i++)
+        {
+            var c1 = input[i];
+            var c2 = reference[i];
+            if (char.ToUpperInvariant(c1) == char.ToUpperInvariant(c2))
+                continue;
+            if (c1 is ' ' or '-' && c2 is ' ' or '-')
+                continue;
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -77,19 +94,20 @@ public static class ShowdownParsing
 
         return species switch
         {
-            (int)Basculin when form is "Blue"         => "Blue-Striped",
-            (int)Vivillon when form is "Poké Ball"    => "Pokeball",
-            (int)Zygarde                              => form.Replace("-C", string.Empty).Replace("50%", string.Empty),
+            (int)Basculin when form is "Blue"           => "Blue-Striped",
+            (int)Vivillon when form is "Poké Ball"      => "Pokeball",
+            (int)Zygarde                                => form.Replace("-C", string.Empty).Replace("50%", string.Empty),
             (int)Minior   when form.StartsWith("M-", StringComparison.OrdinalIgnoreCase)  => MiniorFormName,
-            (int)Minior                               => form.Replace("C-", string.Empty),
-            (int)Necrozma when form is "Dusk"         => $"{form}-Mane",
-            (int)Necrozma when form is "Dawn"         => $"{form}-Wings",
-            (int)Polteageist or (int)Sinistea         => form == "Antique" ? form : string.Empty,
+            (int)Minior                                 => form.Replace("C-", string.Empty),
+            (int)Necrozma when form is "Dusk"           => $"{form}-Mane",
+            (int)Necrozma when form is "Dawn"           => $"{form}-Wings",
+            (int)Polteageist or (int)Sinistea           => form == "Antique" ? form : string.Empty,
+            (int)Maushold when form is "Family of Four" => "Four",
 
-            (int)Furfrou or (int)Greninja or (int)Rockruff => string.Empty,
+            (int)Greninja or (int)Rockruff or (int)Koraidon or (int)Miraidon => string.Empty,
 
-            _ => Legal.Totem_USUM.Contains(species) && form == "Large"
-                ? Legal.Totem_Alolan.Contains(species) && species != (int)Mimikyu ? "Alola-Totem" : "Totem"
+            _ => FormInfo.HasTotemForm(species) && form == "Large"
+                ? species is (int)Raticate or (int)Marowak ? "Alola-Totem" : "Totem"
                 : form.Replace(' ', '-'),
         };
     }
@@ -107,20 +125,21 @@ public static class ShowdownParsing
 
         return species switch
         {
-            (int)Basculin   when form == "Blue-Striped" => "Blue",
-            (int)Vivillon   when form == "Pokeball"     => "Poké Ball",
-            (int)Necrozma   when form == "Dusk-Mane"    => "Dusk",
-            (int)Necrozma   when form == "Dawn-Wings"   => "Dawn",
-            (int)Toxtricity when form == "Low-Key"      => "Low Key",
-            (int)Darmanitan when form == "Galar-Zen"    => "Galar Zen",
-            (int)Minior     when form != MiniorFormName => $"C-{form}",
-            (int)Zygarde    when form == "Complete"     => form,
+            (int)Basculin   when form is "Blue-Striped" => "Blue",
+            (int)Vivillon   when form is "Pokeball"     => "Poké Ball",
+            (int)Necrozma   when form is "Dusk-Mane"    => "Dusk",
+            (int)Necrozma   when form is "Dawn-Wings"   => "Dawn",
+            (int)Toxtricity when form is "Low-Key"      => "Low Key",
+            (int)Darmanitan when form is "Galar-Zen"    => "Galar Zen",
+            (int)Minior     when form is not MiniorFormName => $"C-{form}",
+            (int)Zygarde    when form is "Complete"     => form,
             (int)Zygarde    when ability == 211         => $"{(string.IsNullOrWhiteSpace(form) ? "50%" : "10%")}-C",
             (int)Greninja   when ability == 210         => "Ash", // Battle Bond
             (int)Rockruff   when ability == 020         => "Dusk", // Rockruff-1
+            (int)Maushold   when form is "Four"         => "Family of Four",
             (int)Urshifu or (int)Pikachu or (int)Alcremie => form.Replace('-', ' '), // Strike and Cosplay
 
-            _ => Legal.Totem_USUM.Contains(species) && form.EndsWith("Totem", StringComparison.OrdinalIgnoreCase) ? "Large" : form,
+            _ => FormInfo.HasTotemForm(species) && form.EndsWith("Totem", StringComparison.OrdinalIgnoreCase) ? "Large" : form,
         };
     }
 
@@ -148,6 +167,63 @@ public static class ShowdownParsing
         }
         if (setLines.Count != 0)
             yield return new ShowdownSet(setLines);
+    }
+
+    /// <inheritdoc cref="GetShowdownSets(IEnumerable{string})"/>
+    public static IEnumerable<ShowdownSet> GetShowdownSets(ReadOnlyMemory<char> text)
+    {
+        int start = 0;
+        do
+        {
+            var span = text.Span;
+            var slice = span[start..];
+            var set = GetShowdownSet(slice, out int length);
+            if (set.Species == 0)
+                break;
+            yield return set;
+            start += length;
+        }
+        while (start < text.Length);
+    }
+
+    /// <inheritdoc cref="GetShowdownSets(ReadOnlyMemory{char})"/>
+    public static IEnumerable<ShowdownSet> GetShowdownSets(string text) => GetShowdownSets(text.AsMemory());
+
+    private static int GetLength(ReadOnlySpan<char> text)
+    {
+        // Find the end of the Showdown Set lines.
+        // The end is implied when:
+        // - we see a completely whitespace or empty line, or
+        // - we witness four 'move' definition lines.
+        int length = 0;
+        int moveCount = 4;
+
+        while (true)
+        {
+            var newline = text.IndexOf('\n');
+            if (newline == -1)
+                return length + text.Length;
+
+            var slice = text[..newline];
+            var used = newline + 1;
+            length += used;
+
+            if (slice.IsEmpty || slice.IsWhiteSpace())
+                return length;
+            if (slice.TrimStart()[0] is '-' or '–' && --moveCount == 0)
+                return length;
+            text = text[used..];
+        }
+    }
+
+    public static ShowdownSet GetShowdownSet(ReadOnlySpan<char> text, out int length)
+    {
+        length = GetLength(text);
+        var slice = text[..length];
+        var set = new ShowdownSet(slice);
+        while (length < text.Length && text[length] is '\r' or '\n' or ' ')
+            length++;
+        return set;
     }
 
     /// <summary>
@@ -207,8 +283,7 @@ public static class ShowdownParsing
     public static string GetLocalizedPreviewText(PKM pk, string language)
     {
         var set = new ShowdownSet(pk);
-        if (pk.Format <= 2) // Nature preview from IVs
-            set.Nature = Experience.GetNatureVC(pk.EXP);
+        set.InterpretAsPreview(pk);
         return set.LocalizedText(language);
     }
 }
